@@ -10,6 +10,7 @@
     <span class="service-uptime" title="Durée depuis le démarrage de l’application, commune à tous les navigateurs">
         En service depuis <span class="uptime-value">@FormatElapsed(Uptime.Elapsed)</span>
     </span>
+    <span class="service-clock" title="Date et heure locales du serveur">@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")</span>
 </div>
 
 @code {
