@@ -22,7 +22,7 @@
 
 .simulation .service-mode-dot { background: var(--orange); }
 .service-uptime { white-space: nowrap; }
-.uptime-value { font-variant-numeric: tabular-nums; }
+.uptime-value { color: var(--green); font-variant-numeric: tabular-nums; }
 .service-clock { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 600px) {

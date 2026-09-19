@@ -30,7 +30,7 @@
     }
 
     private static string FormatElapsed(TimeSpan elapsed) =>
-        (elapsed.Days > 0 ? $"{elapsed.Days} j " : "") + elapsed.ToString(@"hh\:mm\:ss");
+        (elapsed.Days > 0 ? $"{elapsed.Days} jour{(elapsed.Days > 1 ? "s" : "")} " : "") + elapsed.ToString(@"hh\:mm\:ss");
 
     public async ValueTask DisposeAsync()
     {
