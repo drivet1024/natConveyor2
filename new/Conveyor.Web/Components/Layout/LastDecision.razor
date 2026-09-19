@@ -1,0 +1,41 @@
+<section class="parcel-panel" aria-label="Dernière décision">
+    <div class="parcel-heading">
+        <span>DERNIÈRE DÉCISION</span>
+        @if (Decision is null) { <span class="demo-badge">DÉMONSTRATION</span> }
+    </div>
+    <div class="parcel-main">
+        <div class="barcode-block">
+            <span class="read-status">@(string.IsNullOrWhiteSpace(Current.Barcode) ? "SANS LECTURE" : "CODE-BARRES LU")</span>
+            <strong class="barcode-value">@(string.IsNullOrWhiteSpace(Current.Barcode) ? "Non lu" : Current.Barcode)</strong>
+        </div>
+        <div class="chute-block"><small>CHUTE</small><strong>@Current.Chute</strong></div>
+    </div>
+    <div class="parcel-details">
+        <div><small>CODE POSTAL DEST.</small><strong>@(string.IsNullOrWhiteSpace(Current.DestinationPostalCode) ? "—" : Current.DestinationPostalCode)</strong></div>
+        <div><small>ROUTE</small><strong>@(Current.RouteId?.ToString() ?? "—")</strong></div>
+        <div class="code98-detail"><small>CODE 98 · COLIS</small>
+            <span class="parcel-code98 @Code98Css" title="@Code98Title" aria-label="@Code98Title">98</span>
+        </div>
+    </div>
+    <div class="parcel-measures">@Current.Weight.ToString("0.##") lb · @Current.Dimension.Length × @Current.Dimension.Width × @Current.Dimension.Height</div>
+    <div class="parcel-reason">@Current.Reason</div>
+    @if (Decision is null) { <div class="demo-note">Aperçu visuel — remplacé dès le premier colis traité.</div> }
+</section>
+
+@code {
+    [Parameter] public SortDecision? Decision { get; set; }
+    [Parameter] public int LineId { get; set; }
+    private SortDecision Current => Decision ?? (LineId == 0 ? DemoEnabled : DemoDisabled);
+    private static readonly SortDecision DemoEnabled = new("12345678901", "", 4, 4,
+        "Route de l’expédition", new Dimension(12.4m, 8.1m, 5.2m), 4.75m, DateTimeOffset.MinValue,
+        "H2X 1Y4", 10, false);
+    private static readonly SortDecision DemoDisabled = DemoEnabled with
+        { Barcode = "98765432101", Chute = 7, PlcChute = 7, DestinationPostalCode = "G1K 3X2", RouteId = 24, DisableCode98 = true };
+    private string Code98Css => Current.DisableCode98 switch { true => "disabled", false => "enabled", null => "unknown" };
+    private string Code98Title => Current.DisableCode98 switch
+    {
+        true => "Code 98 désactivé pour ce colis (disable_code98 = 1)",
+        false => "Code 98 autorisé pour ce colis (disable_code98 = NULL ou 0)",
+        null => "État code 98 inconnu : aucune expédition unique identifiée"
+    };
+}

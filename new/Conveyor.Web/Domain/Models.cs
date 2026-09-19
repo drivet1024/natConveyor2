@@ -8,7 +8,7 @@ public sealed record Dimension(decimal Length, decimal Width, decimal Height, in
 }
 
 public sealed record TimedValue<T>(T Value, DateTimeOffset Timestamp);
-public sealed record Shipment(string ShippingId, int CustomerId, int RouteId, bool DisableCode98);
+public sealed record Shipment(string ShippingId, int CustomerId, int RouteId, bool DisableCode98, string? DestinationPostalCode = null);
 
 public sealed record ParcelContext(
     string CameraData,
@@ -26,7 +26,10 @@ public sealed record SortDecision(
     string Reason,
     Dimension Dimension,
     decimal Weight,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    string? DestinationPostalCode = null,
+    int? RouteId = null,
+    bool? DisableCode98 = null);
 
 public sealed class LineCounters
 {

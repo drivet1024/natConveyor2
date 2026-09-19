@@ -1,0 +1,21 @@
+.parcel-panel { padding: 1rem 1.35rem; border-bottom: 1px solid var(--line); }
+.parcel-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--orange); font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
+.demo-badge { padding: .2rem .4rem; border: 1px dashed var(--orange); border-radius: 3px; font-size: .6rem; }
+.parcel-main { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .85rem; }
+.barcode-block { min-width: 0; }
+.read-status { display: block; font-size: .65rem; color: var(--muted); letter-spacing: .08em; }
+.barcode-value { display: block; margin-top: .2rem; font-family: Consolas, monospace; font-size: clamp(1.4rem, 2.4vw, 2rem); line-height: 1.2; letter-spacing: .04em; color: var(--ink); overflow-wrap: anywhere; }
+.chute-block { flex-shrink: 0; text-align: center; }
+.chute-block small { display: block; color: var(--muted); font-size: .6rem; margin-bottom: .2rem; }
+.chute-block strong { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 .4rem; border-radius: 5px; background: var(--orange); color: #111; font-size: 1.4rem; }
+.parcel-details { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto; gap: .75rem; margin: 1rem 0 .75rem; }
+.parcel-details small { display: block; color: var(--muted); font-size: .6rem; letter-spacing: .06em; margin-bottom: .3rem; }
+.parcel-details strong { font-size: 1.05rem; overflow-wrap: anywhere; }
+.code98-detail { text-align: right; }
+.parcel-code98 { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid; border-radius: 4px; font-size: .9rem; font-weight: 800; }
+.parcel-code98.enabled { color: var(--green); background: #49d17d18; }
+.parcel-code98.disabled { color: var(--red); background: #ff5f6318; }
+.parcel-code98.unknown { color: var(--muted); }
+.parcel-measures, .parcel-reason, .demo-note { font-size: .72rem; color: var(--muted); }
+.parcel-reason { margin-top: .25rem; }
+.demo-note { margin-top: .6rem; font-style: italic; }

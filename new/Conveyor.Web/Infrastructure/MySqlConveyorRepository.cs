@@ -24,7 +24,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         await connection.OpenAsync(cancellationToken);
 
         const string byCustomer = """
-            select shipping_id, customer_id, route_id, disable_code98
+            select shipping_id, customer_id, route_id, disable_code98, dest_postal_code
             from conveyor_shipment where customer_barcode = @barcode limit 1
             """;
         var result = await QueryShipmentAsync(connection, byCustomer, barcode, cancellationToken);
@@ -32,7 +32,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
 
         if (!long.TryParse(barcode, out _) || barcode.Length <= 10) return null;
         const string byShipping = """
-            select shipping_id, customer_id, route_id, disable_code98
+            select shipping_id, customer_id, route_id, disable_code98, dest_postal_code
             from conveyor_shipment
             where shipping_id = @shippingId
                or (reference_no = @reference and customer_id = 129326)
@@ -56,7 +56,9 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         await using var reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return null;
         return new Shipment(reader.GetString("shipping_id"), reader.GetInt32("customer_id"),
-            reader.GetInt32("route_id"), reader.GetBoolean("disable_code98"));
+            reader.GetInt32("route_id"),
+            !reader.IsDBNull(reader.GetOrdinal("disable_code98")) && reader.GetBoolean("disable_code98"),
+            reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : reader.GetString("dest_postal_code"));
     }
 
     public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) =>

@@ -7,6 +7,31 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Decision_contains_shipment_metadata_not_camera_postal_code(bool disabled)
+    {
+        var engine = new SortEngine(new FakeRepository { Disable98 = disabled }, NullLogger<SortEngine>.Instance);
+        var result = await engine.DecideAsync(Line(), Parcel("12345678901,H2X1Y4,99999999999"), CancellationToken.None);
+        Assert.Equal("12345678901", result.Barcode);
+        Assert.Equal("G1K 3X2", result.DestinationPostalCode);
+        Assert.Equal(10, result.RouteId);
+        Assert.Equal(disabled, result.DisableCode98);
+    }
+
+    [Theory]
+    [InlineData("99999999999,H2X1Y4")]
+    [InlineData("12345678901,12345678902")]
+    public async Task Missing_or_ambiguous_shipment_does_not_display_invented_metadata(string camera)
+    {
+        var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
+        var result = await engine.DecideAsync(Line(), Parcel(camera), CancellationToken.None);
+        Assert.Null(result.DestinationPostalCode);
+        Assert.Null(result.RouteId);
+        Assert.Null(result.DisableCode98);
+    }
+
     [Fact]
     public async Task Database_counter_reads_current_history_total_including_decreases()
     {
@@ -118,9 +143,10 @@ public sealed class SortEngineTests
     {
         public long ScanCount { get; set; }
         public bool FailCounts { get; set; }
+        public bool Disable98 { get; set; }
         public bool IsSimulation => true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
-            barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, false) : null);
+            barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null);
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult<int?>(4);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);

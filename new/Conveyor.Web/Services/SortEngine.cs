@@ -21,6 +21,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         var reason = "Expédition introuvable";
         var barcode = "";
         var goodBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Shipment? matchedShipment = null;
 
         if (parcel.CameraData.Contains('?'))
         {
@@ -34,11 +35,12 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             var shipment = await repository.FindShipmentAsync(candidate, token);
             if (shipment is null)
             {
-                if (candidate.Length is 11 or 12) barcode = candidate;
+                if (goodBarcodes.Count == 0 && candidate.Length is 11 or 12) barcode = candidate;
                 continue;
             }
 
             barcode = shipment.CustomerId == 129326 ? shipment.ShippingId + "01" : candidate;
+            matchedShipment = shipment;
             if (barcode.Length >= 11) barcode = barcode[..11];
             goodBarcodes.Add(barcode);
             var configuredChute = await repository.FindChuteForRouteAsync(line.ShiftId, shipment.RouteId, token);
@@ -101,7 +103,10 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         var plcChute = chute == 99 ? line.RejectedChute : chute;
         logger.LogInformation("Ligne {Line}: {Barcode} -> chute {Chute} ({Reason})", line.Id, barcode, chute, reason);
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
-            parcel.Dimension, parcel.Weight, parcel.CameraTimestamp);
+            parcel.Dimension, parcel.Weight, parcel.CameraTimestamp,
+            goodBarcodes.Count == 1 ? matchedShipment?.DestinationPostalCode : null,
+            goodBarcodes.Count == 1 ? matchedShipment?.RouteId : null,
+            goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null);
     }
 
     private static string RenameBentley(string value) =>

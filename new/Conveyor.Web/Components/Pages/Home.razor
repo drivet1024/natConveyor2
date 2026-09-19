@@ -26,11 +26,7 @@
         <div class="line-title"><div><span class="line-number">LIGNE @(line.LineId + 1)</span><h2>@line.Name</h2></div><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
         <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
-        <div class="last-sort">
-            <span>DERNIÈRE DÉCISION</span>
-            @if (line.LastDecision is null) { <p class="empty">Aucun colis traité</p> }
-            else { <div class="decision-row"><strong class="chute">@line.LastDecision.Chute</strong><div><b>@(string.IsNullOrEmpty(line.LastDecision.Barcode) ? "Code inconnu" : line.LastDecision.Barcode)</b><small>@line.LastDecision.Reason · @line.LastDecision.Weight.ToString("0.##") lb · @line.LastDecision.Dimension.Length×@line.LastDecision.Dimension.Width×@line.LastDecision.Dimension.Height</small></div></div> }
-        </div>
+        <LastDecision Decision="line.LastDecision" LineId="line.LineId" />
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
         <div class="actions">
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
