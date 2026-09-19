@@ -1,0 +1,26 @@
+<section class="device-feed" aria-label="Réception des appareils">
+    <div class="feed-heading"><strong>RÉCEPTION EN DIRECT</strong><span>@(Line.Connections.Simulated ? "DONNÉES SIMULÉES" : "DERNIÈRES TRAMES REÇUES")</span></div>
+    @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera)
+    @DeviceRow("DIMENSIONNEUR", Line.DimensionInput, Line.Connections.Dimensioner)
+    @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale)
+</section>
+
+@code {
+    [Parameter, EditorRequired] public LineSnapshot Line { get; set; } = default!;
+    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected) => @<div class="feed-row">
+        <div class="feed-label"><strong>@name</strong><small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small></div>
+        <div class="feed-payload">
+            @if (input is null) { <span class="feed-empty">Aucune trame reçue</span> }
+            else
+            {
+                <code>@Visible(input.Raw)@(input.Truncated ? " … [tronquée]" : "")</code>
+                <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff") · trame @input.Sequence</span>
+            }
+        </div>
+    </div>;
+    private static string Visible(string raw) => string.Concat(raw.Select(character => character switch
+    {
+        '\r' => "⟨CR⟩", '\n' => "⟨LF⟩", '\u0002' => "⟨STX⟩", '\u0003' => "⟨ETX⟩",
+        '\t' => "⟨TAB⟩", _ => char.IsControl(character) ? $"⟨0x{(int)character:X2}⟩" : character.ToString()
+    }));
+}

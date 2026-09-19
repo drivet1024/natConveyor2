@@ -1,0 +1,14 @@
+.device-feed { margin: .8rem 1.1rem; border: 1px solid #52616c; border-radius: 6px; background: #0b1116; overflow: hidden; }
+.feed-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .4rem; padding: .55rem .7rem; border-bottom: 1px solid var(--line); }
+.feed-heading strong { color: var(--green); font-size: .65rem; letter-spacing: .1em; }
+.feed-heading > span { color: var(--muted); font-size: .55rem; }
+.feed-row { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: .65rem; padding: .55rem .7rem; }
+.feed-row + .feed-row { border-top: 1px solid var(--line); }
+.feed-label strong { display: block; font-size: .61rem; color: var(--ink); }
+.feed-label small, .feed-empty { color: var(--muted); font-size: .65rem; }
+.feed-payload code { display: block; color: #e8edf2; font-size: .82rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5rem; overflow-y: auto; }
+.feed-time { display: flex; align-items: center; gap: .3rem; margin-top: .2rem; color: var(--muted); font-size: .6rem; font-variant-numeric: tabular-nums; }
+.receive-pulse { width: 5px; height: 5px; border-radius: 50%; background: #52616c; animation: received .7s ease-out; }
+@keyframes received { from { background: var(--green); box-shadow: 0 0 6px var(--green); } to { background: #52616c; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .receive-pulse { animation: none; } }
+@media (max-width: 400px) { .feed-row { grid-template-columns: 85px minmax(0, 1fr); } }

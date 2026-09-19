@@ -28,6 +28,26 @@ internal sealed class LineController
     private TimedValue<Dimension>? _lastDimension;
     private TimedValue<decimal>? _lastWeight;
     private SortDecision? _lastDecision;
+    private DeviceReception? _cameraInput;
+    private DeviceReception? _dimensionInput;
+    private DeviceReception? _scaleInput;
+
+    private void RecordReception(string device, string frame)
+    {
+        lock (_gate)
+        {
+            var previous = device switch { "camera" => _cameraInput, "dimension" => _dimensionInput, _ => _scaleInput };
+            var input = new DeviceReception(frame.Length > 4096 ? frame[..4096] : frame,
+                DateTimeOffset.Now, (previous?.Sequence ?? 0) + 1, frame.Length > 4096);
+            switch (device)
+            {
+                case "camera": _cameraInput = input; break;
+                case "dimension": _dimensionInput = input; break;
+                default: _scaleInput = input; break;
+            }
+        }
+        _changed();
+    }
     private LineCounters _counters = new();
     private string? _lastError;
     private bool _databaseConnected;
@@ -84,32 +104,32 @@ internal sealed class LineController
             ];
             if (_options.CameraConnectMode)
             {
-                _cameraClient = new(_options.CameraHost, _options.CameraPort, "\r", _logger, _changed, "Caméra");
+                _cameraClient = new(_options.CameraHost, _options.CameraPort, "\r", _logger, _changed, "Caméra", frame => RecordReception("camera", frame));
                 _tasks.Add(_cameraClient.RunAsync(camera.Writer, token));
             }
             else
             {
-                _cameraReceiver = new(_options.CameraPort, "\r", _logger, _changed, "Caméra");
+                _cameraReceiver = new(_options.CameraPort, "\r", _logger, _changed, "Caméra", frame => RecordReception("camera", frame));
                 _tasks.Add(_cameraReceiver.RunAsync(camera.Writer, token));
             }
             if (_options.ScaleConnectMode)
             {
-                _scaleClient = new(_options.ScaleHost, _options.ScalePort, "\r\n", _logger, _changed, "Balance");
+                _scaleClient = new(_options.ScaleHost, _options.ScalePort, "\r\n", _logger, _changed, "Balance", frame => RecordReception("scale", frame));
                 _tasks.Add(_scaleClient.RunAsync(scale.Writer, token));
             }
             else
             {
-                _scaleReceiver = new(_options.ScalePort, "\r\n", _logger, _changed, "Balance");
+                _scaleReceiver = new(_options.ScalePort, "\r\n", _logger, _changed, "Balance", frame => RecordReception("scale", frame));
                 _tasks.Add(_scaleReceiver.RunAsync(scale.Writer, token));
             }
             if (_options.DimensionConnectMode)
             {
-                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur");
+                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", frame => RecordReception("dimension", frame));
                 _tasks.Add(_dimensionClient.RunAsync(dimension.Writer, token));
             }
             else
             {
-                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur");
+                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", frame => RecordReception("dimension", frame));
                 _tasks.Add(_dimensionReceiver.RunAsync(dimension.Writer, token));
             }
         }
@@ -160,6 +180,9 @@ internal sealed class LineController
             _counters.DimensionReads++;
             _counters.ScaleReads++;
         }
+        RecordReception("camera", cameraData);
+        RecordReception("dimension", $"{dimension.Length} × {dimension.Width} × {dimension.Height}");
+        RecordReception("scale", weight.ToString(System.Globalization.CultureInfo.InvariantCulture));
         await HandleCameraAsync(cameraData, now, _stopping!.Token);
     }
 
@@ -276,7 +299,7 @@ internal sealed class LineController
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
                     _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
-            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight);
+            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput);
         }
     }
 }

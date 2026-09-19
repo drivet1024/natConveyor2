@@ -6,7 +6,7 @@ using System.Threading.Channels;
 namespace Conveyor.Web.Infrastructure;
 
 public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
-    Action? connectionChanged = null, string deviceName = "Appareil TCP")
+    Action? connectionChanged = null, string deviceName = "Appareil TCP", Action<string>? frameReceived = null)
 {
     private TcpListener? _listener;
     private volatile bool _connected;
@@ -48,7 +48,7 @@ public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
         finally { _listener.Stop(); SetConnected(false); output.TryComplete(); }
     }
 
-    private static async Task ReadClientAsync(TcpClient client, ChannelWriter<string> output, string delimiter, CancellationToken token)
+    private async Task ReadClientAsync(TcpClient client, ChannelWriter<string> output, string delimiter, CancellationToken token)
     {
         await using var stream = client.GetStream();
         var buffer = new byte[1024];
@@ -63,6 +63,7 @@ public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
                 var text = pending.ToString();
                 var end = text.IndexOf(delimiter, StringComparison.Ordinal);
                 if (end < 0) break;
+                frameReceived?.Invoke(text[..(end + delimiter.Length)]);
                 var frame = text[..end].Trim('\u0002', '\u0003', '\r', '\n');
                 pending.Remove(0, end + delimiter.Length);
                 if (!string.IsNullOrWhiteSpace(frame)) await output.WriteAsync(frame, token);

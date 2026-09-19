@@ -49,6 +49,8 @@ public sealed class LineCounters
 
 public sealed record ConnectionState(bool Camera, bool Dimensioner, bool Scale, bool Database, bool Plc, bool Simulated = false, bool DatabaseSimulated = false);
 
+public sealed record DeviceReception(string Raw, DateTimeOffset ReceivedAt, long Sequence, bool Truncated = false);
+
 public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false);
 
 public sealed record LineSnapshot(
@@ -60,4 +62,7 @@ public sealed record LineSnapshot(
     SortDecision? LastDecision,
     string? LastError,
     DateTimeOffset UpdatedAt,
-    bool Code98Enabled = true);
+    bool Code98Enabled = true,
+    DeviceReception? CameraInput = null,
+    DeviceReception? DimensionInput = null,
+    DeviceReception? ScaleInput = null);

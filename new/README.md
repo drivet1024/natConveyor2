@@ -22,6 +22,17 @@ Ne recopiez pas les mots de passe de l'ancien `App.config` : ils doivent d'abord
 
 ## Flux d'une ligne
 
+Le cadre **Réception en direct**, au-dessus de la dernière décision, affiche la
+dernière trame complète de chaque appareil, l'heure de réception à la milliseconde
+et un numéro de réception. La notification part dès le découpage TCP, avant la
+file de traitement et les accès à la base. Les trames invalides ou vides restent
+visibles, avec leurs caractères de contrôle. L'affichage conserve au maximum
+4 096 caractères par appareil ; le traitement reçoit toujours la trame entière.
+Il affiche la dernière valeur, pas un historique exhaustif de toutes les trames.
+La latence visible dépend de la connexion du navigateur ; aucun délai de
+rafraîchissement périodique n'est ajouté. Le cadre reste vide au démarrage tant
+qu'aucune donnée n'est reçue, même si la dernière décision affiche une démonstration.
+
 Les réglages **Tri et validation** de la page Configuration sont globaux aux deux
 lignes et enregistrés sous `Conveyor:Sorting`. Ils sont appliqués aux deux lignes
 au démarrage. Pour une ancienne configuration sans cette section, les valeurs
