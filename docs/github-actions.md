@@ -132,3 +132,5 @@ exécution déclenchée par le push : relancer un ancien job réutilise son anci
 
 Références : [transfert d'artefacts entre jobs](https://docs.github.com/en/actions/tutorials/store-and-share-data),
 [téléchargement d'artefacts](https://github.com/actions/download-artifact).
+
+Le numéro affiché à côté de CENTRE DE CONTRÔLE est intégré à la compilation. Sur GitHub Actions, `V` est suivi du numéro d’exécution du workflow, incrémenté à chaque nouvelle exécution. Compilation, tests et publication d’une même exécution conservent le même numéro, y compris sur les deux serveurs. Une relance de la même exécution conserve ce numéro. En local, chaque compilation incrémente un compteur `.build-version` exclu de Git (première compilation : V2).

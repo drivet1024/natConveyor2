@@ -12,4 +12,20 @@
     <PackageReference Include="Specshell.NDde" Version="4.0.0" />
   </ItemGroup>
 
+  <Target Name="SetConveyorBuildVersion" BeforeTargets="GetAssemblyVersion" Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <ConveyorVersionFile>$(MSBuildProjectDirectory)/.build-version</ConveyorVersionFile>
+      <ConveyorBuildNumber Condition="'$(GITHUB_RUN_NUMBER)' != ''">$(GITHUB_RUN_NUMBER)</ConveyorBuildNumber>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(ConveyorVersionFile)" Condition="'$(ConveyorBuildNumber)' == '' and Exists('$(ConveyorVersionFile)')">
+      <Output TaskParameter="Lines" PropertyName="PreviousConveyorBuildNumber" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <PreviousConveyorBuildNumber Condition="'$(PreviousConveyorBuildNumber)' == ''">1</PreviousConveyorBuildNumber>
+      <ConveyorBuildNumber Condition="'$(ConveyorBuildNumber)' == ''">$([MSBuild]::Add($(PreviousConveyorBuildNumber), 1))</ConveyorBuildNumber>
+      <InformationalVersion>V$(ConveyorBuildNumber)</InformationalVersion>
+      <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(ConveyorVersionFile)" Lines="$(ConveyorBuildNumber)" Overwrite="true" Condition="'$(GITHUB_RUN_NUMBER)' == ''" />
+  </Target>
 </Project>
