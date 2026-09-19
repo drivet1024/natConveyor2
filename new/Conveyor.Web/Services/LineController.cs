@@ -164,6 +164,9 @@ internal sealed class LineController
         {
             _counters = new LineCounters();
             _lastDecision = null;
+            _cameraInput = null;
+            _dimensionInput = null;
+            _scaleInput = null;
         }
         _changed();
     }

@@ -192,8 +192,17 @@ public sealed class SortEngineTests
             await supervisor.SimulateParcelAsync(1, "12345678901", Dimension.Missing, -1);
             Assert.Equal(98, supervisor.GetSnapshots()[1].LastDecision!.Chute);
             Assert.NotNull(supervisor.GetSnapshots()[0].LastDecision);
+            Assert.NotNull(supervisor.GetSnapshots()[0].CameraInput);
+            Assert.NotNull(supervisor.GetSnapshots()[0].DimensionInput);
+            Assert.NotNull(supervisor.GetSnapshots()[0].ScaleInput);
             supervisor.ResetCounters(0);
             Assert.Null(supervisor.GetSnapshots()[0].LastDecision);
+            Assert.Null(supervisor.GetSnapshots()[0].CameraInput);
+            Assert.Null(supervisor.GetSnapshots()[0].DimensionInput);
+            Assert.Null(supervisor.GetSnapshots()[0].ScaleInput);
+            Assert.NotNull(supervisor.GetSnapshots()[1].CameraInput);
+            Assert.NotNull(supervisor.GetSnapshots()[1].DimensionInput);
+            Assert.NotNull(supervisor.GetSnapshots()[1].ScaleInput);
             Assert.Equal(98, supervisor.GetSnapshots()[1].LastDecision!.Chute);
             Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
         }
