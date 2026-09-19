@@ -22,10 +22,10 @@ public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
     public async Task RunAsync(ChannelWriter<string> output, CancellationToken token)
     {
         _listener = new TcpListener(IPAddress.Any, port);
-        _listener.Start();
-        logger.LogInformation("{Device} : écoute TCP démarrée sur le port {Port}", deviceName, port);
         try
         {
+            _listener.Start();
+            logger.LogInformation("{Device} : écoute TCP démarrée sur le port {Port}; en attente de connexion", deviceName, port);
             while (!token.IsCancellationRequested)
             {
                 using var client = await _listener.AcceptTcpClientAsync(token);
@@ -45,6 +45,11 @@ public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SocketException exception)
+        {
+            if (!token.IsCancellationRequested)
+                logger.LogError(exception, "{Device} : impossible d’écouter sur le port {Port} (erreur {SocketError})", deviceName, port, exception.SocketErrorCode);
+        }
         finally { _listener.Stop(); SetConnected(false); output.TryComplete(); }
     }
 

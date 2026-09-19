@@ -2,12 +2,31 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using Conveyor.Web.Infrastructure;
+using Conveyor.Web.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Conveyor.Web.Tests;
 
 public sealed class TcpConnectionStateTests
 {
+    [Fact]
+    public async Task OccupiedServerPortLogsDeviceErrorAndCompletesChannel()
+    {
+        using var listener = new TcpListener(IPAddress.Any, 0);
+        listener.Server.ExclusiveAddressUse = true;
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using var logs = new InMemoryLogStore();
+        var frames = Channel.CreateUnbounded<string>();
+        var receiver = new TcpFrameReceiver(port, "\r", logs.CreateLogger("Test"), deviceName: "Caméra");
+        await receiver.RunAsync(frames.Writer, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(receiver.Connected);
+        Assert.True(frames.Reader.Completion.IsCompletedSuccessfully);
+        Assert.Contains(logs.GetRecent(), entry => entry.Level == LogLevel.Error
+            && entry.Message.Contains("Caméra") && entry.Message.Contains(port.ToString()));
+    }
+
     [Fact]
     public async Task ClientNotifiesBothObserversWithoutFramesAndReconnectsAfterRemoteClose()
     {

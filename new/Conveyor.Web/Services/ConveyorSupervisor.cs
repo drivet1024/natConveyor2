@@ -23,6 +23,9 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>());
+        var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
+        foreach (var line in activeLines.Where(line => !line.Enabled))
+            logger.LogInformation("Ligne {Line} : démarrage automatique désactivé; appareils non connectés jusqu’au START", line.Id + 1);
         _autoStartIds = activeLines.Where(line => line.Enabled).Select(line => line.Id).ToHashSet();
         _lines = activeLines.ToDictionary(line => line.Id, line =>
         {

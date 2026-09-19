@@ -19,6 +19,7 @@ public sealed class TcpFrameClient(string host, int port, string delimiter, ILog
 
     public async Task RunAsync(ChannelWriter<string> output, CancellationToken token)
     {
+        logger.LogInformation("{Device} : démarrage TCP en mode client vers {Host}:{Port}; connexion en attente", deviceName, host, port);
         try
         {
             while (!token.IsCancellationRequested)

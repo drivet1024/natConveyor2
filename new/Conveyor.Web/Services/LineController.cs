@@ -75,7 +75,10 @@ internal sealed class LineController
         if (Running) return;
         _stopping = new CancellationTokenSource();
         var token = _stopping.Token;
+        _logger.LogInformation("Ligne {Line} : démarrage en mode {Mode}; vérification MySQL avant les connexions appareils", _options.Id + 1, _simulation ? "simulation" : "production");
         _databaseConnected = await _repository.PingAsync(token);
+        if (_simulation)
+            _logger.LogInformation("Ligne {Line} : mode simulation actif, les connexions aux appareils physiques sont désactivées", _options.Id + 1);
         if (_controlsPlcConnection && connectPlc)
         {
             try
