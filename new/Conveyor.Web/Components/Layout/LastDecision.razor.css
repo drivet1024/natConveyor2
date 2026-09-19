@@ -20,10 +20,10 @@
 .parcel-code98.disabled { color: var(--red); background: #ff5f6318; }
 .parcel-code98.unknown { color: var(--muted); }
 .parcel-reason, .demo-note { font-size: .72rem; color: var(--muted); }
-.parcel-measures { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .1rem; min-height: 44px; padding: .2rem .6rem; border: 1px solid #52616c; border-radius: 5px; background: #0b1116; color: var(--ink); font-size: 1.05rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.parcel-measures { display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: .6rem; white-space: nowrap; min-height: 44px; padding: .2rem .6rem; border: 1px solid #52616c; border-radius: 5px; background: #0b1116; color: var(--ink); font-size: 1.05rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .measure-weight { display: inline-flex; align-items: baseline; gap: .3rem; white-space: nowrap; }
 .measure-weight strong { color: var(--green); }
 .measure-weight small, .measure-dimensions span { color: var(--muted); font-size: .75em; font-weight: 400; }
-.measure-dimensions { white-space: nowrap; }
+.measure-dimensions { white-space: nowrap; border-left: 1px solid var(--line); padding-left: .6rem; }
 .parcel-reason { margin-top: .25rem; }
 .demo-note { margin-top: .6rem; font-style: italic; }
