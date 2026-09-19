@@ -56,10 +56,12 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
     {
         await using var reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return null;
-        return new Shipment(reader.GetString("shipping_id"), reader.GetInt32("customer_id"),
+        // Legacy databases can store shipping_id as INT/BIGINT instead of VARCHAR.
+        // Convert the actual value; GetString requires a text column.
+        return new Shipment(Convert.ToString(reader["shipping_id"], CultureInfo.InvariantCulture)!, reader.GetInt32("customer_id"),
             reader.GetInt32("route_id"),
             !reader.IsDBNull(reader.GetOrdinal("disable_code98")) && reader.GetBoolean("disable_code98"),
-            reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : reader.GetString("dest_postal_code"));
+            reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : Convert.ToString(reader["dest_postal_code"], CultureInfo.InvariantCulture));
     }
 
     public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) =>
