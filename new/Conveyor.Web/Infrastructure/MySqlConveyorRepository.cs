@@ -166,8 +166,8 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         logger.LogInformation("Ligne {Line} : insertion prévue dans {Table}; code-barres {Barcode} ({Length} caractères), chute {Chute}",
             lineId + 1, table, decision.Barcode, decision.Barcode.Length, decision.Chute);
         var sql = validBarcode
-            ? "insert into scan_history(parcel_id,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,1)"
-            : "insert into scan_noWB(camera_data,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,1)";
+            ? "insert into scan_history(parcel_id,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,200)"
+            : "insert into scan_noWB(camera_data,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,200)";
         await using var connection = CreateConnection();
         await connection.OpenAsync(token);
         await using var command = new MySqlCommand(sql, connection);
