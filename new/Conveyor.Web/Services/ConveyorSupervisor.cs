@@ -16,14 +16,15 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         SortEngine sortEngine, ILoggerFactory loggerFactory)
     {
         var configuration = options.Value;
-        var primaryLine = configuration.Lines.OrderBy(line => line.Id).First();
+        var activeLines = configuration.GetConfiguredLines().ToArray();
+        var primaryLine = activeLines.First();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>());
-        _autoStartIds = configuration.Lines.Where(line => line.Enabled).Select(line => line.Id).ToHashSet();
-        _lines = configuration.Lines.ToDictionary(line => line.Id, line =>
+        _autoStartIds = activeLines.Where(line => line.Enabled).Select(line => line.Id).ToHashSet();
+        _lines = activeLines.ToDictionary(line => line.Id, line =>
         {
             return new LineController(line, configuration.Simulation, repository, _plc,
                 line.Id == primaryLine.Id, sortEngine,

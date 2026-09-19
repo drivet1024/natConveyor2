@@ -19,6 +19,13 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     public ConveyorOptions GetEditableCopy()
     {
         var copy = Clone(current.Value);
+        copy.LineCount = current.Value.LineCount;
+        if (copy.Lines.Count == 1)
+            copy.Lines.Add(new LineOptions
+            {
+                Id = copy.Lines[0].Id == 0 ? 1 : 0, Name = "Convoyeur secondaire",
+                CameraPort = 5102, ScalePort = 5100, DimensionPort = 1801
+            });
         copy.ApplyGlobalSorting();
         return copy;
     }
@@ -46,8 +53,10 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     private static void Validate(ConveyorOptions options)
     {
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");
+        if (options.LineCount is < 1 or > 2 || options.LineCount > options.Lines.Count)
+            throw new InvalidOperationException("Choisir une ou deux lignes avec leurs paramètres de connexion.");
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
-        var devices = options.Lines.SelectMany(line => new[]
+        var devices = options.GetConfiguredLines().SelectMany(line => new[]
         {
             (Name: "Caméras", Port: line.CameraPort, Client: line.CameraConnectMode, Host: line.CameraHost, line.Enabled),
             (Name: "Dimensionneur", Port: line.DimensionPort, Client: line.DimensionConnectMode, Host: line.DimensionHost, line.Enabled),

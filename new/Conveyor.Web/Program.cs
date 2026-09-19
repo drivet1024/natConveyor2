@@ -33,8 +33,16 @@ builder.Services.AddOptions<ConveyorOptions>()
     .PostConfigure(options => options.ApplyGlobalSorting())
     .ValidateDataAnnotations()
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
-    .Validate(options => options.Lines.SelectMany(line => new[] { line.CameraPort, line.ScalePort, line.DimensionPort }).Distinct().Count() == options.Lines.Count * 3,
-        "Chaque source TCP doit utiliser un port distinct.")
+    .Validate(options => options.LineCount <= options.Lines.Count, "Paramètres manquants pour le nombre de lignes choisi.")
+    .Validate(options =>
+    {
+        var ports = options.GetConfiguredLines().Where(line => line.Enabled).SelectMany(line => new[]
+        {
+            (line.CameraPort, line.CameraConnectMode), (line.ScalePort, line.ScaleConnectMode),
+            (line.DimensionPort, line.DimensionConnectMode)
+        }).Where(device => !device.Item2).Select(device => device.Item1).ToArray();
+        return ports.Distinct().Count() == ports.Length;
+    }, "Chaque source TCP en mode serveur doit utiliser un port distinct.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton<IConveyorRepository>(services =>

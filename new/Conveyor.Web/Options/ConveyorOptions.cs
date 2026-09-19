@@ -5,10 +5,13 @@ namespace Conveyor.Web.Options;
 public sealed class ConveyorOptions
 {
     public const string SectionName = "Conveyor";
+    private int? _lineCount;
+    [Range(1, 2)] public int LineCount { get => _lineCount ?? Math.Clamp(Lines.Count, 1, 2); set => _lineCount = value; }
     public bool Simulation { get; set; } = true;
     public DatabaseOptions Database { get; set; } = new();
     public SortingOptions? Sorting { get; set; }
     [MinLength(1), MaxLength(2)] public List<LineOptions> Lines { get; set; } = [];
+    public IEnumerable<LineOptions> GetConfiguredLines() => Lines.OrderBy(line => line.Id).Take(LineCount);
 
     public void ApplyGlobalSorting()
     {

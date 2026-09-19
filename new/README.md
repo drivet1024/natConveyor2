@@ -22,6 +22,13 @@ Ne recopiez pas les mots de passe de l'ancien `App.config` : ils doivent d'abord
 
 ## Flux d'une ligne
 
+Dans **Configuration → Général**, **Nombre de lignes utilisées** permet de choisir
+une ou deux lignes (`Conveyor:LineCount`). Utiliser **Enregistrer et redémarrer**
+pour appliquer le choix. Avec une ligne, seule la première est affichée et ses
+connexions peuvent démarrer ; les paramètres de la seconde restent enregistrés.
+Le choix **Activée au démarrage** reste indépendant pour chaque ligne utilisée.
+Les anciennes configurations gardent leur nombre de lignes jusqu'à modification.
+
 Le cadre **Réception en direct**, au-dessus de la dernière décision, affiche la
 dernière trame complète de chaque appareil, l'heure de réception à la milliseconde
 et un numéro de réception. La notification part dès le découpage TCP, avant la

@@ -7,6 +7,35 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Line_count_limits_supervision_without_removing_saved_configuration(int count)
+    {
+        var config = new ConveyorOptions { LineCount = count, Simulation = true,
+            Lines = [new() { Id = 0 }, new() { Id = 1, CameraHost = "saved-camera" }] };
+        var repository = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repository,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
+        Assert.Equal(count, supervisor.GetSnapshots().Count);
+        Assert.Equal(2, config.Lines.Count);
+        Assert.Equal("saved-camera", config.Lines[1].CameraHost);
+        if (count == 1) Assert.Throws<KeyNotFoundException>(() => supervisor.SetCode98Enabled(1, false));
+        var saved = System.Text.Json.JsonSerializer.Serialize(config);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<ConveyorOptions>(saved)!;
+        Assert.Equal(count, restored.LineCount);
+        restored.LineCount = 2;
+        Assert.Equal(2, restored.GetConfiguredLines().Count());
+        Assert.Equal("saved-camera", restored.Lines[1].CameraHost);
+    }
+
+    [Fact]
+    public void Legacy_line_count_defaults_to_number_of_configured_lines()
+    {
+        Assert.Equal(1, new ConveyorOptions { Lines = [new() { Id = 0 }] }.LineCount);
+        Assert.Equal(2, new ConveyorOptions { Lines = [new() { Id = 0 }, new() { Id = 1 }] }.LineCount);
+    }
+
     [Fact]
     public async Task Pending_alert_updates_and_clears_after_old_scans_are_removed()
     {
