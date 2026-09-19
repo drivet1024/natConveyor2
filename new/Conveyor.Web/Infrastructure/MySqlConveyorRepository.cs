@@ -92,7 +92,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         await connection.OpenAsync(token);
         await using var transaction = await connection.BeginTransactionAsync(token);
         var count = 0;
-        await using (var select = new MySqlCommand($"select retry from {table} where shipping_id=@id for update", connection, transaction))
+        await using (var select = new MySqlCommand($"select cnt from {table} where camera_data=@id for update", connection, transaction))
         {
             select.Parameters.AddWithValue("@id", barcode);
             var value = await select.ExecuteScalarAsync(token);
@@ -104,8 +104,8 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
             return false;
         }
         await using (var upsert = new MySqlCommand($"""
-            insert into {table}(shipping_id,retry) values(@id,1)
-            on duplicate key update retry=retry+1
+            insert into {table}(camera_data,cnt) values(@id,1)
+            on duplicate key update cnt=cnt+1
             """, connection, transaction))
         {
             upsert.Parameters.AddWithValue("@id", barcode);
@@ -120,7 +120,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         var table = codeType switch { "86" => "code86", "98" => "code98", _ => throw new ArgumentOutOfRangeException(nameof(codeType)) };
         await using var connection = CreateConnection();
         await connection.OpenAsync(token);
-        await using var command = new MySqlCommand($"delete from {table} where shipping_id=@id", connection);
+        await using var command = new MySqlCommand($"delete from {table} where camera_data=@id", connection);
         command.Parameters.AddWithValue("@id", barcode);
         await command.ExecuteNonQueryAsync(token);
     }
