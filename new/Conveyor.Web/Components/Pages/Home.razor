@@ -13,8 +13,8 @@
         <div class="shared-status" title="@PlcTitle()"><span class="connection-led @PlcCss()"></span><div><small>AUTOMATE</small><strong>@PlcLabel()</strong></div></div>
         <div class="database-summary">
             <div class="database-summary-title"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
-            <div class="database-count"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
-            <div class="database-count"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
+            <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
+            <div class="database-count @(_database.PostalCodes == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
         </div>
         <ServiceStatus />
     </div>
