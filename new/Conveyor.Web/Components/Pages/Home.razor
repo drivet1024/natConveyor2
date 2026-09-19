@@ -75,8 +75,8 @@
 </section>
 
 @code {
-    private static string SoftwareVersion => System.Reflection.CustomAttributeExtensions
-        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Home).Assembly)?.InformationalVersion ?? "V1";
+    private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Home).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
     private IReadOnlyList<ConveyorShift> _shifts = [];
     private bool _changingShift;
     private string? _shiftError;
