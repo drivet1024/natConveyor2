@@ -208,6 +208,32 @@ public sealed class SortEngineTests
         }
         finally { await supervisor.StopLineAsync(0); await supervisor.StopLineAsync(1); }
     }
+    [Theory]
+    [InlineData("98765432101", 1, false, 1)]
+    [InlineData("98765432101", 1, true, 1)]
+    [InlineData("12345678901", 1, false, 0)]
+    [InlineData("12345678901", 1, true, 1)]
+    [InlineData("12345678901", 4, false, 1)]
+    [InlineData("12345678901,12345678902", 1, false, 1)]
+    public async Task RejectionsCountSentChuteEvenWhenDatabaseInsertFails(string barcode, int rejectedChute, bool failSave, long expected)
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = rejectedChute }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository { FailSave = failSave };
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, barcode, new Dimension(12, 8, 5), 4.75m);
+            var counters = supervisor.GetSnapshots()[0].Counters;
+            Assert.Equal(1, counters.TotalParcels);
+            Assert.Equal(expected, counters.Rejected);
+            Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
 
     private sealed class FakeRepository : IConveyorRepository
@@ -216,6 +242,7 @@ public sealed class SortEngineTests
         public long ScanCount { get; set; }
         public bool HasOverdueScans { get; set; }
         public bool FailCounts { get; set; }
+        public bool FailSave { get; set; }
         public bool Disable98 { get; set; }
         public bool IsSimulation => true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
@@ -224,7 +251,8 @@ public sealed class SortEngineTests
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-        public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
+        public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) =>
+            FailSave ? Task.FromException(new IOException("Insert failed")) : Task.CompletedTask;
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
         public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) =>
             FailCounts ? Task.FromException<(long, long, long, bool)>(new IOException("Database unavailable"))

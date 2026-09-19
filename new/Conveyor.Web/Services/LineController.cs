@@ -237,6 +237,7 @@ internal sealed class LineController
             weight is not null && (timestamp - weight.Timestamp).Duration() <= window ? weight.Value : -1,
             weight?.Timestamp);
         var stage = "calcul de la chute";
+        var rejectionCounted = false;
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
@@ -244,6 +245,11 @@ internal sealed class LineController
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await _plc.SendChuteAsync(_options.Plc.ChuteTag, decision.PlcChute, _options.Plc.SendCount, token);
             _plcConnected = true;
+            if (decision.PlcChute == _options.RejectedChute)
+            {
+                lock (_gate) _counters.Rejected++;
+                rejectionCounted = true;
+            }
             stage = "insertion MySQL du scan";
             await _repository.SaveScanAsync(_options.Id, parcel, decision, token);
             lock (_gate)
@@ -251,7 +257,6 @@ internal sealed class LineController
                 _lastDecision = decision;
                 _lastError = null;
                 _counters.DatabaseInserts++;
-                if (decision.Chute == _options.RejectedChute || decision.Chute == 99) _counters.Rejected++;
                 if (decision.Chute == 98) _counters.Code98++;
                 if (decision.Chute == _options.NoReadChute ||
                     (parcel.CameraData.Contains('?') && string.IsNullOrEmpty(decision.Barcode))) _counters.NoReads++;
@@ -272,7 +277,12 @@ internal sealed class LineController
             _databaseConnected = false;
             lock (_gate) _lastError = $"{stage} : {exception.Message}";
             _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}, étape : {Stage}; envoi vers le rejet", _options.Id + 1, stage);
-            try { await _plc.SendChuteAsync(_options.Plc.ChuteTag, _options.RejectedChute, 1, token); }
+            try
+            {
+                await _plc.SendChuteAsync(_options.Plc.ChuteTag, _options.RejectedChute, 1, token);
+                if (!rejectionCounted)
+                    lock (_gate) _counters.Rejected++;
+            }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }
         _changed();
