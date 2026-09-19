@@ -15,7 +15,7 @@
             <div class="database-count"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
             <div class="database-count"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
         </div>
-        <div class="mode-pill @(Options.Value.Simulation ? "simulation" : "production")"><span class="status-dot"></span>@(Options.Value.Simulation ? "Simulation appareils" : "Mode production")</div>
+        <ServiceStatus />
     </div>
 </header>
 

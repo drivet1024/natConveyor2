@@ -84,32 +84,32 @@ internal sealed class LineController
             ];
             if (_options.CameraConnectMode)
             {
-                _cameraClient = new(_options.CameraHost, _options.CameraPort, "\r", _logger);
+                _cameraClient = new(_options.CameraHost, _options.CameraPort, "\r", _logger, _changed, "Caméra");
                 _tasks.Add(_cameraClient.RunAsync(camera.Writer, token));
             }
             else
             {
-                _cameraReceiver = new(_options.CameraPort, "\r", _logger);
+                _cameraReceiver = new(_options.CameraPort, "\r", _logger, _changed, "Caméra");
                 _tasks.Add(_cameraReceiver.RunAsync(camera.Writer, token));
             }
             if (_options.ScaleConnectMode)
             {
-                _scaleClient = new(_options.ScaleHost, _options.ScalePort, "\r\n", _logger);
+                _scaleClient = new(_options.ScaleHost, _options.ScalePort, "\r\n", _logger, _changed, "Balance");
                 _tasks.Add(_scaleClient.RunAsync(scale.Writer, token));
             }
             else
             {
-                _scaleReceiver = new(_options.ScalePort, "\r\n", _logger);
+                _scaleReceiver = new(_options.ScalePort, "\r\n", _logger, _changed, "Balance");
                 _tasks.Add(_scaleReceiver.RunAsync(scale.Writer, token));
             }
             if (_options.DimensionConnectMode)
             {
-                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger);
+                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur");
                 _tasks.Add(_dimensionClient.RunAsync(dimension.Writer, token));
             }
             else
             {
-                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger);
+                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur");
                 _tasks.Add(_dimensionReceiver.RunAsync(dimension.Writer, token));
             }
         }

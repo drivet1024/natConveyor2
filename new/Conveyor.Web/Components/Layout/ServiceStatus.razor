@@ -1,0 +1,40 @@
+@implements IAsyncDisposable
+@inject ServiceUptime Uptime
+@inject IOptions<ConveyorOptions> Options
+
+<div class="service-status">
+    <span class="service-mode @(Options.Value.Simulation ? "simulation" : "production")">
+        <span class="service-mode-dot" aria-hidden="true"></span>
+        @(Options.Value.Simulation ? "Simulation appareils" : "Mode production")
+    </span>
+    <span class="service-uptime" title="Durée depuis le démarrage de l’application, commune à tous les navigateurs">
+        En service depuis <span class="uptime-value">@FormatElapsed(Uptime.Elapsed)</span>
+    </span>
+</div>
+
+@code {
+    private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(1));
+    private Task? _updates;
+    private bool _disposed;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _updates = UpdateAsync();
+    }
+
+    private async Task UpdateAsync()
+    {
+        while (await _timer.WaitForNextTickAsync())
+            await InvokeAsync(() => { if (!_disposed) StateHasChanged(); });
+    }
+
+    private static string FormatElapsed(TimeSpan elapsed) =>
+        (elapsed.Days > 0 ? $"{elapsed.Days} j " : "") + elapsed.ToString(@"hh\:mm\:ss");
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _timer.Dispose();
+        if (_updates is not null) await _updates;
+    }
+}

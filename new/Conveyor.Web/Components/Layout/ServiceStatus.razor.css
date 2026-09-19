@@ -1,0 +1,29 @@
+.service-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .3rem;
+    color: var(--muted);
+    font-size: .7rem;
+}
+
+.service-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.service-mode-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+}
+
+.simulation .service-mode-dot { background: var(--orange); }
+.service-uptime { white-space: nowrap; }
+.uptime-value { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 600px) {
+    .service-status { align-items: flex-start; }
+}

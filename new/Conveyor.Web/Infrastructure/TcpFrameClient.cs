@@ -4,9 +4,18 @@ using System.Threading.Channels;
 
 namespace Conveyor.Web.Infrastructure;
 
-public sealed class TcpFrameClient(string host, int port, string delimiter, ILogger logger)
+public sealed class TcpFrameClient(string host, int port, string delimiter, ILogger logger,
+    Action? connectionChanged = null, string deviceName = "Appareil TCP")
 {
-    public bool Connected { get; private set; }
+    private volatile bool _connected;
+    public bool Connected => _connected;
+
+    private void SetConnected(bool connected)
+    {
+        if (_connected == connected) return;
+        _connected = connected;
+        connectionChanged?.Invoke();
+    }
 
     public async Task RunAsync(ChannelWriter<string> output, CancellationToken token)
     {
@@ -18,14 +27,17 @@ public sealed class TcpFrameClient(string host, int port, string delimiter, ILog
                 {
                     using var client = new TcpClient();
                     await client.ConnectAsync(host, port, token);
-                    Connected = true;
+                    logger.LogInformation("{Device} connecté à {Host}:{Port} (mode client)", deviceName, host, port);
+                    SetConnected(true);
                     await ReadAsync(client, output, delimiter, token);
+                    if (!token.IsCancellationRequested)
+                        logger.LogWarning("{Device} : connexion fermée par le serveur {Host}:{Port}; nouvelle tentative dans 2 s", deviceName, host, port);
                 }
                 catch (Exception exception) when (exception is IOException or SocketException)
                 {
-                    logger.LogWarning(exception, "Appareil TCP {Host}:{Port} indisponible", host, port);
+                    logger.LogWarning(exception, "{Device} {Host}:{Port} indisponible", deviceName, host, port);
                 }
-                finally { Connected = false; }
+                finally { SetConnected(false); }
                 await Task.Delay(TimeSpan.FromSeconds(2), token);
             }
         }

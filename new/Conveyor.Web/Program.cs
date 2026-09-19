@@ -16,6 +16,7 @@ if (int.TryParse(Environment.GetEnvironmentVariable("CONVEYOR_RESTART_WAIT_PID")
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton(new ServiceUptime());
 builder.Configuration.AddJsonFile("conveyor.settings.json", optional: true, reloadOnChange: false);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");

@@ -5,35 +5,47 @@ using System.Threading.Channels;
 
 namespace Conveyor.Web.Infrastructure;
 
-public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger)
+public sealed class TcpFrameReceiver(int port, string delimiter, ILogger logger,
+    Action? connectionChanged = null, string deviceName = "Appareil TCP")
 {
     private TcpListener? _listener;
-    public bool Connected { get; private set; }
+    private volatile bool _connected;
+    public bool Connected => _connected;
+
+    private void SetConnected(bool connected)
+    {
+        if (_connected == connected) return;
+        _connected = connected;
+        connectionChanged?.Invoke();
+    }
 
     public async Task RunAsync(ChannelWriter<string> output, CancellationToken token)
     {
         _listener = new TcpListener(IPAddress.Any, port);
         _listener.Start();
-        logger.LogInformation("Écoute TCP démarrée sur le port {Port}", port);
+        logger.LogInformation("{Device} : écoute TCP démarrée sur le port {Port}", deviceName, port);
         try
         {
             while (!token.IsCancellationRequested)
             {
                 using var client = await _listener.AcceptTcpClientAsync(token);
-                Connected = true;
+                logger.LogInformation("{Device} connecté depuis {Remote} sur le port {Port} (mode serveur)", deviceName, client.Client.RemoteEndPoint, port);
+                SetConnected(true);
                 try
                 {
                     await ReadClientAsync(client, output, delimiter, token);
+                    if (!token.IsCancellationRequested)
+                        logger.LogWarning("{Device} : connexion fermée par l’appareil sur le port {Port}", deviceName, port);
                 }
                 catch (Exception exception) when (exception is IOException or SocketException)
                 {
-                    logger.LogWarning(exception, "Connexion TCP perdue sur le port {Port}", port);
+                    logger.LogWarning(exception, "{Device} : connexion TCP perdue sur le port {Port}", deviceName, port);
                 }
-                finally { Connected = false; }
+                finally { SetConnected(false); }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        finally { _listener.Stop(); Connected = false; output.TryComplete(); }
+        finally { _listener.Stop(); SetConnected(false); output.TryComplete(); }
     }
 
     private static async Task ReadClientAsync(TcpClient client, ChannelWriter<string> output, string delimiter, CancellationToken token)
