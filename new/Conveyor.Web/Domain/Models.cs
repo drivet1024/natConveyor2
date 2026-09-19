@@ -53,7 +53,7 @@ public sealed record ConnectionState(bool Camera, bool Dimensioner, bool Scale, 
 
 public sealed record DeviceReception(string Raw, DateTimeOffset ReceivedAt, long Sequence, bool Truncated = false);
 
-public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false);
+public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false, DateTimeOffset? LastShipmentUpdate = null);
 
 public sealed record LineSnapshot(
     int LineId,

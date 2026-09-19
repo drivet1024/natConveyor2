@@ -234,10 +234,38 @@ public sealed class SortEngineTests
         finally { await supervisor.StopLineAsync(0); }
     }
 
+    [Fact]
+    public async Task ShipmentUpdateIsCachedAndReloadedAfterDataReset()
+    {
+        var updated = DateTimeOffset.Now.AddHours(-2);
+        var repo = new FakeRepository { ParcelCount = 10, ShipmentUpdate = updated };
+        using var metrics = new DatabaseMetricsService(repo, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        Assert.Equal(updated, metrics.Current.LastShipmentUpdate);
+        await metrics.RefreshAsync();
+        Assert.Equal(1, repo.ShipmentDateReads);
+        repo.ParcelCount = 0;
+        await metrics.RefreshAsync();
+        Assert.Null(metrics.Current.LastShipmentUpdate);
+        repo.ParcelCount = 20;
+        repo.ShipmentUpdate = updated.AddHours(1);
+        await metrics.RefreshAsync();
+        Assert.Equal(updated.AddHours(1), metrics.Current.LastShipmentUpdate);
+        Assert.Equal(2, repo.ShipmentDateReads);
+    }
+
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public DateTimeOffset? ShipmentUpdate { get; set; }
+        public long ParcelCount { get; set; }
+        public int ShipmentDateReads { get; private set; }
+        public Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken)
+        {
+            ShipmentDateReads++;
+            return Task.FromResult(ShipmentUpdate);
+        }
         public Task ResetDataAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
         public long ScanCount { get; set; }
@@ -257,6 +285,6 @@ public sealed class SortEngineTests
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
         public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) =>
             FailCounts ? Task.FromException<(long, long, long, bool)>(new IOException("Database unavailable"))
-                : Task.FromResult((0L, 0L, ScanCount, HasOverdueScans));
+                : Task.FromResult((ParcelCount, 0L, ScanCount, HasOverdueScans));
     }
 }

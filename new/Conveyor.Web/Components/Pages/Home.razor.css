@@ -14,3 +14,5 @@
 .database-summary { grid-template-columns: auto auto auto auto; }
 .reset-data-button { white-space: nowrap; padding: .4rem .6rem; font-size: .7rem; }
 @media (max-width: 850px) { .database-summary { grid-template-columns: auto auto auto; } }
+
+.shipment-update { display: block; margin-top: .2rem; color: var(--muted); font-size: .6rem; font-variant-numeric: tabular-nums; white-space: nowrap; }

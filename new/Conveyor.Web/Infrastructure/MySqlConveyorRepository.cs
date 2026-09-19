@@ -224,6 +224,17 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         catch { return false; }
     }
 
+    public async Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        const string sql = "select greatest(coalesce(max(UPDATE_DATE), max(INSERT_DATE)), coalesce(max(INSERT_DATE), max(UPDATE_DATE))) from conveyor_shipment";
+        await using var command = new MySqlCommand(sql, connection);
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is null or DBNull ? null
+            : new DateTimeOffset(DateTime.SpecifyKind(Convert.ToDateTime(value, CultureInfo.InvariantCulture), DateTimeKind.Local));
+    }
+
     public async Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token)
     {
         await using var connection = CreateConnection();
@@ -240,6 +251,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => true;
+    public Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken) => Task.FromResult<DateTimeOffset?>(null);
     public Task ResetDataAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
     public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) =>
