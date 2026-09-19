@@ -10,6 +10,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly Dictionary<int, LineController> _lines;
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
+    private readonly IConfigurationEditor _editor;
+    private readonly SemaphoreSlim _shiftGate = new(1, 1);
     private readonly ConveyorOptions _configuration;
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
@@ -22,19 +24,26 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var shifts = await _repository.GetShiftIdsAsync(CancellationToken.None);
         if (!shifts.Contains(shiftId))
             throw new InvalidOperationException("Ce shift n’est pas disponible dans les routes configurées.");
-        foreach (var line in _configuration.Lines) line.ShiftId = shiftId;
-        _configuration.General.ShiftId = shiftId;
-        _logger.LogInformation("Dépôt 2 : shift {Shift} sélectionné pour les deux lignes", shiftId);
-        Changed?.Invoke();
+        await _shiftGate.WaitAsync();
+        try
+        {
+            await _editor.SaveShiftAsync(shiftId);
+            foreach (var line in _configuration.Lines) line.ShiftId = shiftId;
+            _configuration.General.ShiftId = shiftId;
+            _logger.LogInformation("Dépôt 2 : shift {Shift} sélectionné pour les deux lignes", shiftId);
+            Changed?.Invoke();
+        }
+        finally { _shiftGate.Release(); }
     }
 
     public event Action? Changed;
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
-        SortEngine sortEngine, ILoggerFactory loggerFactory)
+        SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor)
     {
         var configuration = options.Value;
         _configuration = configuration;
+        _editor = editor;
         _repository = repository;
         _logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         var activeLines = configuration.GetConfiguredLines().ToArray();

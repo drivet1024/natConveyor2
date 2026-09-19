@@ -16,7 +16,7 @@ public sealed class SortEngineTests
             Lines = [new() { Id = 0 }, new() { Id = 1, CameraHost = "saved-camera" }] };
         var repository = new FakeRepository();
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repository,
-            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
         Assert.Equal(count, supervisor.GetSnapshots().Count);
         Assert.Equal(2, config.Lines.Count);
         Assert.Equal("saved-camera", config.Lines[1].CameraHost);
@@ -171,7 +171,7 @@ public sealed class SortEngineTests
         config.ApplyGlobalSorting();
         var repo = new FakeRepository();
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
-            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
         try
         {
             supervisor.SetCode98Enabled(0, false);

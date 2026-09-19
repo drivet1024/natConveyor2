@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Conveyor.Web.Options;
 using Microsoft.Extensions.Options;
 
@@ -8,11 +9,13 @@ public interface IConfigurationEditor
 {
     ConveyorOptions GetEditableCopy();
     Task SaveAsync(ConveyorOptions options, string? newConnectionString, CancellationToken cancellationToken = default);
+    Task SaveShiftAsync(int shiftId);
     string FilePath { get; }
 }
 
 public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebHostEnvironment environment) : IConfigurationEditor
 {
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     public string FilePath { get; } = Path.Combine(environment.ContentRootPath, "conveyor.settings.json");
 
@@ -40,6 +43,36 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             options.Database.ConnectionString = newConnectionString.Trim();
 
         var document = new Dictionary<string, ConveyorOptions> { [ConveyorOptions.SectionName] = options };
+        await _writeGate.WaitAsync(cancellationToken);
+        try { await WriteDocumentAsync(document, cancellationToken); }
+        finally { _writeGate.Release(); }
+    }
+
+    public async Task SaveShiftAsync(int shiftId)
+    {
+        await _writeGate.WaitAsync();
+        try
+        {
+            var nodeOptions = new JsonNodeOptions { PropertyNameCaseInsensitive = true };
+            var document = File.Exists(FilePath)
+                ? JsonNode.Parse(await File.ReadAllTextAsync(FilePath), nodeOptions)!.AsObject()
+                : new JsonObject(nodeOptions);
+            var conveyor = document[ConveyorOptions.SectionName] as JsonObject;
+            if (conveyor is null)
+                document[ConveyorOptions.SectionName] = conveyor = new JsonObject(nodeOptions);
+            var general = conveyor["General"] as JsonObject;
+            if (general is null)
+                conveyor["General"] = general = JsonSerializer.SerializeToNode(current.Value.General, JsonOptions)!.AsObject();
+            // Existing JSON may use camelCase; preserve the original key.
+            var key = general.Select(pair => pair.Key).FirstOrDefault(key => string.Equals(key, "ShiftId", StringComparison.OrdinalIgnoreCase)) ?? "shiftId";
+            general[key] = shiftId;
+            await WriteDocumentAsync(document, CancellationToken.None);
+        }
+        finally { _writeGate.Release(); }
+    }
+
+    private async Task WriteDocumentAsync<T>(T document, CancellationToken cancellationToken)
+    {
         var temporaryPath = FilePath + ".tmp";
         await using (var stream = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
             await JsonSerializer.SerializeAsync(stream, document, JsonOptions, cancellationToken);

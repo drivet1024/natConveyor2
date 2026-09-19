@@ -49,7 +49,6 @@ public sealed class ShiftSelectionTests
     {
         var repository = new SimulationConveyorRepository();
         return new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(options), repository,
-            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
     }
 }
-
