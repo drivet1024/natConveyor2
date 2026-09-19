@@ -51,6 +51,15 @@
 
 .connections {
     grid-template-columns: repeat(3, 1fr);
+    padding: .5rem 1.1rem;
+}
+
+.metrics .metric {
+    padding: .5rem 1.1rem;
+}
+
+.metrics .metric strong {
+    line-height: 1.2;
 }
 
 .run-state.unavailable {
