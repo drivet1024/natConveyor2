@@ -5,7 +5,7 @@
 <PageTitle>Configuration</PageTitle>
 
 <header class="dashboard-header">
-    <div><span class="eyebrow">PARAMÈTRES</span><h1>Configuration</h1><p>Base locale, appareils et règles propres à chaque ligne</p></div>
+    <div><span class="eyebrow">PARAMÈTRES</span><h1>Configuration</h1><p>Paramètres communs aux deux lignes et connexions des appareils</p></div>
 </header>
 
 @if (_saved)
@@ -26,11 +26,25 @@
     <ValidationSummary />
 
     <section class="config-section">
-        <div class="config-section-title"><div><span class="eyebrow">GÉNÉRAL</span><h2>Exécution et base de données</h2></div></div>
+        <div class="config-section-title"><div><span class="eyebrow">GÉNÉRAL</span><h2>Configuration globale</h2></div></div>
         <div class="config-grid">
             <label class="toggle-field"><InputCheckbox @bind-Value="_model.Simulation" /><span>Mode simulation</span><small>Désactiver pour communiquer avec les appareils réels.</small></label>
             <label class="wide-field"><span>Nouvelle chaîne de connexion MySQL</span><InputText type="password" autocomplete="new-password" @bind-Value="_newConnectionString" placeholder="Laisser vide pour conserver la valeur actuelle" /><small>La valeur actuelle n’est jamais affichée dans le navigateur.</small></label>
         </div>
+            <div class="config-block">
+                <h3>TRI ET VALIDATION — COMMUN AUX DEUX LIGNES</h3>
+                <div class="config-grid">
+                @NumberField("Chute rejet", _sorting.RejectedChute, value => _sorting.RejectedChute = value)
+                @NumberField("Chute sans lecture", _sorting.NoReadChute, value => _sorting.NoReadChute = value)
+                @NumberField("Délai de corrélation (ms)", _sorting.CorrelationDelayMs, value => _sorting.CorrelationDelayMs = value)
+                @NumberField("Fenêtre de corrélation (ms)", _sorting.CorrelationWindowMs, value => _sorting.CorrelationWindowMs = value)
+                @DecimalField("Poids maximal", _sorting.MaximumWeight, value => _sorting.MaximumWeight = value)
+                @DecimalField("Dimension maximale", _sorting.MaximumDimension, value => _sorting.MaximumDimension = value)
+                <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.PostalCodeSort" /><span>Tri par code postal</span></label>
+                <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.ValidateDimensionsAndWeight" /><span>Valider poids et dimensions</span></label>
+                <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.EnableCode86" /><span>Activer le code 86</span></label>
+                </div>
+            </div>
     </section>
 
     @foreach (var line in _model.Lines)
@@ -94,20 +108,6 @@
                     <label><span>Protocole balance</span><InputSelect @bind-Value="line.ScaleProtocol"><option>Delimited</option><option>Fixed16From0</option><option>Fixed16From1</option></InputSelect></label>
                 </div>
             </div>
-            <div class="config-block">
-                <h3>TRI ET VALIDATION</h3>
-                <div class="config-grid">
-                @NumberField("Chute rejet", line.RejectedChute, value => line.RejectedChute = value)
-                @NumberField("Chute sans lecture", line.NoReadChute, value => line.NoReadChute = value)
-                @NumberField("Délai de corrélation (ms)", line.CorrelationDelayMs, value => line.CorrelationDelayMs = value)
-                @NumberField("Fenêtre de corrélation (ms)", line.CorrelationWindowMs, value => line.CorrelationWindowMs = value)
-                @DecimalField("Poids maximal", line.MaximumWeight, value => line.MaximumWeight = value)
-                @DecimalField("Dimension maximale", line.MaximumDimension, value => line.MaximumDimension = value)
-                <label class="toggle-field"><InputCheckbox @bind-Value="line.PostalCodeSort" /><span>Tri par code postal</span></label>
-                <label class="toggle-field"><InputCheckbox @bind-Value="line.ValidateDimensionsAndWeight" /><span>Valider poids et dimensions</span></label>
-                <label class="toggle-field"><InputCheckbox @bind-Value="line.EnableCode86" /><span>Activer le code 86</span></label>
-                </div>
-            </div>
         </section>
     }
 
@@ -121,6 +121,7 @@
 
 @code {
     private ConveyorOptions _model = new();
+    private SortingOptions _sorting => _model.Sorting!;
     private string _newConnectionString = "";
     private bool _saving;
     private bool _saved;

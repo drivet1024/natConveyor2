@@ -16,11 +16,17 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     public string FilePath { get; } = Path.Combine(environment.ContentRootPath, "conveyor.settings.json");
 
-    public ConveyorOptions GetEditableCopy() => Clone(current.Value);
+    public ConveyorOptions GetEditableCopy()
+    {
+        var copy = Clone(current.Value);
+        copy.ApplyGlobalSorting();
+        return copy;
+    }
 
     public async Task SaveAsync(ConveyorOptions options, string? newConnectionString, CancellationToken cancellationToken = default)
     {
         Validate(options);
+        options.ApplyGlobalSorting();
         if (string.IsNullOrWhiteSpace(newConnectionString))
             options.Database.ConnectionString = current.Value.Database.ConnectionString;
         else

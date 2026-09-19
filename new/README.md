@@ -22,6 +22,13 @@ Ne recopiez pas les mots de passe de l'ancien `App.config` : ils doivent d'abord
 
 ## Flux d'une ligne
 
+Les réglages **Tri et validation** de la page Configuration sont globaux aux deux
+lignes et enregistrés sous `Conveyor:Sorting`. Ils sont appliqués aux deux lignes
+au démarrage. Pour une ancienne configuration sans cette section, les valeurs
+de la ligne ayant le plus petit identifiant (ligne principale) sont reprises.
+Les anciens champs par ligne restent compatibles mais sont remplacés par les
+valeurs globales à l'enregistrement et au démarrage.
+
 - Caméra : serveur TCP, messages terminés par `CR`.
 - Dimensionneur : serveur TCP ou client TCP, trames de 16 caractères encadrées par STX/ETX.
 - Balance : serveur TCP; protocoles `Delimited`, `Fixed16From0` et `Fixed16From1`.

@@ -30,6 +30,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOptions<ConveyorOptions>()
     .Bind(builder.Configuration.GetSection(ConveyorOptions.SectionName))
+    .PostConfigure(options => options.ApplyGlobalSorting())
     .ValidateDataAnnotations()
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
     .Validate(options => options.Lines.SelectMany(line => new[] { line.CameraPort, line.ScalePort, line.DimensionPort }).Distinct().Count() == options.Lines.Count * 3,
