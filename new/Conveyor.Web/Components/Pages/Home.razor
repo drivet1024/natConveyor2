@@ -25,7 +25,10 @@
     <article class="line-card">
         <div class="line-title"><div><span class="line-number">LIGNE @(line.LineId + 1)</span><h2>@line.Name</h2></div><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
-        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
+        <div class="metrics"><div class="metric metric-parcels">
+            <div><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis</span></div>
+            <div class="registered-total" title="Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes"><strong>@_database.Scans.ToString("N0")</strong><span>Enregistrés</span></div>
+        </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100")</div>
         <LastDecision Decision="line.LastDecision" LineId="line.LineId" />
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
         <div class="actions">
@@ -49,7 +52,6 @@
     private readonly HashSet<int> _busyLines = [];
     protected override void OnInitialized() { Supervisor.Changed += OnChanged; DatabaseMetrics.Changed += OnChanged; Refresh(); }
     private RenderFragment Connection(string label, bool connected, bool simulated) => @<div class="connection-item" title="@(simulated ? "Simulation — aucune connexion physique" : connected ? "Connexion établie" : "Déconnecté")"><span class="connection-led @(simulated ? "sim" : connected ? "ok" : "ko")"></span><span>@label</span></div>;
-    private RenderFragment Metric(string label, long value, string? title = null) => @<div class="metric" title="@title"><strong>@value.ToString("N0")</strong><span>@label</span></div>;
     private RenderFragment ErrorMetric(string label, long errors, LineCounters counters) =>
         PercentageMetric(label, errors, counters.TotalParcels - counters.NoReads,
             "Erreurs parmi les colis lus : erreurs ÷ (colis − sans lecture) × 100");

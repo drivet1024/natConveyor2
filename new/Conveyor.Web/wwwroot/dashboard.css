@@ -124,3 +124,7 @@
 .metric-value-row .metric-percentage { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .btn-code98.enabled { color: var(--green); border-color: var(--green); background: #49d17d18; }
 .btn-code98.disabled { color: var(--red); border-color: var(--red); background: #ff5f6318; }
+.metric-parcels { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+.metric-parcels > div { min-width: 0; }
+.metric-parcels strong { overflow-wrap: anywhere; }
+.metric-parcels .registered-total { margin-left: auto; text-align: right; }
