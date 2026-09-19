@@ -48,7 +48,7 @@
     private void Refresh() => _entries = LogStore.GetRecent(500, _minimum, _search);
     private void Clear() => LogStore.Clear();
     private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
-    private static string ShortSource(string source) => source.Replace("Microsoft.AspNetCore.", "ASP.NET/");
+    private static string ShortSource(string source) => source switch { "Conveyor.Line.0" => "line 0", "Conveyor.Line.1" => "line 1", _ => "" };
     private static string Label(LogLevel level) => level switch { LogLevel.Warning => "AVERT.", LogLevel.Error or LogLevel.Critical => "ERREUR", _ => "INFO" };
     public void Dispose() => LogStore.Changed -= OnChanged;
 }
