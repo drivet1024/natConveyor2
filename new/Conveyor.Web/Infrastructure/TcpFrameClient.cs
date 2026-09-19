@@ -23,7 +23,7 @@ public sealed class TcpFrameClient(string host, int port, string delimiter, ILog
                 }
                 catch (Exception exception) when (exception is IOException or SocketException)
                 {
-                    logger.LogWarning(exception, "Dimensionneur {Host}:{Port} indisponible", host, port);
+                    logger.LogWarning(exception, "Appareil TCP {Host}:{Port} indisponible", host, port);
                 }
                 finally { Connected = false; }
                 await Task.Delay(TimeSpan.FromSeconds(2), token);

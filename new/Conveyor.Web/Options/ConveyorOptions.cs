@@ -23,7 +23,11 @@ public sealed class LineOptions
     public int DepotId { get; set; }
     public int ShiftId { get; set; }
     public int CameraPort { get; set; }
+    public string CameraHost { get; set; } = "";
+    public bool CameraConnectMode { get; set; }
     public int ScalePort { get; set; }
+    public string ScaleHost { get; set; } = "";
+    public bool ScaleConnectMode { get; set; }
     public int DimensionPort { get; set; }
     public string DimensionHost { get; set; } = "";
     public bool DimensionConnectMode { get; set; }

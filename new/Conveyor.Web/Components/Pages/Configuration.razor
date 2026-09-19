@@ -37,22 +37,12 @@
     {
         <section class="config-section">
             <div class="config-section-title"><div><span class="eyebrow">LIGNE @(line.Id + 1)</span><h2>@line.Name</h2></div><label class="inline-toggle"><InputCheckbox @bind-Value="line.Enabled" /> Activée au démarrage</label></div>
+            <div class="config-block">
+            <h3>GÉNÉRAL</h3>
             <div class="config-grid">
                 @TextField("Nom", line.Name, value => line.Name = value)
                 @NumberField("Dépôt", line.DepotId, value => line.DepotId = value)
-                @NumberField("Quart / shift", line.ShiftId, value => line.ShiftId = value)
-                @NumberField("Port caméra", line.CameraPort, value => line.CameraPort = value)
-                @NumberField("Port balance", line.ScalePort, value => line.ScalePort = value)
-                @NumberField("Port dimensionneur", line.DimensionPort, value => line.DimensionPort = value)
-                @TextField("Adresse dimensionneur", line.DimensionHost, value => line.DimensionHost = value)
-                <label><span>Mode dimensionneur</span><InputSelect @bind-Value="line.DimensionConnectMode"><option value="false">Serveur — l’appareil se connecte</option><option value="true">Client — connexion vers l’appareil</option></InputSelect></label>
-                <label><span>Protocole balance</span><InputSelect @bind-Value="line.ScaleProtocol"><option>Delimited</option><option>Fixed16From0</option><option>Fixed16From1</option></InputSelect></label>
-                @NumberField("Chute rejet", line.RejectedChute, value => line.RejectedChute = value)
-                @NumberField("Chute sans lecture", line.NoReadChute, value => line.NoReadChute = value)
-                @NumberField("Délai de corrélation (ms)", line.CorrelationDelayMs, value => line.CorrelationDelayMs = value)
-                @NumberField("Fenêtre de corrélation (ms)", line.CorrelationWindowMs, value => line.CorrelationWindowMs = value)
-                @DecimalField("Poids maximal", line.MaximumWeight, value => line.MaximumWeight = value)
-                @DecimalField("Dimension maximale", line.MaximumDimension, value => line.MaximumDimension = value)
+                @NumberField("Shift de départ", line.ShiftId, value => line.ShiftId = value)
                 @if (line.Id == 0)
                 {
                     <label><span>Protocole automate</span><InputSelect @bind-Value="line.Plc.Protocol"><option value="Dde">DDE / RSLinx</option><option value="Tcp">Passerelle TCP</option></InputSelect><small>La connexion est contrôlée uniquement par START/STOP de la ligne principale.</small></label>
@@ -68,9 +58,55 @@
                     }
                 }
                 @TextField("Tag chute automate", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
+            </div>
+            </div>
+            <div class="config-block">
+                <h3>CAMÉRAS</h3>
+                <div class="config-grid">
+                    <label><span>Mode TCP/IP</span><InputSelect @bind-Value="line.CameraConnectMode"><option value="false">Serveur — l’appareil se connecte</option><option value="true">Client — connexion vers le serveur</option></InputSelect></label>
+                    @if (line.CameraConnectMode)
+                    {
+                        @TextField("Adresse IP du serveur", line.CameraHost, value => line.CameraHost = value)
+                    }
+                    @NumberField("Port de communication", line.CameraPort, value => line.CameraPort = value)
+                </div>
+            </div>
+            <div class="config-block">
+                <h3>DIMENSIONNEUR</h3>
+                <div class="config-grid">
+                    <label><span>Mode TCP/IP</span><InputSelect @bind-Value="line.DimensionConnectMode"><option value="false">Serveur — l’appareil se connecte</option><option value="true">Client — connexion vers le serveur</option></InputSelect></label>
+                    @if (line.DimensionConnectMode)
+                    {
+                        @TextField("Adresse IP du serveur", line.DimensionHost, value => line.DimensionHost = value)
+                    }
+                    @NumberField("Port de communication", line.DimensionPort, value => line.DimensionPort = value)
+                </div>
+            </div>
+            <div class="config-block">
+                <h3>BALANCE</h3>
+                <div class="config-grid">
+                    <label><span>Mode TCP/IP</span><InputSelect @bind-Value="line.ScaleConnectMode"><option value="false">Serveur — l’appareil se connecte</option><option value="true">Client — connexion vers le serveur</option></InputSelect></label>
+                    @if (line.ScaleConnectMode)
+                    {
+                        @TextField("Adresse IP du serveur", line.ScaleHost, value => line.ScaleHost = value)
+                    }
+                    @NumberField("Port de communication", line.ScalePort, value => line.ScalePort = value)
+                    <label><span>Protocole balance</span><InputSelect @bind-Value="line.ScaleProtocol"><option>Delimited</option><option>Fixed16From0</option><option>Fixed16From1</option></InputSelect></label>
+                </div>
+            </div>
+            <div class="config-block">
+                <h3>TRI ET VALIDATION</h3>
+                <div class="config-grid">
+                @NumberField("Chute rejet", line.RejectedChute, value => line.RejectedChute = value)
+                @NumberField("Chute sans lecture", line.NoReadChute, value => line.NoReadChute = value)
+                @NumberField("Délai de corrélation (ms)", line.CorrelationDelayMs, value => line.CorrelationDelayMs = value)
+                @NumberField("Fenêtre de corrélation (ms)", line.CorrelationWindowMs, value => line.CorrelationWindowMs = value)
+                @DecimalField("Poids maximal", line.MaximumWeight, value => line.MaximumWeight = value)
+                @DecimalField("Dimension maximale", line.MaximumDimension, value => line.MaximumDimension = value)
                 <label class="toggle-field"><InputCheckbox @bind-Value="line.PostalCodeSort" /><span>Tri par code postal</span></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="line.ValidateDimensionsAndWeight" /><span>Valider poids et dimensions</span></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="line.EnableCode86" /><span>Activer le code 86</span></label>
+                </div>
             </div>
         </section>
     }

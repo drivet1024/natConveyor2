@@ -20,9 +20,11 @@ internal sealed class LineController
     private CancellationTokenSource? _stopping;
     private List<Task> _tasks = [];
     private TcpFrameReceiver? _cameraReceiver;
+    private TcpFrameClient? _cameraClient;
     private TcpFrameReceiver? _dimensionReceiver;
     private TcpFrameClient? _dimensionClient;
     private TcpFrameReceiver? _scaleReceiver;
+    private TcpFrameClient? _scaleClient;
     private TimedValue<Dimension>? _lastDimension;
     private TimedValue<decimal>? _lastWeight;
     private SortDecision? _lastDecision;
@@ -73,17 +75,33 @@ internal sealed class LineController
             var camera = Channel.CreateBounded<string>(new BoundedChannelOptions(1_000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
             var dimension = Channel.CreateBounded<string>(1_000);
             var scale = Channel.CreateBounded<string>(1_000);
-            _cameraReceiver = new(_options.CameraPort, "\r", _logger);
-            _scaleReceiver = new(_options.ScalePort, "\r\n", _logger);
             _tasks =
             [
-                _cameraReceiver.RunAsync(camera.Writer, token),
-                _scaleReceiver.RunAsync(scale.Writer, token),
                 ConsumeCameraAsync(camera.Reader, token),
                 ConsumeDimensionsAsync(dimension.Reader, token),
                 ConsumeScaleAsync(scale.Reader, token),
                 MonitorAsync(token)
             ];
+            if (_options.CameraConnectMode)
+            {
+                _cameraClient = new(_options.CameraHost, _options.CameraPort, "\r", _logger);
+                _tasks.Add(_cameraClient.RunAsync(camera.Writer, token));
+            }
+            else
+            {
+                _cameraReceiver = new(_options.CameraPort, "\r", _logger);
+                _tasks.Add(_cameraReceiver.RunAsync(camera.Writer, token));
+            }
+            if (_options.ScaleConnectMode)
+            {
+                _scaleClient = new(_options.ScaleHost, _options.ScalePort, "\r\n", _logger);
+                _tasks.Add(_scaleClient.RunAsync(scale.Writer, token));
+            }
+            else
+            {
+                _scaleReceiver = new(_options.ScalePort, "\r\n", _logger);
+                _tasks.Add(_scaleReceiver.RunAsync(scale.Writer, token));
+            }
             if (_options.DimensionConnectMode)
             {
                 _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger);
@@ -242,9 +260,9 @@ internal sealed class LineController
             };
             var connections = _simulation
                 ? new ConnectionState(false, false, false, _databaseConnected, false, true, _repository.IsSimulation)
-                : new ConnectionState(_cameraReceiver?.Connected == true,
+                : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
-                    _scaleReceiver?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
+                    _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now);
         }
     }
