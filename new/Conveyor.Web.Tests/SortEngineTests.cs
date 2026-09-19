@@ -191,7 +191,10 @@ public sealed class SortEngineTests
             supervisor.SetCode98Enabled(1, true);
             await supervisor.SimulateParcelAsync(1, "12345678901", Dimension.Missing, -1);
             Assert.Equal(98, supervisor.GetSnapshots()[1].LastDecision!.Chute);
+            Assert.NotNull(supervisor.GetSnapshots()[0].LastDecision);
             supervisor.ResetCounters(0);
+            Assert.Null(supervisor.GetSnapshots()[0].LastDecision);
+            Assert.Equal(98, supervisor.GetSnapshots()[1].LastDecision!.Chute);
             Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
         }
         finally { await supervisor.StopLineAsync(0); await supervisor.StopLineAsync(1); }

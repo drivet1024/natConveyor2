@@ -160,7 +160,11 @@ internal sealed class LineController
 
     public void ResetCounters()
     {
-        lock (_gate) _counters = new LineCounters();
+        lock (_gate)
+        {
+            _counters = new LineCounters();
+            _lastDecision = null;
+        }
         _changed();
     }
 
