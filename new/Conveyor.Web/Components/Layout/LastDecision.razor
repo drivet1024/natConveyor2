@@ -17,7 +17,10 @@
             <span class="parcel-code98 @Code98Css" title="@Code98Title" aria-label="@Code98Title">98</span>
         </div>
     </div>
-    <div class="parcel-measures">@Current.Weight.ToString("0.##") lb · @Current.Dimension.Length × @Current.Dimension.Width × @Current.Dimension.Height</div>
+    <div class="parcel-measures">
+        <span class="measure-weight" title="Poids"><strong>@Current.Weight.ToString("0.##")</strong><small>lb</small></span>
+        <span class="measure-dimensions" title="Dimensions : longueur × largeur × hauteur"><strong>@Current.Dimension.Length.ToString("0.##") <span>×</span> @Current.Dimension.Width.ToString("0.##") <span>×</span> @Current.Dimension.Height.ToString("0.##")</strong></span>
+    </div>
     <div class="parcel-reason">@Current.Reason</div>
     @if (Decision is null) { <div class="demo-note">Aperçu visuel — remplacé dès le premier colis traité.</div> }
 </section>
