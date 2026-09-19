@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+logs/
+appsettings.Production.json
+conveyor.settings.json
+conveyor.settings.json.tmp
+test-diag.log

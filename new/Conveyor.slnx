@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Conveyor.Web.Tests/Conveyor.Web.Tests.csproj" />
+  <Project Path="Conveyor.Web/Conveyor.Web.csproj" />
+</Solution>

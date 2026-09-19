@@ -1,0 +1,54 @@
+@page "/logs"
+@implements IDisposable
+@inject ILogStore LogStore
+
+<PageTitle>Journaux</PageTitle>
+
+<header class="dashboard-header">
+    <div><span class="eyebrow">DIAGNOSTIC</span><h1>Journaux en direct</h1><p>Événements récents des lignes, appareils, base et automate</p></div>
+    <button class="btn btn-reset" @onclick="Clear">Effacer l’affichage</button>
+</header>
+
+<section class="log-toolbar">
+    <label>Niveau
+        <select @bind="_minimum" @bind:after="Refresh">
+            <option value="Information">Information</option>
+            <option value="Warning">Avertissement</option>
+            <option value="Error">Erreur</option>
+        </select>
+    </label>
+    <label>Recherche
+        <input @bind="_search" @bind:event="oninput" @bind:after="Refresh" placeholder="ligne, caméra, automate…" />
+    </label>
+    <span class="log-count">@_entries.Count événement(s)</span>
+</section>
+
+<section class="log-panel">
+    @if (_entries.Count == 0)
+    {
+        <div class="log-empty">Aucun événement correspondant.</div>
+    }
+    @foreach (var entry in _entries)
+    {
+        <article class="log-row @entry.Level.ToString().ToLowerInvariant()">
+            <time>@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</time>
+            <span class="log-level">@Label(entry.Level)</span>
+            <span class="log-source">@ShortSource(entry.Source)</span>
+            <span class="log-message">@entry.Message</span>
+            @if (!string.IsNullOrWhiteSpace(entry.Exception)) { <details><summary>Détails</summary><pre>@entry.Exception</pre></details> }
+        </article>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<RuntimeLogEntry> _entries = [];
+    private LogLevel _minimum = LogLevel.Information;
+    private string _search = "";
+    protected override void OnInitialized() { LogStore.Changed += OnChanged; Refresh(); }
+    private void Refresh() => _entries = LogStore.GetRecent(500, _minimum, _search);
+    private void Clear() => LogStore.Clear();
+    private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
+    private static string ShortSource(string source) => source.Replace("Microsoft.AspNetCore.", "ASP.NET/");
+    private static string Label(LogLevel level) => level switch { LogLevel.Warning => "AVERT.", LogLevel.Error or LogLevel.Critical => "ERREUR", _ => "INFO" };
+    public void Dispose() => LogStore.Changed -= OnChanged;
+}

@@ -1,0 +1,85 @@
+@page "/"
+@implements IDisposable
+@inject IConveyorSupervisor Supervisor
+@inject IOptions<ConveyorOptions> Options
+@inject IDatabaseMetricsService DatabaseMetrics
+
+<PageTitle>Contrôle des convoyeurs</PageTitle>
+
+<header class="dashboard-header">
+    <div><span class="eyebrow">CENTRE DE CONTRÔLE</span><h1>Convoyeurs</h1><p>Supervision en temps réel de @_lines.Count ligne(s)</p></div>
+    <div class="header-summary">
+        <div class="shared-status" title="@PlcTitle()"><span class="connection-led @PlcCss()"></span><div><small>AUTOMATE</small><strong>@PlcLabel()</strong></div></div>
+        <div class="database-summary">
+            <div class="database-summary-title"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
+            <div class="database-count"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
+            <div class="database-count"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
+        </div>
+        <div class="mode-pill @(Options.Value.Simulation ? "simulation" : "production")"><span class="status-dot"></span>@(Options.Value.Simulation ? "Simulation appareils" : "Mode production")</div>
+    </div>
+</header>
+
+<section class="line-grid">
+@foreach (var line in _lines)
+{
+    <article class="line-card">
+        <div class="line-title"><div><span class="line-number">LIGNE @(line.LineId + 1)</span><h2>@line.Name</h2></div><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
+        <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
+        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @Metric("Rejets",line.Counters.Rejected) @Metric("Sans lecture",line.Counters.NoReads) @Metric("Erreurs dim.",line.Counters.DimensionErrors) @Metric("Erreurs poids",line.Counters.ScaleErrors) @Metric("Enregistrés",line.Counters.DatabaseInserts)</div>
+        <div class="last-sort">
+            <span>DERNIÈRE DÉCISION</span>
+            @if (line.LastDecision is null) { <p class="empty">Aucun colis traité</p> }
+            else { <div class="decision-row"><strong class="chute">@line.LastDecision.Chute</strong><div><b>@(string.IsNullOrEmpty(line.LastDecision.Barcode) ? "Code inconnu" : line.LastDecision.Barcode)</b><small>@line.LastDecision.Reason · @line.LastDecision.Weight.ToString("0.##") lb · @line.LastDecision.Dimension.Length×@line.LastDecision.Dimension.Width×@line.LastDecision.Dimension.Height</small></div></div> }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
+        <div class="actions">
+            <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
+            <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
+            <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Réinitialiser</button>
+            @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
+        </div>
+    </article>
+}
+</section>
+
+@code {
+    private IReadOnlyList<LineSnapshot> _lines = [];
+    private DatabaseReferenceCounts _database = new(0, 0, false, true, DateTimeOffset.MinValue);
+    private readonly HashSet<int> _busyLines = [];
+    protected override void OnInitialized() { Supervisor.Changed += OnChanged; DatabaseMetrics.Changed += OnChanged; Refresh(); }
+    private RenderFragment Connection(string label, bool connected, bool simulated) => @<div class="connection-item" title="@(simulated ? "Simulation — aucune connexion physique" : connected ? "Connexion établie" : "Déconnecté")"><span class="connection-led @(simulated ? "sim" : connected ? "ok" : "ko")"></span><span>@label</span></div>;
+    private RenderFragment Metric(string label, long value) => @<div class="metric"><strong>@value.ToString("N0")</strong><span>@label</span></div>;
+    private bool IsBusy(int id) => _busyLines.Contains(id);
+    private async Task StartConnections(int id)
+    {
+        _busyLines.Add(id);
+        try
+        {
+            var line = _lines.First(item => item.LineId == id);
+            if (line.Running) await Supervisor.RestartLineAsync(id); else await Supervisor.StartLineAsync(id);
+        }
+        finally { _busyLines.Remove(id); Refresh(); }
+    }
+    private async Task StopConnections(int id)
+    {
+        _busyLines.Add(id);
+        try { await Supervisor.StopLineAsync(id); }
+        finally { _busyLines.Remove(id); Refresh(); }
+    }
+    private void Reset(int id) => Supervisor.ResetCounters(id);
+    private Task Inject(int id) => Supervisor.SimulateParcelAsync(id,"12345678901,H2X1Y4",new Dimension(12.4m,8.1m,5.2m),4.75m);
+    private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
+    private void Refresh() { _lines = Supervisor.GetSnapshots(); _database = DatabaseMetrics.Current; }
+    private string DatabaseCss() => _database.Simulated ? "sim" : _database.Connected ? "ok" : "ko";
+    private bool PlcSimulated() => _lines.Count > 0 && _lines.All(line => line.Connections.Simulated);
+    private bool PlcConnected() { var running = _lines.Where(line => line.Running).ToArray(); return running.Length > 0 && running.All(line => line.Connections.Plc); }
+    private string PlcCss() => PlcSimulated() ? "sim" : PlcConnected() ? "ok" : "ko";
+    private string PlcLabel() => PlcSimulated() ? "Simulation" : PlcConnected() ? "Connecté" : "Déconnecté";
+    private string PlcTitle() => PlcSimulated() ? "Automate simulé — aucune connexion physique" : PlcConnected() ? "Connexion automate établie" : "Connexion automate indisponible";
+    private static bool LineAvailable(LineSnapshot line) => line.Connections.Simulated ||
+        (line.Connections.Camera && line.Connections.Dimensioner && line.Connections.Scale && line.Connections.Database && line.Connections.Plc);
+    private static string LineStateLabel(LineSnapshot line) => !line.Running ? "EN ARRÊT" : LineAvailable(line) ? "EN MARCHE" : "NON DISPONIBLE";
+    private static string LineStateCss(LineSnapshot line) => !line.Running ? "off" : LineAvailable(line) ? "on" : "unavailable";
+    private static string FormatCount(long value) => value.ToString("N0");
+    public void Dispose() { Supervisor.Changed -= OnChanged; DatabaseMetrics.Changed -= OnChanged; }
+}

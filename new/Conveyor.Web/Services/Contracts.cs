@@ -1,0 +1,43 @@
+using Conveyor.Web.Domain;
+
+namespace Conveyor.Web.Services;
+
+public interface IConveyorRepository
+{
+    bool IsSimulation { get; }
+    Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
+    Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
+    Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
+    Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken cancellationToken);
+    Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken cancellationToken);
+    Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
+    Task<bool> PingAsync(CancellationToken cancellationToken);
+    Task<(long Parcels, long PostalCodes)> GetReferenceCountsAsync(CancellationToken cancellationToken);
+}
+
+public interface IDatabaseMetricsService
+{
+    event Action? Changed;
+    DatabaseReferenceCounts Current { get; }
+    Task RefreshAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IPlcGateway
+{
+    bool IsConnected { get; }
+    Task ConnectAsync(CancellationToken cancellationToken);
+    Task DisconnectAsync();
+    Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken cancellationToken);
+    Task<bool> PingAsync(CancellationToken cancellationToken);
+}
+
+public interface IConveyorSupervisor
+{
+    event Action? Changed;
+    IReadOnlyList<LineSnapshot> GetSnapshots();
+    Task StartLineAsync(int lineId);
+    Task RestartLineAsync(int lineId);
+    Task StopLineAsync(int lineId);
+    void ResetCounters(int lineId);
+    Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight);
+}
