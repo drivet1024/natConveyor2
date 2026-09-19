@@ -8,6 +8,30 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
+    public async Task Database_counter_reads_current_history_total_including_decreases()
+    {
+        var repository = new FakeRepository { ScanCount = 1234 };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        Assert.Equal(1234, metrics.Current.Scans);
+        repository.ScanCount = 12;
+        await metrics.RefreshAsync();
+        Assert.Equal(12, metrics.Current.Scans);
+    }
+
+    [Fact]
+    public async Task Database_counter_keeps_last_total_when_read_fails()
+    {
+        var repository = new FakeRepository { ScanCount = 1234 };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        repository.FailCounts = true;
+        await metrics.RefreshAsync();
+        Assert.Equal(1234, metrics.Current.Scans);
+        Assert.False(metrics.Current.Connected);
+    }
+
+    [Fact]
     public async Task Known_waybill_uses_configured_route()
     {
         var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
@@ -48,6 +72,8 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public long ScanCount { get; set; }
+        public bool FailCounts { get; set; }
         public bool IsSimulation => true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
             barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, false) : null);
@@ -57,6 +83,8 @@ public sealed class SortEngineTests
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
         public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
-        public Task<(long Parcels, long PostalCodes)> GetReferenceCountsAsync(CancellationToken token) => Task.FromResult((0L, 0L));
+        public Task<(long Parcels, long PostalCodes, long Scans)> GetReferenceCountsAsync(CancellationToken token) =>
+            FailCounts ? Task.FromException<(long, long, long)>(new IOException("Database unavailable"))
+                : Task.FromResult((0L, 0L, ScanCount));
     }
 }

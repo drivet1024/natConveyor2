@@ -6,7 +6,7 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
     : BackgroundService, IDatabaseMetricsService
 {
     private readonly object _gate = new();
-    private DatabaseReferenceCounts _current = new(0, 0, false, repository.IsSimulation, DateTimeOffset.MinValue);
+    private DatabaseReferenceCounts _current = new(0, 0, 0, false, repository.IsSimulation, DateTimeOffset.MinValue);
     public event Action? Changed;
     public DatabaseReferenceCounts Current { get { lock (_gate) return _current; } }
 
@@ -15,7 +15,7 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
         try
         {
             var counts = await repository.GetReferenceCountsAsync(cancellationToken);
-            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, true, repository.IsSimulation, DateTimeOffset.Now);
+            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, counts.Scans, true, repository.IsSimulation, DateTimeOffset.Now);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

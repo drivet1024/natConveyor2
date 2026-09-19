@@ -45,7 +45,7 @@ public sealed class LineCounters
 
 public sealed record ConnectionState(bool Camera, bool Dimensioner, bool Scale, bool Database, bool Plc, bool Simulated = false, bool DatabaseSimulated = false);
 
-public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, bool Connected, bool Simulated, DateTimeOffset UpdatedAt);
+public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt);
 
 public sealed record LineSnapshot(
     int LineId,
