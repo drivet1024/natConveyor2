@@ -8,6 +8,8 @@ public sealed record Dimension(decimal Length, decimal Width, decimal Height, in
 }
 
 public sealed record TimedValue<T>(T Value, DateTimeOffset Timestamp);
+public sealed record ConveyorShift(int Id, string Name);
+
 public sealed record Shipment(string ShippingId, int CustomerId, int RouteId, bool DisableCode98, string? DestinationPostalCode = null);
 
 public sealed record ParcelContext(

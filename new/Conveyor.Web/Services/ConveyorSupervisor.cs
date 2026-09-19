@@ -21,8 +21,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         if (_configuration.General?.DepotId != 2)
             throw new InvalidOperationException("Le choix de shift est réservé au dépôt 2.");
-        var shifts = await _repository.GetShiftIdsAsync(CancellationToken.None);
-        if (!shifts.Contains(shiftId))
+        var shifts = await _repository.GetShiftsAsync(CancellationToken.None);
+        if (!shifts.Any(shift => shift.Id == shiftId))
             throw new InvalidOperationException("Ce shift n’est pas disponible dans les routes configurées.");
         await _shiftGate.WaitAsync();
         try

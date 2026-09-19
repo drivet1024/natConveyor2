@@ -87,14 +87,14 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
             reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : Convert.ToString(reader["dest_postal_code"], CultureInfo.InvariantCulture));
     }
 
-    public async Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
-        await using var command = new MySqlCommand("select distinct shift_id from conveyor_shift_route where shift_id is not null order by shift_id", connection);
+        await using var command = new MySqlCommand("select id, name from conveyor_shift order by id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var shifts = new List<int>();
-        while (await reader.ReadAsync(cancellationToken)) shifts.Add(reader.GetInt32(0));
+        var shifts = new List<ConveyorShift>();
+        while (await reader.ReadAsync(cancellationToken)) shifts.Add(new(reader.GetInt32(0), reader.IsDBNull(1) ? $"Shift {reader.GetInt32(0)}" : reader.GetString(1)));
         return shifts;
     }
 
@@ -214,7 +214,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => true;
-    public Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<int>>([1, 2]);
+    public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
     public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) =>
         Task.FromResult<Shipment?>(barcode.StartsWith("123456789", StringComparison.Ordinal)
             ? new("12345678901", 1, 10, false) : null);

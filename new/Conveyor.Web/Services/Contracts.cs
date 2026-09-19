@@ -5,7 +5,7 @@ namespace Conveyor.Web.Services;
 public interface IConveyorRepository
 {
     bool IsSimulation { get; }
-    Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken);
     Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);

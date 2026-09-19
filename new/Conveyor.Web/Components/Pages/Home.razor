@@ -45,12 +45,12 @@
             @if (Options.Value.General?.DepotId == 2)
             {
                 <label class="shift-choice">Shift
-                    <select value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shiftIds.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
-                        @if (!_shiftIds.Contains(Supervisor.CurrentShiftId))
+                    <select value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shifts.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
+                        @if (!_shifts.Any(shift => shift.Id == Supervisor.CurrentShiftId))
                         {
-                            <option value="@Supervisor.CurrentShiftId">@Supervisor.CurrentShiftId (actuel)</option>
+                            <option value="@Supervisor.CurrentShiftId">Shift @Supervisor.CurrentShiftId — non défini</option>
                         }
-                        @foreach (var shift in _shiftIds) { <option value="@shift">@shift</option> }
+                        @foreach (var shift in _shifts) { <option value="@shift.Id">@shift.Name</option> }
                     </select>
                 </label>
                 @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
@@ -62,7 +62,7 @@
 </section>
 
 @code {
-    private IReadOnlyList<int> _shiftIds = [];
+    private IReadOnlyList<ConveyorShift> _shifts = [];
     private bool _changingShift;
     private string? _shiftError;
     protected override async Task OnInitializedAsync()
@@ -73,8 +73,8 @@
     {
         try
         {
-            _shiftIds = await Repository.GetShiftIdsAsync(CancellationToken.None);
-            _shiftError = _shiftIds.Count == 0 ? "Aucun shift dans les routes configurées." : null;
+            _shifts = await Repository.GetShiftsAsync(CancellationToken.None);
+            _shiftError = _shifts.Count == 0 ? "Aucun shift dans la table conveyor_shift." : null;
         }
         catch { _shiftError = "Impossible de charger les shifts depuis MySQL."; }
     }
