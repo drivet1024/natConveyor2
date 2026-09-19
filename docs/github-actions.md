@@ -94,5 +94,14 @@ Le paquet est conservé sept jours dans GitHub. La vérification HTTP attend env
 une minute ; elle ne valide pas les connexions physiques aux appareils. Le job
 signale les erreurs sans retour automatique à la version précédente.
 
+Pendant le remplacement des fichiers, la tâche est temporairement désactivée.
+Le script attend la sortie des processus Conveyor du dossier cible et vérifie
+les verrous avant toute copie. Un verrou temporaire est réessayé pendant 30 secondes.
+Si un fichier reste verrouillé, vérifier les instances ouvertes manuellement et
+les droits du compte runner ; le script ne termine pas les autres programmes.
+La tâche est réactivée même en cas d'erreur, mais l'application n'est relancée
+qu'après une copie réussie. Après un correctif du script, utiliser la nouvelle
+exécution déclenchée par le push : relancer un ancien job réutilise son ancien paquet.
+
 Références : [transfert d'artefacts entre jobs](https://docs.github.com/en/actions/tutorials/store-and-share-data),
 [téléchargement d'artefacts](https://github.com/actions/download-artifact).

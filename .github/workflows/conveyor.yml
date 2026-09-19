@@ -49,6 +49,9 @@ jobs:
       - name: Publier
         run: dotnet publish new/Conveyor.Web/Conveyor.Web.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:RUNNER_TEMP/conveyor-package/app"
 
+      - name: Verifier les verrous de deploiement
+        run: ./scripts/Test-DeploymentFileLocks.ps1
+
       - name: Inclure les scripts d'installation
         run: |
           New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/conveyor-package/scripts" -Force | Out-Null
