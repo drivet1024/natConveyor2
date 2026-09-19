@@ -200,6 +200,7 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<int>>([1, 2]);
         public long ScanCount { get; set; }
         public bool HasOverdueScans { get; set; }
         public bool FailCounts { get; set; }

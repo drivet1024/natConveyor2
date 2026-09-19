@@ -5,6 +5,7 @@ namespace Conveyor.Web.Services;
 public interface IConveyorRepository
 {
     bool IsSimulation { get; }
+    Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken);
     Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
@@ -35,6 +36,8 @@ public interface IConveyorSupervisor
 {
     event Action? Changed;
     IReadOnlyList<LineSnapshot> GetSnapshots();
+    int CurrentShiftId { get; }
+    Task SetShiftAsync(int shiftId);
     Task StartLineAsync(int lineId);
     Task RestartLineAsync(int lineId);
     Task StopLineAsync(int lineId);

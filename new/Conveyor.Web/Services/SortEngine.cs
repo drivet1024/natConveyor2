@@ -11,6 +11,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
     public async Task<SortDecision> DecideAsync(LineOptions line, ParcelContext parcel, CancellationToken token)
     {
+        var shiftId = line.ShiftId;
         var code98Enabled = line.ValidateDimensionsAndWeight;
         var missingMeasurements = parcel.Weight <= 0 || parcel.Dimension.Length <= 0 ||
             parcel.Dimension.Width <= 0 || parcel.Dimension.Height <= 0;
@@ -43,7 +44,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             matchedShipment = shipment;
             if (barcode.Length >= 11) barcode = barcode[..11];
             goodBarcodes.Add(barcode);
-            var configuredChute = await repository.FindChuteForRouteAsync(line.ShiftId, shipment.RouteId, token);
+            var configuredChute = await repository.FindChuteForRouteAsync(shiftId, shipment.RouteId, token);
             if (configuredChute is > 0)
             {
                 chute = configuredChute.Value;
@@ -80,7 +81,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
         if (line.PostalCodeSort && postalCodes.Length == 1 && (chute == line.RejectedChute || chute == 86))
         {
-            var postalChute = await repository.FindChuteForPostalCodeAsync(line.ShiftId, postalCodes[0], token);
+            var postalChute = await repository.FindChuteForPostalCodeAsync(shiftId, postalCodes[0], token);
             if (postalChute is > 0)
             {
                 chute = postalChute.Value;

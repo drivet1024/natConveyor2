@@ -1,0 +1,4 @@
+
+.shift-choice { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--muted); }
+.shift-choice select { background: #0d1317; color: #fff; border: 1px solid #36464d; border-radius: 4px; padding: .45rem .5rem; min-width: 4rem; }
+.shift-error { color: #ff6677; font-size: .75rem; }

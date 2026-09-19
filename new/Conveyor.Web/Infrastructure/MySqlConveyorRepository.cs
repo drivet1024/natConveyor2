@@ -64,6 +64,17 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
             reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : Convert.ToString(reader["dest_postal_code"], CultureInfo.InvariantCulture));
     }
 
+    public async Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new MySqlCommand("select distinct shift_id from conveyor_shift_route where shift_id is not null order by shift_id", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var shifts = new List<int>();
+        while (await reader.ReadAsync(cancellationToken)) shifts.Add(reader.GetInt32(0));
+        return shifts;
+    }
+
     public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) =>
         ScalarIntAsync("select chute_no from conveyor_shift_route where shift_id=@shift and new_route_id=@route limit 1",
             [("@shift", shiftId), ("@route", routeId)], token);
@@ -173,6 +184,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => true;
+    public Task<IReadOnlyList<int>> GetShiftIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<int>>([1, 2]);
     public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) =>
         Task.FromResult<Shipment?>(barcode.StartsWith("123456789", StringComparison.Ordinal)
             ? new("12345678901", 1, 10, false) : null);

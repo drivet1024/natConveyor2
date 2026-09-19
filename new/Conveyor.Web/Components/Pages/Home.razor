@@ -1,5 +1,6 @@
 @page "/"
 @implements IDisposable
+@inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
 @inject IOptions<ConveyorOptions> Options
 @inject IDatabaseMetricsService DatabaseMetrics
@@ -41,6 +42,19 @@
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
                     title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
                     @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+            @if (Options.Value.General?.DepotId == 2)
+            {
+                <label class="shift-choice">Shift
+                    <select value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shiftIds.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
+                        @if (!_shiftIds.Contains(Supervisor.CurrentShiftId))
+                        {
+                            <option value="@Supervisor.CurrentShiftId">@Supervisor.CurrentShiftId (actuel)</option>
+                        }
+                        @foreach (var shift in _shiftIds) { <option value="@shift">@shift</option> }
+                    </select>
+                </label>
+                @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
+            }
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
         </div>
     </article>
@@ -48,6 +62,31 @@
 </section>
 
 @code {
+    private IReadOnlyList<int> _shiftIds = [];
+    private bool _changingShift;
+    private string? _shiftError;
+    protected override async Task OnInitializedAsync()
+    {
+        if (Options.Value.General?.DepotId == 2) await LoadShifts();
+    }
+    private async Task LoadShifts()
+    {
+        try
+        {
+            _shiftIds = await Repository.GetShiftIdsAsync(CancellationToken.None);
+            _shiftError = _shiftIds.Count == 0 ? "Aucun shift dans les routes configurées." : null;
+        }
+        catch { _shiftError = "Impossible de charger les shifts depuis MySQL."; }
+    }
+    private async Task ChangeShift(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var shift)) return;
+        _changingShift = true;
+        _shiftError = null;
+        try { await Supervisor.SetShiftAsync(shift); }
+        catch (Exception exception) { _shiftError = exception.Message; }
+        finally { _changingShift = false; }
+    }
     private IReadOnlyList<LineSnapshot> _lines = [];
     private DatabaseReferenceCounts _database = new(0, 0, 0, false, true, DateTimeOffset.MinValue);
     private readonly HashSet<int> _busyLines = [];

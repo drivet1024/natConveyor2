@@ -10,12 +10,33 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly Dictionary<int, LineController> _lines;
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
+    private readonly ConveyorOptions _configuration;
+    private readonly IConveyorRepository _repository;
+    private readonly ILogger _logger;
+    public int CurrentShiftId => _configuration.General!.ShiftId;
+
+    public async Task SetShiftAsync(int shiftId)
+    {
+        if (_configuration.General?.DepotId != 2)
+            throw new InvalidOperationException("Le choix de shift est réservé au dépôt 2.");
+        var shifts = await _repository.GetShiftIdsAsync(CancellationToken.None);
+        if (!shifts.Contains(shiftId))
+            throw new InvalidOperationException("Ce shift n’est pas disponible dans les routes configurées.");
+        foreach (var line in _configuration.Lines) line.ShiftId = shiftId;
+        _configuration.General.ShiftId = shiftId;
+        _logger.LogInformation("Dépôt 2 : shift {Shift} sélectionné pour les deux lignes", shiftId);
+        Changed?.Invoke();
+    }
+
     public event Action? Changed;
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
         SortEngine sortEngine, ILoggerFactory loggerFactory)
     {
         var configuration = options.Value;
+        _configuration = configuration;
+        _repository = repository;
+        _logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         var activeLines = configuration.GetConfiguredLines().ToArray();
         var primaryLine = activeLines.First();
         _plc = configuration.Simulation
