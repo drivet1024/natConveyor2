@@ -29,7 +29,7 @@
 
 @if (_resetDataMessage is not null)
 {
-    <div class="config-notice @(_resetDataFailed ? "error" : "success")" role="status">@_resetDataMessage</div>
+    <div class="config-notice error" role="status">@_resetDataMessage</div>
 }
 
 <section class="line-grid">
@@ -133,25 +133,19 @@
         finally { _busyLines.Remove(id); Refresh(); }
     }
     private bool _resettingData;
-    private bool _resetDataFailed;
     private string? _resetDataMessage;
     private async Task ResetData()
     {
         if (_resettingData) return;
         _resettingData = true;
         _resetDataMessage = null;
-        _resetDataFailed = false;
         try
         {
             await Repository.ResetDataAsync(CancellationToken.None);
-            _resetDataMessage = Repository.IsSimulation
-                ? "Reset Data simulé — aucune donnée MySQL supprimée."
-                : "Reset Data terminé : scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 vidées.";
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Échec du Reset Data");
-            _resetDataFailed = true;
             _resetDataMessage = "Reset Data interrompu. Des tables peuvent déjà avoir été vidées ; consulter les journaux.";
         }
         finally
