@@ -1,7 +1,10 @@
 .parcel-panel { padding: .8rem 1.35rem; border-bottom: 1px solid var(--line); }
 .parcel-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--orange); font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
 .demo-badge { padding: .2rem .4rem; border: 1px dashed var(--orange); border-radius: 3px; font-size: .6rem; }
-.parcel-main { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .85rem; }
+.parcel-main { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .85rem; flex-wrap: wrap; }
+.parcel-right { display: flex; align-items: flex-end; gap: .5rem; margin-left: auto; }
+.measure-block { text-align: right; }
+.measure-caption { display: block; color: var(--muted); font-size: .6rem; margin-bottom: .2rem; }
 .barcode-block { min-width: 0; }
 .read-status { display: block; font-size: .65rem; color: var(--muted); letter-spacing: .08em; }
 .barcode-value { display: block; margin-top: .2rem; font-family: Consolas, monospace; font-size: clamp(1.4rem, 2.4vw, 2rem); line-height: 1.2; letter-spacing: .04em; color: var(--ink); overflow-wrap: anywhere; }
@@ -17,10 +20,10 @@
 .parcel-code98.disabled { color: var(--red); background: #ff5f6318; }
 .parcel-code98.unknown { color: var(--muted); }
 .parcel-reason, .demo-note { font-size: .72rem; color: var(--muted); }
-.parcel-measures { display: flex; align-items: baseline; gap: .85rem; color: var(--ink); font-size: clamp(1rem, 1.5vw, 1.25rem); line-height: 1.25; font-variant-numeric: tabular-nums; }
+.parcel-measures { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .1rem; min-height: 44px; padding: .2rem .6rem; border: 1px solid #52616c; border-radius: 5px; background: #0b1116; color: var(--ink); font-size: 1.05rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .measure-weight { display: inline-flex; align-items: baseline; gap: .3rem; white-space: nowrap; }
 .measure-weight strong { color: var(--green); }
 .measure-weight small, .measure-dimensions span { color: var(--muted); font-size: .75em; font-weight: 400; }
-.measure-dimensions { border-left: 1px solid var(--line); padding-left: .85rem; }
+.measure-dimensions { white-space: nowrap; }
 .parcel-reason { margin-top: .25rem; }
 .demo-note { margin-top: .6rem; font-style: italic; }

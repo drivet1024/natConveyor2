@@ -8,7 +8,16 @@
             <span class="read-status">@(string.IsNullOrWhiteSpace(Current.Barcode) ? "SANS LECTURE" : "CODE-BARRES LU")</span>
             <strong class="barcode-value">@(string.IsNullOrWhiteSpace(Current.Barcode) ? "Non lu" : Current.Barcode)</strong>
         </div>
-        <div class="chute-block"><small>CHUTE</small><strong>@Current.Chute</strong></div>
+        <div class="parcel-right">
+            <div class="chute-block"><small>CHUTE</small><strong>@Current.Chute</strong></div>
+            <div class="measure-block">
+                <small class="measure-caption">POIDS · DIMENSIONS</small>
+    <div class="parcel-measures">
+        <span class="measure-weight" title="Poids"><strong>@Current.Weight.ToString("0.##")</strong><small>lb</small></span>
+        <span class="measure-dimensions" title="Dimensions : longueur × largeur × hauteur"><strong>@Current.Dimension.Length.ToString("0.##") <span>×</span> @Current.Dimension.Width.ToString("0.##") <span>×</span> @Current.Dimension.Height.ToString("0.##")</strong></span>
+    </div>
+            </div>
+        </div>
     </div>
     <div class="parcel-details">
         <div><small>CODE POSTAL DEST.</small><strong>@(string.IsNullOrWhiteSpace(Current.DestinationPostalCode) ? "—" : Current.DestinationPostalCode)</strong></div>
@@ -16,10 +25,6 @@
         <div class="code98-detail"><small>CODE 98 · COLIS</small>
             <span class="parcel-code98 @Code98Css" title="@Code98Title" aria-label="@Code98Title">98</span>
         </div>
-    </div>
-    <div class="parcel-measures">
-        <span class="measure-weight" title="Poids"><strong>@Current.Weight.ToString("0.##")</strong><small>lb</small></span>
-        <span class="measure-dimensions" title="Dimensions : longueur × largeur × hauteur"><strong>@Current.Dimension.Length.ToString("0.##") <span>×</span> @Current.Dimension.Width.ToString("0.##") <span>×</span> @Current.Dimension.Height.ToString("0.##")</strong></span>
     </div>
     <div class="parcel-reason">@Current.Reason</div>
     @if (Decision is null) { <div class="demo-note">Aperçu visuel — remplacé dès le premier colis traité.</div> }
