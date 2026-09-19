@@ -70,7 +70,7 @@ internal sealed class LineController
 
     public bool Running => _stopping is { IsCancellationRequested: false };
 
-    public async Task StartAsync(bool connectPlc = true)
+    public async Task StartAsync()
     {
         if (Running) return;
         _stopping = new CancellationTokenSource();
@@ -79,7 +79,7 @@ internal sealed class LineController
         _databaseConnected = await _repository.PingAsync(token);
         if (_simulation)
             _logger.LogInformation("Ligne {Line} : mode simulation actif, les connexions aux appareils physiques sont désactivées", _options.Id + 1);
-        if (_controlsPlcConnection && connectPlc)
+        if (_controlsPlcConnection)
         {
             try
             {

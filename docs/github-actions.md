@@ -74,6 +74,8 @@ Un échec des tests empêche les deux déploiements. Un échec ou un runner hors
 sur un ordinateur n'annule pas le déploiement sur l'autre. Les déploiements sont
 sérialisés séparément pour chaque ordinateur.
 
+Au démarrage et après chaque redémarrage, la ligne principale activée au démarrage ouvre aussi la connexion automate DDE (ou TCP selon la configuration), sans clic sur START.
+
 Pour DDE, garder ouverte la session Windows de RSLinx. Elle peut être verrouillée.
 La tâche utilise cette session, même si le runner fonctionne comme service.
 Le compte du runner doit pouvoir écrire dans le dossier cible, arrêter Conveyor

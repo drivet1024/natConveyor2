@@ -68,7 +68,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
-            await line.StartAsync(connectPlc: false);
+            await line.StartAsync();
         try { await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken); }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
