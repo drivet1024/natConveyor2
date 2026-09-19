@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
 <div class="page">
     <div class="sidebar @(_menuCollapsed ? "sidebar-collapsed" : "")">
@@ -13,7 +13,7 @@
 </div>
 
 @code {
-    private bool _menuCollapsed;
+    private bool _menuCollapsed = true;
     private void ToggleMenu() => _menuCollapsed = !_menuCollapsed;
 }
 

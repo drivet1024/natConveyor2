@@ -55,11 +55,18 @@
 }
 
 .metrics .metric {
-    padding: .5rem 1.1rem;
+    padding: .3rem 1.1rem;
+    line-height: 1.15;
 }
 
 .metrics .metric strong {
-    line-height: 1.2;
+    line-height: 1.05;
+}
+
+.metrics .metric > span,
+.metrics .metric-parcels > div > span {
+    display: block;
+    margin-top: .15rem;
 }
 
 .run-state.unavailable {
