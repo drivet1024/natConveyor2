@@ -1,0 +1,38 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<dialog @ref="_dialog" class="data-wait-modal" aria-labelledby="data-wait-title" aria-describedby="data-wait-description">
+    <span class="waiting-spinner" aria-hidden="true"></span>
+    <h2 id="data-wait-title">En attente des données Colis et Code postaux…</h2>
+    <div class="waiting-counts" aria-live="polite">
+        <span class="@(Parcels == 0 ? "missing" : "ready")">Colis : @Parcels.ToString("N0")</span>
+        <span class="@(PostalCodes == 0 ? "missing" : "ready")">Codes postaux : @PostalCodes.ToString("N0")</span>
+    </div>
+    <p id="data-wait-description">Cette fenêtre se fermera automatiquement lorsque les deux listes seront remplies.</p>
+</dialog>
+
+@code {
+    [Parameter] public long Parcels { get; set; }
+    [Parameter] public long PostalCodes { get; set; }
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private bool _disposed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./data-wait-modal.js");
+            if (_disposed) { await _module.DisposeAsync(); return; }
+            await _module.InvokeVoidAsync("show", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

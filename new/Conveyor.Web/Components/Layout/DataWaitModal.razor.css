@@ -1,0 +1,10 @@
+.data-wait-modal { width: min(500px, calc(100vw - 2rem)); padding: 1.6rem; border: 1px solid var(--orange); border-radius: 10px; background: var(--panel); color: var(--ink); text-align: center; box-shadow: 0 16px 60px #0009; }
+.data-wait-modal::backdrop { background: #000b; }
+h2 { font-size: 1.1rem; margin: 1rem 0; }
+p { color: var(--muted); font-size: .8rem; margin: 1rem 0 0; }
+.waiting-counts { display: flex; justify-content: center; flex-wrap: wrap; gap: 1rem; font-size: .85rem; }
+.missing { color: var(--red); }
+.ready { color: var(--green); }
+.waiting-spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--orange); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .waiting-spinner { animation: none; } }

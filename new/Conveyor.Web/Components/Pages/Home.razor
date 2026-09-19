@@ -8,6 +8,11 @@
 
 <PageTitle>Contrôle des convoyeurs</PageTitle>
 
+@if (_database.Parcels == 0 || _database.PostalCodes == 0)
+{
+    <DataWaitModal Parcels="_database.Parcels" PostalCodes="_database.PostalCodes" />
+}
+
 <header class="dashboard-header">
     <div class="control-heading"><h1 class="eyebrow">CENTRE DE CONTRÔLE</h1><span class="software-version" title="Version du logiciel" aria-label="@($"Version du logiciel {SoftwareVersion}")">@SoftwareVersion</span></div>
     <div class="header-summary">
