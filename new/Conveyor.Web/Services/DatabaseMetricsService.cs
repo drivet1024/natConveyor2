@@ -28,7 +28,7 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await RefreshAsync(stoppingToken);
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
         while (await timer.WaitForNextTickAsync(stoppingToken)) await RefreshAsync(stoppingToken);
     }
 }
