@@ -238,6 +238,7 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public Task ResetDataAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
         public long ScanCount { get; set; }
         public bool HasOverdueScans { get; set; }

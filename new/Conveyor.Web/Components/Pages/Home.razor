@@ -1,5 +1,6 @@
 @page "/"
 @implements IDisposable
+@inject ILogger<Home> Logger
 @inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
 @inject IOptions<ConveyorOptions> Options
@@ -20,6 +21,11 @@
     </div>
 </header>
 
+@if (_resetDataMessage is not null)
+{
+    <div class="config-notice @(_resetDataFailed ? "error" : "success")" role="status">@_resetDataMessage</div>
+}
+
 <section class="line-grid">
 @foreach (var line in _lines)
 {
@@ -37,6 +43,7 @@
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
             <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Réinitialiser</button>
+            <button type="button" class="btn btn-reset" disabled="@_resettingData" title="Vider conveyor_shipment, code86 et code98 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Date")</button>
             <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
                     aria-pressed="@(line.Code98Enabled ? "true" : "false")"
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
@@ -118,6 +125,31 @@
         _busyLines.Add(id);
         try { await Supervisor.StopLineAsync(id); }
         finally { _busyLines.Remove(id); Refresh(); }
+    }
+    private bool _resettingData;
+    private bool _resetDataFailed;
+    private string? _resetDataMessage;
+    private async Task ResetData()
+    {
+        if (_resettingData) return;
+        _resettingData = true;
+        _resetDataMessage = null;
+        _resetDataFailed = false;
+        try
+        {
+            await Repository.ResetDataAsync(CancellationToken.None);
+            await DatabaseMetrics.RefreshAsync();
+            _resetDataMessage = Repository.IsSimulation
+                ? "Reset Date simulé — aucune donnée MySQL supprimée."
+                : "Reset Date terminé : conveyor_shipment, code86 et code98 vidées.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Échec du Reset Date");
+            _resetDataFailed = true;
+            _resetDataMessage = "Échec du Reset Date. Consulter les journaux pour le détail.";
+        }
+        finally { _resettingData = false; Refresh(); }
     }
     private void Reset(int id) => Supervisor.ResetCounters(id);
     private Task Inject(int id) => Supervisor.SimulateParcelAsync(id,"12345678901,H2X1Y4",new Dimension(12.4m,8.1m,5.2m),4.75m);

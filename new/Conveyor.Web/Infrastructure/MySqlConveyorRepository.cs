@@ -149,6 +149,20 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         return true;
     }
 
+    public async Task ResetDataAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        foreach (var table in new[] { "conveyor_shipment", "code86", "code98" })
+        {
+            await using var command = new MySqlCommand($"delete from {table}", connection, transaction);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        logger.LogInformation("Reset Date terminé : conveyor_shipment, code86 et code98 vidées dans la base {Database}", connection.Database);
+    }
+
     public async Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token)
     {
         var table = codeType switch { "86" => "code86", "98" => "code98", _ => throw new ArgumentOutOfRangeException(nameof(codeType)) };
@@ -214,6 +228,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => true;
+    public Task ResetDataAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
     public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) =>
         Task.FromResult<Shipment?>(barcode.StartsWith("123456789", StringComparison.Ordinal)
