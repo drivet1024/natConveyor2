@@ -3,4 +3,6 @@
 .shift-choice select { background: #0d1317; color: #fff; border: 1px solid #36464d; border-radius: 4px; padding: .45rem .5rem; min-width: 4rem; }
 .shift-error { color: #ff6677; font-size: .75rem; }
 
-.software-version { font-size: .55em; color: var(--muted); white-space: nowrap; }
+.control-heading { display: flex; align-items: baseline; gap: .65rem; }
+.dashboard-header .control-heading h1 { margin: 0; font-size: .68rem; letter-spacing: .15em; color: var(--orange); font-weight: 800; }
+.software-version { font-size: .75rem; color: var(--muted); white-space: nowrap; }
