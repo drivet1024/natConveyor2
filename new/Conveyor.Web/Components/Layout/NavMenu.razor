@@ -1,31 +1,45 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+<div class="navigation @(Collapsed ? "collapsed" : "")">
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">N // CONVEYOR</a>
+        <a class="navbar-brand" href="" title="Supervision" aria-label="Supervision"><span class="brand-full">N // CONVEYOR</span><span class="brand-short">N</span></a>
+        <button type="button" class="menu-collapse" @onclick="OnToggle"
+                title="@(Collapsed ? "Agrandir le menu" : "Réduire le menu")"
+                aria-label="@(Collapsed ? "Agrandir le menu" : "Réduire le menu")"
+                aria-expanded="@(!Collapsed ? "true" : "false")" aria-controls="main-navigation">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
+    <nav id="main-navigation" class="nav flex-column" aria-label="Navigation principale">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Supervision
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" title="Supervision" aria-label="Supervision">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span><span class="nav-label">Supervision</span>
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="logs">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Journaux
+            <NavLink class="nav-link" href="logs" title="Journaux" aria-label="Journaux">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span><span class="nav-label">Journaux</span>
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="configuration">
-                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Configuration
+            <NavLink class="nav-link" href="configuration" title="Configuration" aria-label="Configuration">
+                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true">⚙</span><span class="nav-label">Configuration</span>
             </NavLink>
         </div>
 
     </nav>
 </div>
 
+
+</div>
+
+@code {
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public EventCallback OnToggle { get; set; }
+}
