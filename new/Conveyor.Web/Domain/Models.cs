@@ -67,4 +67,5 @@ public sealed record LineSnapshot(
     bool Code98Enabled = true,
     DeviceReception? CameraInput = null,
     DeviceReception? DimensionInput = null,
-    DeviceReception? ScaleInput = null);
+    DeviceReception? ScaleInput = null,
+    DeviceReception? PlcInput = null, string PlcTag = "COLISDDE", bool PlcTagSupported = false);

@@ -1,6 +1,20 @@
 <section class="device-feed" aria-label="Réception des appareils">
     <div class="feed-heading"><strong>RÉCEPTION EN DIRECT</strong><span>@(Line.Connections.Simulated ? "DONNÉES SIMULÉES" : "DERNIÈRES TRAMES REÇUES")</span></div>
-    @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera)
+    <div class="camera-plc-row">
+        @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera)
+        <div class="plc-feed">
+            <div class="feed-label"><strong>AUTOMATE · @Line.PlcTag</strong></div>
+            <div class="feed-payload">
+                @if (Line.PlcInput is { } input)
+                {
+                    <code>@Visible(input.Raw)</code>
+                    <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff")</span>
+                }
+                else { <span class="feed-empty">@(Line.PlcTagSupported ? "En attente de valeur DDE" : "Lecture DDE indisponible")</span> }
+                @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
+            </div>
+        </div>
+    </div>
     @DeviceRow("DIMENSIONNEUR", Line.DimensionInput, Line.Connections.Dimensioner)
     @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale)
 </section>

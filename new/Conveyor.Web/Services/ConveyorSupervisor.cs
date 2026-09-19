@@ -52,7 +52,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
-                : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>());
+                : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(), activeLines.Select(line => line.Plc.ChuteTag));
         var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         foreach (var line in activeLines.Where(line => !line.Enabled))
             logger.LogInformation("Ligne {Line} : démarrage automatique désactivé; appareils non connectés jusqu’au START", line.Id + 1);
@@ -63,6 +63,13 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 line.Id == primaryLine.Id, sortEngine,
                 loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke());
         });
+        if (_plc is DdePlcGateway dde) dde.TagChanged += OnPlcTagChanged;
+    }
+
+    private void OnPlcTagChanged(string tag, string value)
+    {
+        foreach (var line in _configuration.GetConfiguredLines().Where(line => string.Equals(line.Plc.ChuteTag, tag, StringComparison.OrdinalIgnoreCase)))
+            Get(line.Id).RecordPlcReception(value);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,6 +88,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public override void Dispose()
     {
+        if (_plc is DdePlcGateway dde) dde.TagChanged -= OnPlcTagChanged;
         (_plc as IDisposable)?.Dispose();
         base.Dispose();
     }

@@ -28,6 +28,16 @@ internal sealed class LineController
     private TimedValue<Dimension>? _lastDimension;
     private TimedValue<decimal>? _lastWeight;
     private SortDecision? _lastDecision;
+    private DeviceReception? _plcInput;
+    public void RecordPlcReception(string value)
+    {
+        lock (_gate)
+        {
+            if (_plcInput?.Raw == value) return;
+            _plcInput = new(value, DateTimeOffset.Now, (_plcInput?.Sequence ?? 0) + 1);
+        }
+        _changed();
+    }
     private DeviceReception? _cameraInput;
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
@@ -164,6 +174,7 @@ internal sealed class LineController
         {
             _counters = new LineCounters();
             _lastDecision = null;
+            _plcInput = null;
             _cameraInput = null;
             _dimensionInput = null;
             _scaleInput = null;
@@ -322,7 +333,7 @@ internal sealed class LineController
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
                     _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
-            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput);
+            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput, _options.Plc.ChuteTag, _plc is DdePlcGateway);
         }
     }
 }

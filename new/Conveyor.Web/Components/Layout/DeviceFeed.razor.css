@@ -12,3 +12,7 @@
 @keyframes received { from { background: var(--green); box-shadow: 0 0 6px var(--green); } to { background: #52616c; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .receive-pulse { animation: none; } }
 @media (max-width: 400px) { .feed-row { grid-template-columns: 85px minmax(0, 1fr); } }
+
+.camera-plc-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+.plc-feed { padding: .55rem .7rem; border-left: 1px solid var(--line); min-width: 0; }
+.camera-plc-row .feed-row { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
