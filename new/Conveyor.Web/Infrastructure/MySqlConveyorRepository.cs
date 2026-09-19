@@ -1,3 +1,4 @@
+using System.Globalization;
 using Conveyor.Web.Domain;
 using Conveyor.Web.Options;
 using Conveyor.Web.Services;
@@ -137,7 +138,8 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         command.Parameters.AddWithValue("@w", parcel.Dimension.Width);
         command.Parameters.AddWithValue("@weight", parcel.Weight);
         command.Parameters.AddWithValue("@chute", decision.Chute);
-        command.Parameters.AddWithValue("@date", parcel.CameraTimestamp.UtcDateTime);
+        // Keep the legacy 19-character local timestamp (also supported by VARCHAR(19) columns).
+        command.Parameters.AddWithValue("@date", parcel.CameraTimestamp.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("@line", lineId);
         await command.ExecuteNonQueryAsync(token);
     }
@@ -159,7 +161,7 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         await connection.OpenAsync(token);
         const string sql = "select (select count(*) from conveyor_shipment), (select count(*) from location), (select count(*) from scan_history), exists(select 1 from scan_history where date_insert < @cutoff)";
         await using var command = new MySqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@cutoff", DateTime.UtcNow.AddMinutes(-5));
+        command.Parameters.AddWithValue("@cutoff", DateTime.Now.AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         await using var reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return (0, 0, 0, false);
         return (reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetBoolean(3));
