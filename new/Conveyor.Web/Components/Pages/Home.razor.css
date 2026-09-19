@@ -8,3 +8,5 @@
 .software-version { font-size: .75rem; color: var(--muted); white-space: nowrap; }
 
 .database-count.empty-count strong { color: var(--red); }
+
+.actions .btn-code98 { margin-left: auto; }

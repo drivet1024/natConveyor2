@@ -42,13 +42,9 @@
         <div class="actions">
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
-            <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Réinitialiser</button>
+            <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Compteur à 0</button>
             <button type="button" class="btn btn-reset" disabled="@_resettingData" title="Vider conveyor_shipment, code86 et code98 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Date")</button>
-            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
-                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
-                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
-                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
-                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+
             @if (Options.Value.General?.DepotId == 2)
             {
                 <label class="shift-choice">Shift
@@ -63,6 +59,11 @@
                 @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
             }
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
+            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
+                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
+                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
+                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
+                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
         </div>
     </article>
 }
