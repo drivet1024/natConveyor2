@@ -7,7 +7,7 @@ using MySqlConnector;
 
 namespace Conveyor.Web.Infrastructure;
 
-public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) : IConveyorRepository
+public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options, ILogger<MySqlConveyorRepository> logger) : IConveyorRepository
 {
     public bool IsSimulation => false;
     private readonly string _connectionString = options.Value.Database.ConnectionString;
@@ -139,6 +139,9 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
     public async Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token)
     {
         var validBarcode = decision.Barcode.Length is 11 or 12;
+        var table = validBarcode ? "scan_history" : "scan_noWB";
+        logger.LogInformation("Ligne {Line} : insertion prévue dans {Table}; code-barres {Barcode} ({Length} caractères), chute {Chute}",
+            lineId + 1, table, decision.Barcode, decision.Barcode.Length, decision.Chute);
         var sql = validBarcode
             ? "insert into scan_history(parcel_id,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,1)"
             : "insert into scan_noWB(camera_data,l,h,w,weight,chute,date_insert,lineId,source_type) values(@data,@l,@h,@w,@weight,@chute,@date,@line,1)";
@@ -154,7 +157,11 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         // Keep the legacy 19-character local timestamp (also supported by VARCHAR(19) columns).
         command.Parameters.AddWithValue("@date", parcel.CameraTimestamp.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("@line", lineId);
-        await command.ExecuteNonQueryAsync(token);
+        var affected = await command.ExecuteNonQueryAsync(token);
+        if (affected != 1)
+            throw new InvalidOperationException($"Insertion dans {table} : {affected} ligne(s) affectée(s), 1 attendue.");
+        logger.LogInformation("Ligne {Line} : insertion confirmée dans {Database}.{Table}; 1 enregistrement, code-barres {Barcode}",
+            lineId + 1, connection.Database, table, validBarcode ? decision.Barcode[..11] : "sans lecture valide");
     }
 
     public async Task<bool> PingAsync(CancellationToken token)

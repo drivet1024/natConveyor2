@@ -229,12 +229,15 @@ internal sealed class LineController
             dimension?.Timestamp,
             weight is not null && (timestamp - weight.Timestamp).Duration() <= window ? weight.Value : -1,
             weight?.Timestamp);
+        var stage = "calcul de la chute";
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
             _databaseConnected = true;
+            stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await _plc.SendChuteAsync(_options.Plc.ChuteTag, decision.PlcChute, _options.Plc.SendCount, token);
             _plcConnected = true;
+            stage = "insertion MySQL du scan";
             await _repository.SaveScanAsync(_options.Id, parcel, decision, token);
             lock (_gate)
             {
@@ -260,8 +263,8 @@ internal sealed class LineController
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             _databaseConnected = false;
-            lock (_gate) _lastError = exception.Message;
-            _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}; envoi vers le rejet", _options.Id);
+            lock (_gate) _lastError = $"{stage} : {exception.Message}";
+            _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}, étape : {Stage}; envoi vers le rejet", _options.Id + 1, stage);
             try { await _plc.SendChuteAsync(_options.Plc.ChuteTag, _options.RejectedChute, 1, token); }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }
