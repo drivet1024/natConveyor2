@@ -25,7 +25,7 @@
     <article class="line-card">
         <div class="line-title"><div><span class="line-number">LIGNE @(line.LineId + 1)</span><h2>@line.Name</h2></div><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
-        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @Metric("Rejets",line.Counters.Rejected) @Metric("Sans lecture",line.Counters.NoReads) @Metric("Erreurs dim.",line.Counters.DimensionErrors) @Metric("Erreurs poids",line.Counters.ScaleErrors) @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
+        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @Metric("Rejets",line.Counters.Rejected) @Metric("Sans lecture",line.Counters.NoReads) @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
         <div class="last-sort">
             <span>DERNIÈRE DÉCISION</span>
             @if (line.LastDecision is null) { <p class="empty">Aucun colis traité</p> }
@@ -49,6 +49,15 @@
     protected override void OnInitialized() { Supervisor.Changed += OnChanged; DatabaseMetrics.Changed += OnChanged; Refresh(); }
     private RenderFragment Connection(string label, bool connected, bool simulated) => @<div class="connection-item" title="@(simulated ? "Simulation — aucune connexion physique" : connected ? "Connexion établie" : "Déconnecté")"><span class="connection-led @(simulated ? "sim" : connected ? "ok" : "ko")"></span><span>@label</span></div>;
     private RenderFragment Metric(string label, long value, string? title = null) => @<div class="metric" title="@title"><strong>@value.ToString("N0")</strong><span>@label</span></div>;
+    private RenderFragment ErrorMetric(string label, long errors, LineCounters counters) => @<div class="metric" title="Erreurs parmi les colis lus : erreurs ÷ (colis − sans lecture) × 100">
+        <div class="metric-value-row"><strong>@errors.ToString("N0")</strong><span class="metric-percentage">@ErrorPercentage(errors, counters).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
+        <span>@label</span>
+    </div>;
+    private static decimal ErrorPercentage(long errors, LineCounters counters)
+    {
+        var readParcels = counters.TotalParcels - counters.NoReads;
+        return readParcels > 0 ? errors * 100m / readParcels : 0;
+    }
     private bool IsBusy(int id) => _busyLines.Contains(id);
     private async Task StartConnections(int id)
     {

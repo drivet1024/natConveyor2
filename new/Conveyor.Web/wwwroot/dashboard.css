@@ -119,3 +119,6 @@
     .database-summary { grid-template-columns: 1fr 1fr; }
     .database-summary-title { grid-column: 1 / -1; padding: 0 0 .4rem; border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+.metric-value-row { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.metric-value-row .metric-percentage { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -210,8 +210,12 @@ internal sealed class LineController
                 _counters.DatabaseInserts++;
                 if (decision.Chute == _options.RejectedChute || decision.Chute == 99) _counters.Rejected++;
                 if (decision.Chute == _options.NoReadChute) _counters.NoReads++;
-                if (!parcel.Dimension.IsValid(_options.MaximumDimension)) _counters.DimensionErrors++;
-                if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) _counters.ScaleErrors++;
+                else
+                {
+                    // Measurement error rates use read parcels only, excluding no-reads.
+                    if (!parcel.Dimension.IsValid(_options.MaximumDimension)) _counters.DimensionErrors++;
+                    if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) _counters.ScaleErrors++;
+                }
                 if (decision.Reason == "Route de l'expédition") _counters.SortedByWaybill++;
                 if (decision.Reason == "Route du code postal") _counters.SortedByPostalCode++;
                 _lastDimension = null;
