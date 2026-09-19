@@ -7,10 +7,33 @@ using MySqlConnector;
 
 namespace Conveyor.Web.Infrastructure;
 
-public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options, ILogger<MySqlConveyorRepository> logger) : IConveyorRepository
+public sealed class MySqlConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => false;
-    private readonly string _connectionString = options.Value.Database.ConnectionString;
+    private readonly string _connectionString;
+    private readonly ILogger<MySqlConveyorRepository> logger;
+
+    public MySqlConveyorRepository(IOptions<ConveyorOptions> options, ILogger<MySqlConveyorRepository> logger)
+    {
+        this.logger = logger;
+        _connectionString = options.Value.Database.ConnectionString;
+        if (string.IsNullOrWhiteSpace(_connectionString))
+        {
+            logger.LogWarning("Base locale MySQL : aucune adresse configurée (chaîne de connexion absente)");
+            return;
+        }
+        try
+        {
+            var target = new MySqlConnectionStringBuilder(_connectionString);
+            logger.LogInformation("Base locale MySQL : serveur cible {Server}, port {Port}, base {Database} — tentative de connexion au démarrage",
+                target.Server, target.Port, target.Database);
+        }
+        catch (ArgumentException)
+        {
+            // Never log the connection string or parsing exception: they can contain credentials.
+            logger.LogWarning("Base locale MySQL : impossible de déterminer le serveur cible, chaîne de connexion invalide");
+        }
+    }
 
     private MySqlConnection CreateConnection()
     {
