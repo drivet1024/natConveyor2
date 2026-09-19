@@ -9,6 +9,7 @@ public sealed class ConveyorOptions
     [Range(1, 2)] public int LineCount { get => _lineCount ?? Math.Clamp(Lines.Count, 1, 2); set => _lineCount = value; }
     public bool Simulation { get; set; } = true;
     public DatabaseOptions Database { get; set; } = new();
+    public GeneralOptions? General { get; set; }
     public SortingOptions? Sorting { get; set; }
     [MinLength(1), MaxLength(2)] public List<LineOptions> Lines { get; set; } = [];
     public IEnumerable<LineOptions> GetConfiguredLines() => Lines.OrderBy(line => line.Id).Take(LineCount);
@@ -18,6 +19,7 @@ public sealed class ConveyorOptions
         // Older installations only have per-line settings. Use the primary line
         // once; after saving, the global section is authoritative.
         var primary = Lines.OrderBy(line => line.Id).FirstOrDefault() ?? new LineOptions();
+        General ??= new GeneralOptions { Name = primary.Name, DepotId = primary.DepotId, ShiftId = primary.ShiftId };
         Sorting ??= new SortingOptions
         {
             RejectedChute = primary.RejectedChute,
@@ -32,6 +34,9 @@ public sealed class ConveyorOptions
         };
         foreach (var line in Lines)
         {
+            line.Name = General.Name;
+            line.DepotId = General.DepotId;
+            line.ShiftId = General.ShiftId;
             line.RejectedChute = Sorting.RejectedChute;
             line.NoReadChute = Sorting.NoReadChute;
             line.CorrelationDelayMs = Sorting.CorrelationDelayMs;
@@ -43,6 +48,13 @@ public sealed class ConveyorOptions
             line.EnableCode86 = Sorting.EnableCode86;
         }
     }
+}
+
+public sealed class GeneralOptions
+{
+    public string Name { get; set; } = "Convoyeur";
+    public int DepotId { get; set; }
+    public int ShiftId { get; set; }
 }
 
 public sealed class SortingOptions

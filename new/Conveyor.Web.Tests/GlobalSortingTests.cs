@@ -9,6 +9,33 @@ namespace Conveyor.Web.Tests;
 public sealed class GlobalSortingTests
 {
     [Fact]
+    public void GeneralSettingsMigrateFromPrimaryLineAndPreserveIndividualPlcTags()
+    {
+        var options = new ConveyorOptions
+        {
+            Lines = [new() { Id = 1, Name = "Secondaire", DepotId = 99, Plc = new() { ChuteTag = "SECOND" } },
+                new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN" } }]
+        };
+        options.ApplyGlobalSorting();
+        Assert.Equal("Site", options.General!.Name);
+        Assert.Equal(7, options.General.DepotId);
+        Assert.Equal(3, options.General.ShiftId);
+        options.General.Name = "Québec";
+        options.General.DepotId = 8;
+        options.General.ShiftId = 4;
+        var restored = JsonSerializer.Deserialize<ConveyorOptions>(JsonSerializer.Serialize(options))!;
+        restored.ApplyGlobalSorting();
+        Assert.All(restored.Lines, line =>
+        {
+            Assert.Equal("Québec", line.Name);
+            Assert.Equal(8, line.DepotId);
+            Assert.Equal(4, line.ShiftId);
+        });
+        Assert.Equal("SECOND", restored.Lines[0].Plc.ChuteTag);
+        Assert.Equal("MAIN", restored.Lines[1].Plc.ChuteTag);
+    }
+
+    [Fact]
     public void LegacyConfigurationUsesPrimaryLineAndPreservesDeviceSettings()
     {
         var options = new ConveyorOptions

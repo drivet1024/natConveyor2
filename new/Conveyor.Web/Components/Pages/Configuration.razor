@@ -28,9 +28,32 @@
     <section class="config-section">
         <div class="config-section-title"><div><span class="eyebrow">GÉNÉRAL</span><h2>Configuration globale</h2></div></div>
         <div class="config-grid">
+            @TextField("Nom", _general.Name, value => _general.Name = value)
+            @NumberField("Dépôt", _general.DepotId, value => _general.DepotId = value)
+            @NumberField("Shift de départ", _general.ShiftId, value => _general.ShiftId = value)
             <label class="toggle-field"><InputCheckbox @bind-Value="_model.Simulation" /><span>Mode simulation</span><small>Désactiver pour communiquer avec les appareils réels.</small></label>
             <label><span>Nombre de lignes utilisées</span><InputSelect @bind-Value="_model.LineCount"><option value="1">1 ligne</option><option value="2">2 lignes</option></InputSelect><small>Appliqué après enregistrement et redémarrage. Les réglages de la deuxième ligne sont conservés.</small></label>
             <label class="wide-field"><span>Nouvelle chaîne de connexion MySQL</span><InputText type="password" autocomplete="new-password" @bind-Value="_newConnectionString" placeholder="Laisser vide pour conserver la valeur actuelle" /><small>La valeur actuelle n’est jamais affichée dans le navigateur.</small></label>
+        </div>
+        <div class="config-block">
+            <h3>AUTOMATE</h3>
+            <div class="config-grid">
+                <label><span>Protocole automate</span><InputSelect @bind-Value="_plc.Protocol"><option value="Dde">DDE / RSLinx</option><option value="Tcp">Passerelle TCP</option></InputSelect><small>Connexion commune, contrôlée par START/STOP de la ligne principale.</small></label>
+                @if (string.Equals(_plc.Protocol, "Dde", StringComparison.OrdinalIgnoreCase))
+                {
+                    @TextField("Service DDE", _plc.DdeService, value => _plc.DdeService = value)
+                    @TextField("Sujet DDE", _plc.DdeTopic, value => _plc.DdeTopic = value)
+                }
+                else
+                {
+                    @TextField("Adresse passerelle automate", _plc.Host, value => _plc.Host = value)
+                    @NumberField("Port automate", _plc.Port, value => _plc.Port = value)
+                }
+                @foreach (var line in _model.GetConfiguredLines())
+                {
+                    @TextField($"Tag chute automate — ligne {line.Id + 1}", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
+                }
+            </div>
         </div>
             <div class="config-block">
                 <h3>TRI ET VALIDATION — COMMUN AUX DEUX LIGNES</h3>
@@ -51,30 +74,7 @@
     @foreach (var line in _model.GetConfiguredLines())
     {
         <section class="config-section">
-            <div class="config-section-title"><div><span class="eyebrow">LIGNE @(line.Id + 1)</span><h2>@line.Name</h2></div><label class="inline-toggle"><InputCheckbox @bind-Value="line.Enabled" /> Activée au démarrage</label></div>
-            <div class="config-block">
-            <h3>GÉNÉRAL</h3>
-            <div class="config-grid">
-                @TextField("Nom", line.Name, value => line.Name = value)
-                @NumberField("Dépôt", line.DepotId, value => line.DepotId = value)
-                @NumberField("Shift de départ", line.ShiftId, value => line.ShiftId = value)
-                @if (line.Id == 0)
-                {
-                    <label><span>Protocole automate</span><InputSelect @bind-Value="line.Plc.Protocol"><option value="Dde">DDE / RSLinx</option><option value="Tcp">Passerelle TCP</option></InputSelect><small>La connexion est contrôlée uniquement par START/STOP de la ligne principale.</small></label>
-                    @if (string.Equals(line.Plc.Protocol, "Dde", StringComparison.OrdinalIgnoreCase))
-                    {
-                        @TextField("Service DDE", line.Plc.DdeService, value => line.Plc.DdeService = value)
-                        @TextField("Sujet DDE", line.Plc.DdeTopic, value => line.Plc.DdeTopic = value)
-                    }
-                    else
-                    {
-                        @TextField("Adresse passerelle automate", line.Plc.Host, value => line.Plc.Host = value)
-                        @NumberField("Port automate", line.Plc.Port, value => line.Plc.Port = value)
-                    }
-                }
-                @TextField("Tag chute automate", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
-            </div>
-            </div>
+            <div class="config-section-title"><div><span class="eyebrow">LIGNE @(line.Id + 1)</span></div><label class="inline-toggle"><InputCheckbox @bind-Value="line.Enabled" /> Activée au démarrage</label></div>
             <div class="config-block">
                 <h3>CAMÉRAS</h3>
                 <div class="config-grid">
@@ -122,6 +122,8 @@
 
 @code {
     private ConveyorOptions _model = new();
+    private GeneralOptions _general => _model.General!;
+    private PlcOptions _plc => _model.Lines.OrderBy(line => line.Id).First().Plc;
     private SortingOptions _sorting => _model.Sorting!;
     private string _newConnectionString = "";
     private bool _saving;
