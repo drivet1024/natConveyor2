@@ -15,7 +15,7 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
         try
         {
             var counts = await repository.GetReferenceCountsAsync(cancellationToken);
-            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, counts.Scans, true, repository.IsSimulation, DateTimeOffset.Now);
+            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, counts.Scans, true, repository.IsSimulation, DateTimeOffset.Now, counts.HasOverdueScans);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

@@ -7,6 +7,27 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Fact]
+    public async Task Pending_alert_updates_and_clears_after_old_scans_are_removed()
+    {
+        var repository = new FakeRepository { ScanCount = 7, HasOverdueScans = true };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        Assert.Equal(7, metrics.Current.Scans);
+        Assert.True(metrics.Current.HasOverdueScans);
+        repository.FailCounts = true;
+        await metrics.RefreshAsync();
+        Assert.True(metrics.Current.HasOverdueScans);
+        Assert.False(metrics.Current.Connected);
+        repository.FailCounts = false;
+        repository.ScanCount = 2;
+        repository.HasOverdueScans = false;
+        await metrics.RefreshAsync();
+        Assert.Equal(2, metrics.Current.Scans);
+        Assert.False(metrics.Current.HasOverdueScans);
+        Assert.True(metrics.Current.Connected);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -151,6 +172,7 @@ public sealed class SortEngineTests
     private sealed class FakeRepository : IConveyorRepository
     {
         public long ScanCount { get; set; }
+        public bool HasOverdueScans { get; set; }
         public bool FailCounts { get; set; }
         public bool Disable98 { get; set; }
         public bool IsSimulation => true;
@@ -162,8 +184,8 @@ public sealed class SortEngineTests
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
         public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
-        public Task<(long Parcels, long PostalCodes, long Scans)> GetReferenceCountsAsync(CancellationToken token) =>
-            FailCounts ? Task.FromException<(long, long, long)>(new IOException("Database unavailable"))
-                : Task.FromResult((0L, 0L, ScanCount));
+        public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) =>
+            FailCounts ? Task.FromException<(long, long, long, bool)>(new IOException("Database unavailable"))
+                : Task.FromResult((0L, 0L, ScanCount, HasOverdueScans));
     }
 }

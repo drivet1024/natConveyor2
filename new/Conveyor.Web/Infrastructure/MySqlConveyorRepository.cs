@@ -153,15 +153,16 @@ public sealed class MySqlConveyorRepository(IOptions<ConveyorOptions> options) :
         catch { return false; }
     }
 
-    public async Task<(long Parcels, long PostalCodes, long Scans)> GetReferenceCountsAsync(CancellationToken token)
+    public async Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(token);
-        const string sql = "select (select count(*) from conveyor_shipment), (select count(*) from location), (select count(*) from scan_history)";
+        const string sql = "select (select count(*) from conveyor_shipment), (select count(*) from location), (select count(*) from scan_history), exists(select 1 from scan_history where date_insert < @cutoff)";
         await using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@cutoff", DateTime.UtcNow.AddMinutes(-5));
         await using var reader = await command.ExecuteReaderAsync(token);
-        if (!await reader.ReadAsync(token)) return (0, 0, 0);
-        return (reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2));
+        if (!await reader.ReadAsync(token)) return (0, 0, 0, false);
+        return (reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetBoolean(3));
     }
 }
 
@@ -177,5 +178,5 @@ public sealed class SimulationConveyorRepository : IConveyorRepository
     public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
     public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
     public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
-    public Task<(long Parcels, long PostalCodes, long Scans)> GetReferenceCountsAsync(CancellationToken token) => Task.FromResult((0L, 0L, 0L));
+    public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) => Task.FromResult((0L, 0L, 0L, false));
 }

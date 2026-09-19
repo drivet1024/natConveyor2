@@ -12,7 +12,7 @@ public interface IConveyorRepository
     Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken cancellationToken);
     Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
     Task<bool> PingAsync(CancellationToken cancellationToken);
-    Task<(long Parcels, long PostalCodes, long Scans)> GetReferenceCountsAsync(CancellationToken cancellationToken);
+    Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken cancellationToken);
 }
 
 public interface IDatabaseMetricsService

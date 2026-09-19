@@ -130,3 +130,4 @@
 .metric-parcels .registered-total { margin-left: auto; text-align: right; }
 .line-title.compact-line-title { padding: .55rem 1.35rem; gap: .75rem; }
 .line-title.compact-line-title h2 { margin: 0; font-size: .68rem; line-height: 1.2; }
+.metric-parcels .registered-total.overdue strong { color: var(--red); }
