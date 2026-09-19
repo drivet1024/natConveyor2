@@ -68,8 +68,11 @@ avant ce premier déploiement. Le script n'arrête que l'exécutable du dossier 
 
 Un push sur `main` suffit : compilation et tests sur GitHub, téléchargement puis
 redémarrage sur le serveur. Plus besoin de copier les scripts ou les binaires à la main.
-Les deux jobs s'appellent **Compiler et tester sur GitHub** et **Installer sur le serveur**.
-Un échec des tests empêche le déploiement. Les déploiements sont sérialisés.
+La compilation est unique, puis deux jobs déploient le même paquet :
+**Installer sur CONV-QC** et **Installer sur STH-CONV-H-11**.
+Un échec des tests empêche les deux déploiements. Un échec ou un runner hors ligne
+sur un ordinateur n'annule pas le déploiement sur l'autre. Les déploiements sont
+sérialisés séparément pour chaque ordinateur.
 
 Pour DDE, garder ouverte la session Windows de RSLinx. Elle peut être verrouillée.
 La tâche utilise cette session, même si le runner fonctionne comme service.
@@ -87,8 +90,30 @@ Dans **Settings → Secrets and variables → Actions → Variables**, on peut r
 | `CONVEYOR_HEALTH_URL` | `http://localhost:5164/api/lines` |
 
 Pour changer l'adresse d'écoute, modifier aussi les arguments de la tâche Windows.
-Si plusieurs runners ont les labels ci-dessus, ajouter un label spécifique au
-serveur dans `jobs.deploy.runs-on` pour sélectionner la bonne machine.
+Chaque runner possède un label distinct, déjà attribué dans GitHub :
+
+| Ordinateur | Label de déploiement |
+| --- | --- |
+| `CONV-QC` | `conveyor-qc` |
+| `STH-CONV-H-11` | `conveyor-sth` |
+
+Ne pas attribuer ces deux labels au même runner. La préparation initiale (PowerShell 7,
+tâche Windows, session RSLinx et fichiers de configuration) doit être faite sur
+**chacun des deux ordinateurs**. Aucun dépôt ni SDK n'est nécessaire sur ces PC.
+Le chemin par défaut reste `C:\natconveyor2-dev` et la tâche `Conveyor.Web` sur chacun.
+
+Pour des chemins, tâches ou ports différents, utiliser les variables propres au PC :
+
+| PC | Chemin | Tâche | URL de vérification |
+| --- | --- | --- | --- |
+| CONV-QC | `CONVEYOR_QC_DEPLOY_PATH` | `CONVEYOR_QC_TASK_NAME` | `CONVEYOR_QC_HEALTH_URL` |
+| STH-CONV-H-11 | `CONVEYOR_STH_DEPLOY_PATH` | `CONVEYOR_STH_TASK_NAME` | `CONVEYOR_STH_HEALTH_URL` |
+
+Ces variables prennent priorité sur les variables communes. Les fichiers
+`appsettings*.json` et `conveyor.settings.json` de chaque PC restent locaux et ne
+sont pas remplacés. Configurer sur chaque PC sa base, ses appareils et ses lignes.
+Deux applications visant la même base ou les mêmes appareils ne sont pas isolées
+par le simple fait d'utiliser deux runners.
 
 Le paquet est conservé sept jours dans GitHub. La vérification HTTP attend environ
 une minute ; elle ne valide pas les connexions physiques aux appareils. Le job

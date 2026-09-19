@@ -13,10 +13,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: conveyor-windows
-  cancel-in-progress: false
-
 jobs:
   build:
     name: Compiler et tester sur GitHub
@@ -69,10 +65,27 @@ jobs:
             !${{ runner.temp }}/conveyor-package/app/**/conveyor.settings.json*
 
   deploy:
-    name: Installer sur le serveur
+    name: Installer sur ${{ matrix.target.name }}
     needs: build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.deploy)
-    runs-on: [self-hosted, Windows, X64]
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: CONV-QC
+            label: conveyor-qc
+            path_variable: CONVEYOR_QC_DEPLOY_PATH
+            task_variable: CONVEYOR_QC_TASK_NAME
+            health_variable: CONVEYOR_QC_HEALTH_URL
+          - name: STH-CONV-H-11
+            label: conveyor-sth
+            path_variable: CONVEYOR_STH_DEPLOY_PATH
+            task_variable: CONVEYOR_STH_TASK_NAME
+            health_variable: CONVEYOR_STH_HEALTH_URL
+    runs-on: [self-hosted, Windows, X64, '${{ matrix.target.label }}']
+    concurrency:
+      group: conveyor-deploy-${{ matrix.target.label }}
+      cancel-in-progress: false
     timeout-minutes: 10
     defaults:
       run:
@@ -86,9 +99,9 @@ jobs:
 
       - name: Deployer et redemarrer
         env:
-          CONVEYOR_DEPLOY_PATH: ${{ vars.CONVEYOR_DEPLOY_PATH || 'C:\natconveyor2-dev' }}
-          CONVEYOR_TASK_NAME: ${{ vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
-          CONVEYOR_HEALTH_URL: ${{ vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
+          CONVEYOR_DEPLOY_PATH: ${{ vars[matrix.target.path_variable] || vars.CONVEYOR_DEPLOY_PATH || 'C:\natconveyor2-dev' }}
+          CONVEYOR_TASK_NAME: ${{ vars[matrix.target.task_variable] || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
+          CONVEYOR_HEALTH_URL: ${{ vars[matrix.target.health_variable] || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
         run: |
           $package = Join-Path $env:RUNNER_TEMP "conveyor-package/$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           & "$package/scripts/Deploy-Conveyor.ps1" -SourcePath "$package/app" -DeployPath $env:CONVEYOR_DEPLOY_PATH -TaskName $env:CONVEYOR_TASK_NAME -HealthUrl $env:CONVEYOR_HEALTH_URL
