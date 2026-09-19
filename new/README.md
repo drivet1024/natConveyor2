@@ -45,6 +45,20 @@ Lorsque `Conveyor:Database:ConnectionString` contient une chaîne MySQL, la base
 
 ## API d'exploitation
 
+Le bouton **98** de la supervision active (vert) ou désactive (rouge) la validation
+du poids et des dimensions pour les deux lignes, immédiatement. Un poids absent
+ou nul, ou une dimension absente ou nulle, entraîne la chute 98 lorsque le bouton
+est actif, y compris pour un tri par code postal ou une absence de lecture.
+La protection contre plusieurs expéditions (code 99) reste prioritaire.
+Lorsque le bouton est désactivé, le tri conserve sa décision sans déviation liée
+aux mesures. Les contrôles existants des valeurs maximales restent actifs avec
+le bouton vert. Le compteur **Code 98** compte les traitements enregistrés avec
+la chute 98 ; son pourcentage utilise le total des colis de la ligne.
+Il se remet à zéro avec les autres compteurs.
+
+Le bouton modifie l'état courant. Pour conserver cet état après redémarrage,
+enregistrer **Activer le code 98 (poids et dimensions)** dans Configuration.
+
 - `GET /api/lines`
 - `POST /api/lines/{id}/start`
 - `POST /api/lines/{id}/restart`

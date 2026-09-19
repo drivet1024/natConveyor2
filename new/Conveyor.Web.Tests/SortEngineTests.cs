@@ -68,6 +68,50 @@ public sealed class SortEngineTests
     }
 
     private static LineOptions Line() => new() { Id = 0, ShiftId = 1, RejectedChute = 16, NoReadChute = 1 };
+    [Theory]
+    [InlineData(true, "12345678901", 0, 12, 98)]
+    [InlineData(true, "12345678901", 5, 0, 98)]
+    [InlineData(true, "99999999999,H2X1Y4", 0, 12, 98)]
+    [InlineData(true, "?", 0, 0, 98)]
+    [InlineData(false, "12345678901", 0, 0, 4)]
+    [InlineData(false, "99999999999,H2X1Y4", 0, 0, 7)]
+    [InlineData(false, "?", 0, 0, 1)]
+    [InlineData(true, "12345678901", 5, 12, 4)]
+    [InlineData(true, "12345678901,12345678902", 0, 0, 99)]
+    public async Task Code98_switch_preserves_original_route_when_disabled(bool enabled, string camera, int weight, int length, int expected)
+    {
+        var line = Line();
+        line.ValidateDimensionsAndWeight = enabled;
+        var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
+        var parcel = Parcel(camera) with { Weight = weight, Dimension = new Dimension(length, 8, 5) };
+        var result = await engine.DecideAsync(line, parcel, CancellationToken.None);
+        Assert.Equal(expected, result.Chute);
+        Assert.Equal(expected == 99 ? line.RejectedChute : expected, result.PlcChute);
+    }
+
+    [Fact]
+    public async Task Code98_toggle_is_shared_and_counter_resets()
+    {
+        var config = new ConveyorOptions { Simulation = true, Lines = [new() { Id = 0, CorrelationDelayMs = 0 }, new() { Id = 1 }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
+        try
+        {
+            supervisor.SetCode98Enabled(false);
+            Assert.All(supervisor.GetSnapshots(), line => Assert.False(line.Code98Enabled));
+            await supervisor.SimulateParcelAsync(0, "12345678901", Dimension.Missing, -1);
+            Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
+            supervisor.SetCode98Enabled(true);
+            Assert.All(supervisor.GetSnapshots(), line => Assert.True(line.Code98Enabled));
+            await supervisor.SimulateParcelAsync(0, "12345678901", Dimension.Missing, -1);
+            Assert.Equal(1, supervisor.GetSnapshots()[0].Counters.Code98);
+            supervisor.ResetCounters(0);
+            Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
 
     private sealed class FakeRepository : IConveyorRepository

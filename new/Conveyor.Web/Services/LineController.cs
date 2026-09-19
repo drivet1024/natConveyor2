@@ -209,7 +209,9 @@ internal sealed class LineController
                 _lastError = null;
                 _counters.DatabaseInserts++;
                 if (decision.Chute == _options.RejectedChute || decision.Chute == 99) _counters.Rejected++;
-                if (decision.Chute == _options.NoReadChute) _counters.NoReads++;
+                if (decision.Chute == 98) _counters.Code98++;
+                if (decision.Chute == _options.NoReadChute ||
+                    (parcel.CameraData.Contains('?') && string.IsNullOrEmpty(decision.Barcode))) _counters.NoReads++;
                 else
                 {
                     // Measurement error rates use read parcels only, excluding no-reads.
@@ -257,7 +259,7 @@ internal sealed class LineController
             var counters = new LineCounters
             {
                 CameraReads = _counters.CameraReads, DimensionReads = _counters.DimensionReads, ScaleReads = _counters.ScaleReads,
-                TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads,
+                TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads, Code98 = _counters.Code98,
                 DimensionErrors = _counters.DimensionErrors, ScaleErrors = _counters.ScaleErrors,
                 SortedByWaybill = _counters.SortedByWaybill, SortedByPostalCode = _counters.SortedByPostalCode,
                 DatabaseInserts = _counters.DatabaseInserts
@@ -267,7 +269,7 @@ internal sealed class LineController
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
                     _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
-            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now);
+            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight);
         }
     }
 }

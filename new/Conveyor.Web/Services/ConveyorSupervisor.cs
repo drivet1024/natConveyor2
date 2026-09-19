@@ -10,12 +10,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly Dictionary<int, LineController> _lines;
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
+    private readonly ConveyorOptions _configuration;
     public event Action? Changed;
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
         SortEngine sortEngine, ILoggerFactory loggerFactory)
     {
         var configuration = options.Value;
+        _configuration = configuration;
         var primaryLine = configuration.Lines.OrderBy(line => line.Id).First();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
@@ -61,6 +63,13 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     }
     public Task StopLineAsync(int lineId) => Get(lineId).StopAsync();
     public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
+    public void SetCode98Enabled(bool enabled)
+    {
+        _configuration.ApplyGlobalSorting();
+        _configuration.Sorting!.ValidateDimensionsAndWeight = enabled;
+        _configuration.ApplyGlobalSorting();
+        Changed?.Invoke();
+    }
     public Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight) => Get(lineId).SimulateAsync(cameraData, dimension, weight);
     private LineController Get(int lineId) => _lines.TryGetValue(lineId, out var line) ? line : throw new KeyNotFoundException($"Ligne {lineId} inconnue.");
 }

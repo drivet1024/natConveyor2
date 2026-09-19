@@ -36,6 +36,7 @@ public sealed class LineCounters
     public long TotalParcels { get; set; }
     public long Rejected { get; set; }
     public long NoReads { get; set; }
+    public long Code98 { get; set; }
     public long DimensionErrors { get; set; }
     public long ScaleErrors { get; set; }
     public long SortedByWaybill { get; set; }
@@ -55,4 +56,5 @@ public sealed record LineSnapshot(
     LineCounters Counters,
     SortDecision? LastDecision,
     string? LastError,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool Code98Enabled = true);

@@ -25,7 +25,7 @@
     <article class="line-card">
         <div class="line-title"><div><span class="line-number">LIGNE @(line.LineId + 1)</span><h2>@line.Name</h2></div><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
-        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
+        <div class="metrics">@Metric("Colis",line.Counters.TotalParcels) @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @Metric("Enregistrés",_database.Scans, "Total de scan_history — toutes les lignes, actualisé toutes les 15 secondes")</div>
         <div class="last-sort">
             <span>DERNIÈRE DÉCISION</span>
             @if (line.LastDecision is null) { <p class="empty">Aucun colis traité</p> }
@@ -36,6 +36,11 @@
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
             <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Réinitialiser</button>
+            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "enabled" : "disabled")"
+                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
+                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour les deux lignes" : "Activer le code 98 pour les deux lignes")"
+                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur les deux lignes." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur les deux lignes.")"
+                    @onclick="() => Supervisor.SetCode98Enabled(!line.Code98Enabled)">98</button>
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
         </div>
     </article>

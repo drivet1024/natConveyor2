@@ -11,6 +11,9 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
     public async Task<SortDecision> DecideAsync(LineOptions line, ParcelContext parcel, CancellationToken token)
     {
+        var code98Enabled = line.ValidateDimensionsAndWeight;
+        var missingMeasurements = parcel.Weight <= 0 || parcel.Dimension.Length <= 0 ||
+            parcel.Dimension.Width <= 0 || parcel.Dimension.Height <= 0;
         var tokens = parcel.CameraData.ToUpperInvariant().Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var postalCodes = tokens.Where(x => PostalCodeRegex().IsMatch(x)).Select(x => x.Replace(" ", "")).Distinct().ToArray();
         var candidates = tokens.Where(x => x.Length > 8 && !PostalCodeRegex().IsMatch(x) && !x.Contains('?')).Distinct().ToArray();
@@ -45,7 +48,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
                 reason = "Route de l'expédition";
             }
 
-            if (line.ValidateDimensionsAndWeight)
+            if (code98Enabled && !missingMeasurements)
             {
                 var invalidMeasurements = !parcel.Dimension.IsValid(line.MaximumDimension) ||
                                           parcel.Weight <= 0 || parcel.Weight > line.MaximumWeight;
@@ -81,6 +84,12 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
                 chute = postalChute.Value;
                 reason = "Route du code postal";
             }
+        }
+
+        if (code98Enabled && missingMeasurements)
+        {
+            chute = 98;
+            reason = "Poids ou dimensions manquants";
         }
 
         if (goodBarcodes.Count > 1)
