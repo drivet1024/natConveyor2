@@ -16,3 +16,5 @@
 @media (max-width: 850px) { .database-summary { grid-template-columns: auto auto auto; } }
 
 .shipment-update { display: block; margin-top: .2rem; color: var(--muted); font-size: .6rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.shipment-update.stale { color: var(--red); }

@@ -18,7 +18,7 @@
     <div class="header-summary">
         <div class="shared-status" title="@PlcTitle()"><span class="connection-led @PlcCss()"></span><div><small>AUTOMATE</small><strong>@PlcLabel()</strong></div></div>
         <div class="database-summary">
-            <div class="database-summary-title"><span class="connection-led @DatabaseCss()"></span><div><span>BASE LOCALE</span><small class="shipment-update" title="Dernière insertion ou mise à jour des colis (heure du serveur). Date relue toutes les 30 secondes.">@ShipmentUpdateLabel()</small></div></div>
+            <div class="database-summary-title"><span class="connection-led @DatabaseCss()"></span><div><span>BASE LOCALE</span><small class="shipment-update @(_database.LastShipmentUpdate is { } updated && DateTimeOffset.Now - updated > TimeSpan.FromMinutes(30) ? "stale" : "")" title="Dernière insertion ou mise à jour des colis (heure du serveur). Date relue toutes les 30 secondes.">@ShipmentUpdateLabel()</small></div></div>
             <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
             <div class="database-count @(_database.PostalCodes == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
