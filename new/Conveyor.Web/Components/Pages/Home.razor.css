@@ -10,3 +10,7 @@
 .database-count.empty-count strong { color: var(--red); }
 
 .actions .btn-code98 { margin-left: auto; }
+
+.database-summary { grid-template-columns: auto auto auto auto; }
+.reset-data-button { white-space: nowrap; padding: .4rem .6rem; font-size: .7rem; }
+@media (max-width: 850px) { .database-summary { grid-template-columns: auto auto auto; } }

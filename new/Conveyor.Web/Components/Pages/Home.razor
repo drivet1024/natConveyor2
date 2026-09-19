@@ -16,6 +16,7 @@
             <div class="database-summary-title"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
             <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
             <div class="database-count @(_database.PostalCodes == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
+            <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
     </div>
@@ -43,7 +44,6 @@
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
             <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Compteur à 0</button>
-            <button type="button" class="btn btn-reset" disabled="@_resettingData" title="Vider conveyor_shipment, code86 et code98 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Date")</button>
 
             @if (Options.Value.General?.DepotId == 2)
             {
@@ -139,18 +139,21 @@
         try
         {
             await Repository.ResetDataAsync(CancellationToken.None);
-            await DatabaseMetrics.RefreshAsync();
             _resetDataMessage = Repository.IsSimulation
-                ? "Reset Date simulé — aucune donnée MySQL supprimée."
-                : "Reset Date terminé : conveyor_shipment, code86 et code98 vidées.";
+                ? "Reset Data simulé — aucune donnée MySQL supprimée."
+                : "Reset Data terminé : scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 vidées.";
         }
         catch (Exception exception)
         {
-            Logger.LogError(exception, "Échec du Reset Date");
+            Logger.LogError(exception, "Échec du Reset Data");
             _resetDataFailed = true;
-            _resetDataMessage = "Échec du Reset Date. Consulter les journaux pour le détail.";
+            _resetDataMessage = "Reset Data interrompu. Des tables peuvent déjà avoir été vidées ; consulter les journaux.";
         }
-        finally { _resettingData = false; Refresh(); }
+        finally
+        {
+            try { await DatabaseMetrics.RefreshAsync(); }
+            finally { _resettingData = false; Refresh(); }
+        }
     }
     private void Reset(int id) => Supervisor.ResetCounters(id);
     private Task Inject(int id) => Supervisor.SimulateParcelAsync(id,"12345678901,H2X1Y4",new Dimension(12.4m,8.1m,5.2m),4.75m);

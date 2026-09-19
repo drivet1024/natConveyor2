@@ -153,14 +153,26 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        foreach (var table in new[] { "conveyor_shipment", "code86", "code98" })
+        // TRUNCATE commits independently in MySQL; do not imply transactional rollback.
+        foreach (var sql in new[]
         {
-            await using var command = new MySqlCommand($"delete from {table}", connection, transaction);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            "truncate table scan_history", "truncate table wb", "truncate table conveyor_shipment",
+            "truncate table postalcode", "truncate table location", "delete from code98", "delete from code86"
+        })
+        {
+            try
+            {
+                await using var command = new MySqlCommand(sql, connection);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+                logger.LogInformation("Reset Data : {Operation} terminé dans la base {Database}", sql, connection.Database);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "Reset Data interrompu sur {Operation}; les opérations précédentes restent appliquées", sql);
+                throw;
+            }
         }
-        await transaction.CommitAsync(cancellationToken);
-        logger.LogInformation("Reset Date terminé : conveyor_shipment, code86 et code98 vidées dans la base {Database}", connection.Database);
+        logger.LogInformation("Reset Data terminé : scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 vidées dans la base {Database}", connection.Database);
     }
 
     public async Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token)
