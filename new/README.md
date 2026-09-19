@@ -38,7 +38,8 @@ visibles, avec leurs caractères de contrôle. L'affichage conserve au maximum
 Il affiche la dernière valeur, pas un historique exhaustif de toutes les trames.
 La latence visible dépend de la connexion du navigateur ; aucun délai de
 rafraîchissement périodique n'est ajouté. Le cadre reste vide au démarrage tant
-qu'aucune donnée n'est reçue, même si la dernière décision affiche une démonstration.
+qu'aucune donnée n'est reçue. La dernière décision affiche « Aucun colis traité »
+jusqu'au premier traitement, sans données de démonstration.
 
 Les réglages **Tri et validation** de la page Configuration sont globaux aux deux
 lignes et enregistrés sous `Conveyor:Sorting`. Ils sont appliqués aux deux lignes
