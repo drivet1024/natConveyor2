@@ -115,7 +115,7 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task Code98_toggle_is_shared_and_counter_resets()
+    public async Task Code98_toggle_is_independent_reactivates_and_counter_resets()
     {
         var config = new ConveyorOptions { Simulation = true, Lines = [new() { Id = 0, CorrelationDelayMs = 0 }, new() { Id = 1 }] };
         config.ApplyGlobalSorting();
@@ -124,18 +124,27 @@ public sealed class SortEngineTests
             new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance);
         try
         {
-            supervisor.SetCode98Enabled(false);
-            Assert.All(supervisor.GetSnapshots(), line => Assert.False(line.Code98Enabled));
+            supervisor.SetCode98Enabled(0, false);
+            Assert.False(supervisor.GetSnapshots()[0].Code98Enabled);
+            Assert.True(supervisor.GetSnapshots()[1].Code98Enabled);
             await supervisor.SimulateParcelAsync(0, "12345678901", Dimension.Missing, -1);
             Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
-            supervisor.SetCode98Enabled(true);
+            supervisor.SetCode98Enabled(0, true);
             Assert.All(supervisor.GetSnapshots(), line => Assert.True(line.Code98Enabled));
             await supervisor.SimulateParcelAsync(0, "12345678901", Dimension.Missing, -1);
             Assert.Equal(1, supervisor.GetSnapshots()[0].Counters.Code98);
+            supervisor.SetCode98Enabled(1, false);
+            Assert.True(supervisor.GetSnapshots()[0].Code98Enabled);
+            Assert.False(supervisor.GetSnapshots()[1].Code98Enabled);
+            await supervisor.SimulateParcelAsync(1, "12345678901", Dimension.Missing, -1);
+            Assert.Equal(4, supervisor.GetSnapshots()[1].LastDecision!.Chute);
+            supervisor.SetCode98Enabled(1, true);
+            await supervisor.SimulateParcelAsync(1, "12345678901", Dimension.Missing, -1);
+            Assert.Equal(98, supervisor.GetSnapshots()[1].LastDecision!.Chute);
             supervisor.ResetCounters(0);
             Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code98);
         }
-        finally { await supervisor.StopLineAsync(0); }
+        finally { await supervisor.StopLineAsync(0); await supervisor.StopLineAsync(1); }
     }
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
 

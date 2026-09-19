@@ -35,11 +35,11 @@
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
             <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Réinitialiser</button>
-            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "enabled" : "disabled")"
+            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
                     aria-pressed="@(line.Code98Enabled ? "true" : "false")"
-                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour les deux lignes" : "Activer le code 98 pour les deux lignes")"
-                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur les deux lignes." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur les deux lignes.")"
-                    @onclick="() => Supervisor.SetCode98Enabled(!line.Code98Enabled)">98</button>
+                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
+                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
+                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
         </div>
     </article>

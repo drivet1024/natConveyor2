@@ -141,6 +141,13 @@ internal sealed class LineController
         _changed();
     }
 
+    public void SetCode98Enabled(bool enabled)
+    {
+        _options.ValidateDimensionsAndWeight = enabled;
+        _logger.LogInformation("Ligne {Line}: code 98 {State}", _options.Id, enabled ? "activé" : "désactivé");
+        _changed();
+    }
+
     public async Task SimulateAsync(string cameraData, Dimension dimension, decimal weight)
     {
         if (!_simulation) throw new InvalidOperationException("L'injection est disponible uniquement en mode simulation.");
