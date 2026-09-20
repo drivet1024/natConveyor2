@@ -63,6 +63,11 @@
         <LastDecision Decision="line.LastDecision" />
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
         <div class="actions">
+            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
+                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
+                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
+                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
+                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
 
             @if (Options.Value.General?.DepotId == 2)
             {
@@ -78,12 +83,8 @@
                 @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
             }
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
-            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
-                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
-                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
-                    title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
-                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
-            <button type="button" class="btn" title="Reset des appareils" aria-label="Ouvrir les commandes de reset des appareils" @onclick="() => _converterLineId = line.LineId">⚙</button>
+
+            <button type="button" class="btn gear-button" title="Reset des appareils" aria-label="Ouvrir les commandes de reset des appareils" @onclick="() => _converterLineId = line.LineId">⚙</button>
         </div>
     </article>
 }
