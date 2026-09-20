@@ -13,5 +13,12 @@
 @media (prefers-reduced-motion: reduce) { .receive-pulse { animation: none; } }
 @media (max-width: 400px) { .feed-row { grid-template-columns: 85px minmax(0, 1fr); } }
 
-.camera-plc-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); border-bottom: 1px solid var(--line); }
+.camera-plc-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+.camera-plc-row.has-transfer { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.camera-plc-row > .feed-row { min-width: 0; }
 .plc-feed { padding: .55rem .7rem; border-left: 1px solid var(--line); min-width: 0; }
+.plc-feed .feed-label strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) {
+    .camera-plc-row.has-transfer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .camera-plc-row.has-transfer > .feed-row { grid-column: 1 / -1; }
+}
