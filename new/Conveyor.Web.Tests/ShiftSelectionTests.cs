@@ -25,12 +25,13 @@ public sealed class ShiftSelectionTests
     }
 
     [Fact]
-    public async Task OtherDepotsCannotChangeShiftFromDashboard()
+    public async Task OtherDepotsCanChangeToAnAvailableLocalShift()
     {
         var options = CreateOptions(1);
         using var supervisor = CreateSupervisor(options);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetShiftAsync(2));
-        Assert.All(options.Lines, line => Assert.Equal(1, line.ShiftId));
+        await supervisor.SetShiftAsync(2);
+        Assert.Equal(2, supervisor.CurrentShiftId);
+        Assert.All(options.Lines, line => Assert.Equal(2, line.ShiftId));
     }
 
     private static ConveyorOptions CreateOptions(int depot)

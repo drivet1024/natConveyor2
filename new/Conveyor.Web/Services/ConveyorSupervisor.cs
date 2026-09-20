@@ -31,8 +31,6 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public async Task SetShiftAsync(int shiftId)
     {
-        if (_configuration.General?.DepotId != 2)
-            throw new InvalidOperationException("Le choix de shift est réservé au dépôt 2.");
         var shifts = await _repository.GetShiftsAsync(CancellationToken.None);
         if (!shifts.Any(shift => shift.Id == shiftId))
             throw new InvalidOperationException("Ce shift n’est pas disponible dans les routes configurées.");
@@ -41,7 +39,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         {
             await _editor.SaveShiftAsync(shiftId);
             foreach (var line in _configuration.Lines) line.ShiftId = shiftId;
-            _configuration.General.ShiftId = shiftId;
+            _configuration.General!.ShiftId = shiftId;
             _logger.LogInformation("Dépôt 2 : shift {Shift} sélectionné pour les deux lignes", shiftId);
             Changed?.Invoke();
         }
