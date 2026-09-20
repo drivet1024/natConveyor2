@@ -6,3 +6,7 @@ p { font-size: .8rem; margin-top: 1rem; }
 .error { color: var(--red); }
 .message { color: var(--muted); }
 .close-popup { display: block; margin: 1rem 0 0 auto; }
+
+.command-group { border: 1px solid #52616c; border-radius: 6px; background: #0e151a; margin-top: .85rem; overflow: hidden; }
+.command-group h3 { margin: 0; padding: .6rem .8rem; border-bottom: 1px solid #52616c; background: #1c242b; color: var(--orange); font-size: .75rem; font-weight: 800; letter-spacing: .08em; }
+.command-group .reset-buttons { padding: .85rem .8rem; gap: .75rem; }
