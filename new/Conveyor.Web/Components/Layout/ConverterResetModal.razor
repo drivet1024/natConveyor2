@@ -1,10 +1,12 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject ConverterResetService ResetService
+@inject IConveyorSupervisor Supervisor
 
 <dialog @ref="_dialog" class="converter-dialog" aria-labelledby="converter-title">
-    <h2 id="converter-title">Appareils — ligne @(LineId + 1)</h2>
+    <h2 id="converter-title">Commandes — ligne @(LineId + 1)</h2>
     <div class="reset-buttons">
+        <button type="button" class="btn btn-reset" disabled="@_busy" @onclick="ResetCounters">Compteur à 0</button>
         <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(true)">Reset Balance</button>
         <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(false)">Reset Dimensionneur</button>
     </div>
@@ -32,6 +34,12 @@
             await module.InvokeVoidAsync("show", _dialog);
         }
         catch (JSDisconnectedException) { }
+    }
+    private void ResetCounters()
+    {
+        Supervisor.ResetCounters(LineId);
+        _error = false;
+        _message = "Compteurs remis à zéro.";
     }
     private async Task Reset(bool scale)
     {

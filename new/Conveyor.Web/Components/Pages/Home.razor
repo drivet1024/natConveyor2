@@ -53,7 +53,6 @@
         <div class="actions">
             <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
             <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
-            <button class="btn btn-reset" @onclick="() => Reset(line.LineId)">Compteur à 0</button>
 
             @if (Options.Value.General?.DepotId == 2)
             {
@@ -161,7 +160,6 @@
             finally { _resettingData = false; Refresh(); }
         }
     }
-    private void Reset(int id) => Supervisor.ResetCounters(id);
     private Task Inject(int id) => Supervisor.SimulateParcelAsync(id,"12345678901,H2X1Y4",new Dimension(12.4m,8.1m,5.2m),4.75m);
     private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
     private void Refresh() { _lines = Supervisor.GetSnapshots(); _database = DatabaseMetrics.Current; }
