@@ -48,7 +48,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         await connection.OpenAsync(cancellationToken);
 
         const string byCustomer = """
-            select shipping_id, customer_id, route_id, disable_code98, dest_postal_code
+            select shipping_id, customer_id, new_route_id, disable_code98, dest_postal_code
             from conveyor_shipment where customer_barcode = @barcode limit 1
             """;
         var result = await QueryShipmentAsync(connection, byCustomer, barcode, cancellationToken);
@@ -56,7 +56,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 
         if (!long.TryParse(barcode, out _) || barcode.Length <= 10) return null;
         const string byShipping = """
-            select shipping_id, customer_id, route_id, disable_code98, dest_postal_code
+            select shipping_id, customer_id, new_route_id, disable_code98, dest_postal_code
             from conveyor_shipment
             where left(trim(cast(shipping_id as char)), 9) = @shippingId
                or (reference_no = @reference and customer_id = 129326)
@@ -82,7 +82,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         // Legacy databases can store shipping_id as INT/BIGINT instead of VARCHAR.
         // Convert the actual value; GetString requires a text column.
         return new Shipment(Convert.ToString(reader["shipping_id"], CultureInfo.InvariantCulture)!, reader.GetInt32("customer_id"),
-            reader.GetInt32("route_id"),
+            reader.GetInt32("new_route_id"),
             !reader.IsDBNull(reader.GetOrdinal("disable_code98")) && reader.GetBoolean("disable_code98"),
             reader.IsDBNull(reader.GetOrdinal("dest_postal_code")) ? null : Convert.ToString(reader["dest_postal_code"], CultureInfo.InvariantCulture));
     }
