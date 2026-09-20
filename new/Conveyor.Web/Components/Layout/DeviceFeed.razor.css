@@ -13,5 +13,5 @@
 @media (prefers-reduced-motion: reduce) { .receive-pulse { animation: none; } }
 @media (max-width: 400px) { .feed-row { grid-template-columns: 85px minmax(0, 1fr); } }
 
-.camera-plc-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+.camera-plc-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); border-bottom: 1px solid var(--line); }
 .plc-feed { padding: .55rem .7rem; border-left: 1px solid var(--line); min-width: 0; }

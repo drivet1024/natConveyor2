@@ -53,6 +53,7 @@
                 @foreach (var line in _model.GetConfiguredLines())
                 {
                     @TextField($"Tag chute automate — ligne {line.Id + 1}", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
+                    @TextField($"Tag lecture transfert — ligne {line.Id + 1}", line.Plc.TransferTag, value => line.Plc.TransferTag = value)
                 }
             </div>
         </div>

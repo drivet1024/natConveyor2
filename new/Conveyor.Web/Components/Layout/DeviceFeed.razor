@@ -2,18 +2,11 @@
     <div class="feed-heading"><strong>RÉCEPTION EN DIRECT</strong><span>@(Line.Connections.Simulated ? "DONNÉES SIMULÉES" : "DERNIÈRES TRAMES REÇUES")</span></div>
     <div class="camera-plc-row">
         @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera)
-        <div class="plc-feed">
-            <div class="feed-label"><strong>AUTOMATE · @Line.PlcTag</strong></div>
-            <div class="feed-payload">
-                @if (Line.PlcInput is { } input)
-                {
-                    <code>@Visible(input.Raw)</code>
-                    <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff")</span>
-                }
-                else { <span class="feed-empty">@(Line.PlcTagSupported ? "En attente de valeur DDE" : "Lecture DDE indisponible")</span> }
-                @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
-            </div>
-        </div>
+        @PlcReadout("AUTOMATE", Line.PlcTag, Line.PlcInput, Line.PlcTagSupported)
+        @if (!string.IsNullOrWhiteSpace(Line.PlcTransferTag))
+        {
+            @PlcReadout("TRANSFERT", Line.PlcTransferTag, Line.PlcTransferInput, Line.PlcTransferTagSupported)
+        }
     </div>
     @DeviceRow("DIMENSIONNEUR", Line.DimensionInput, Line.Connections.Dimensioner)
     @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale)
@@ -21,6 +14,18 @@
 
 @code {
     [Parameter, EditorRequired] public LineSnapshot Line { get; set; } = default!;
+    private RenderFragment PlcReadout(string name, string tag, DeviceReception? input, bool supported) => @<div class="plc-feed">
+        <div class="feed-label"><strong>@name · @tag</strong></div>
+        <div class="feed-payload">
+            @if (input is not null)
+            {
+                <code>@Visible(input.Raw)</code>
+                <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff")</span>
+            }
+            else { <span class="feed-empty">@(supported ? "En attente de valeur DDE" : "Lecture DDE indisponible")</span> }
+            @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
+        </div>
+    </div>;
     private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected) => @<div class="feed-row">
         <div class="feed-label"><strong>@name</strong><small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small></div>
         <div class="feed-payload">

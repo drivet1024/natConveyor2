@@ -117,6 +117,7 @@ public sealed class PlcOptions
     public string Host { get; set; } = "127.0.0.1";
     public int Port { get; set; } = 7000;
     public string ChuteTag { get; set; } = "COLISDDE";
+    public string TransferTag { get; set; } = "";
     public int SendCount { get; set; } = 1;
 }
 

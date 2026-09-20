@@ -31,6 +31,7 @@ internal sealed class LineController
     private long _lastUsedScaleSequence;
     private SortDecision? _lastDecision;
     private DeviceReception? _plcInput;
+    private DeviceReception? _plcTransferInput;
     public void RecordPlcReception(string value)
     {
         lock (_gate)
@@ -177,11 +178,21 @@ internal sealed class LineController
             _counters = new LineCounters();
             _lastDecision = null;
             _plcInput = null;
+            _plcTransferInput = null;
             _cameraInput = null;
             _dimensionInput = null;
             _scaleInput = null;
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
+        }
+        _changed();
+    }
+    public void RecordPlcTransferReception(string value)
+    {
+        lock (_gate)
+        {
+            if (_plcTransferInput?.Raw == value) return;
+            _plcTransferInput = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
         }
         _changed();
     }
@@ -381,7 +392,10 @@ internal sealed class LineController
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
                     _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
-            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now, _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput, _options.Plc.ChuteTag, _plc is DdePlcGateway);
+            return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
+                _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
+                _options.Plc.ChuteTag, _plc is DdePlcGateway, _plcTransferInput, _options.Plc.TransferTag,
+                _plc is DdePlcGateway && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag));
         }
     }
 }

@@ -13,8 +13,8 @@ public sealed class GlobalSortingTests
     {
         var options = new ConveyorOptions
         {
-            Lines = [new() { Id = 1, Name = "Secondaire", DepotId = 99, Plc = new() { ChuteTag = "SECOND" } },
-                new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN" } }]
+            Lines = [new() { Id = 1, Name = "Secondaire", DepotId = 99, Plc = new() { ChuteTag = "SECOND", TransferTag = "READ_SECOND" } },
+                new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN", TransferTag = "READ_MAIN" } }]
         };
         options.ApplyGlobalSorting();
         Assert.Equal("Site", options.General!.Name);
@@ -33,6 +33,8 @@ public sealed class GlobalSortingTests
         });
         Assert.Equal("SECOND", restored.Lines[0].Plc.ChuteTag);
         Assert.Equal("MAIN", restored.Lines[1].Plc.ChuteTag);
+        Assert.Equal("READ_SECOND", restored.Lines[0].Plc.TransferTag);
+        Assert.Equal("READ_MAIN", restored.Lines[1].Plc.TransferTag);
     }
 
     [Fact]
