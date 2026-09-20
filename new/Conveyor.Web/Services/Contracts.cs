@@ -40,6 +40,7 @@ public interface IConveyorSupervisor
     event Action? Changed;
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }
+    bool? ConveyorRunning { get; }
     Task SetShiftAsync(int shiftId);
     Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause);
     Task StartLineAsync(int lineId);

@@ -18,5 +18,6 @@
 
 .conveyor-controls { display: flex; align-items: center; gap: .75rem; min-height: 56px; padding: .45rem .75rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .conveyor-controls h2 { margin: 0; white-space: nowrap; color: var(--orange); font-size: .65rem; font-weight: 800; letter-spacing: .09em; }
+.conveyor-controls h2.running { color: var(--green); text-shadow: 0 0 8px #49d17d66; }
 .conveyor-buttons { display: flex; align-items: center; gap: .5rem; }
 .conveyor-buttons .btn { padding: .4rem .6rem; font-size: .7rem; white-space: nowrap; }

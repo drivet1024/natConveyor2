@@ -4,6 +4,8 @@ public sealed record ConveyorActionResult(bool Recorded, string Message);
 
 public static class ConveyorMotion
 {
+    public const string MotionTag = "DEPART_SYSTEMES";
+
     public static async Task<ConveyorActionResult> ExecuteAsync(IPlcGateway plc, IConveyorRepository repository,
         int? conveyorId, bool simulation, bool start, int? cause, ILogger logger)
     {
@@ -13,7 +15,7 @@ public static class ConveyorMotion
         if (!plc.IsConnected) throw new InvalidOperationException("Automate déconnecté. Utiliser CONNECTER dans l’engrenage de la ligne principale.");
         if (!simulation && repository.IsSimulation) throw new InvalidOperationException("Configurer la base MySQL pour enregistrer les actions.");
         // One shared command starts or stops both lines.
-        await plc.SendChuteAsync("DEPART_SYSTEMES", start ? 1 : 0, 1, CancellationToken.None);
+        await plc.SendChuteAsync(MotionTag, start ? 1 : 0, 1, CancellationToken.None);
         if (simulation) return new(true, "Commande simulée ; aucun mouvement ni enregistrement MySQL.");
         try
         {

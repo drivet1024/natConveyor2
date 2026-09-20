@@ -34,6 +34,19 @@ public sealed class ShiftSelectionTests
         Assert.All(options.Lines, line => Assert.Equal(2, line.ShiftId));
     }
 
+    [Fact]
+    public void ConveyorRunningReflectsDepartSystemesDdeValue()
+    {
+        using var supervisor = CreateSupervisor(CreateOptions(1));
+        Assert.Null(supervisor.ConveyorRunning);
+        supervisor.RecordPlcTagChange(ConveyorMotion.MotionTag, "1");
+        Assert.True(supervisor.ConveyorRunning);
+        supervisor.RecordPlcTagChange(ConveyorMotion.MotionTag, "0");
+        Assert.False(supervisor.ConveyorRunning);
+        supervisor.RecordPlcTagChange("OTHER_TAG", "1");
+        Assert.False(supervisor.ConveyorRunning);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions

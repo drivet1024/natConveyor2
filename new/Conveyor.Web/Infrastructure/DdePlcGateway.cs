@@ -35,7 +35,7 @@ public sealed class DdePlcGateway(PlcOptions options, ILogger<DdePlcGateway> log
                 await Task.Run(client.Connect, token);
                 _client = client;
                 client.Advise += OnAdvise;
-                foreach (var tag in (monitoredTags ?? [options.ChuteTag, options.TransferTag])
+                foreach (var tag in (monitoredTags ?? [options.ChuteTag, options.TransferTag, ConveyorMotion.MotionTag])
                     .Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase))
                 {
                     try

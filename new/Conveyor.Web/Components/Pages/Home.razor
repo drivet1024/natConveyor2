@@ -27,7 +27,8 @@
     <div class="control-heading"><h1 class="eyebrow">CENTRE DE CONTRÔLE</h1><span class="software-version" title="Version du logiciel" aria-label="@($"Version du logiciel {SoftwareVersion}")">@SoftwareVersion</span></div>
     <div class="header-summary">
         <section class="conveyor-controls" aria-labelledby="conveyor-controls-title">
-            <h2 id="conveyor-controls-title">CONVOYEUR</h2>
+            <h2 id="conveyor-controls-title" class="@(Supervisor.ConveyorRunning == true ? "running" : null)"
+                title="@(Supervisor.ConveyorRunning == true ? "Convoyeur en fonction — DEPART_SYSTEMES = 1" : Supervisor.ConveyorRunning == false ? "Convoyeur arrêté — DEPART_SYSTEMES = 0" : "État DEPART_SYSTEMES en attente")">CONVOYEUR</h2>
             <div class="conveyor-buttons">
                 <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
                 <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>

@@ -17,6 +17,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
     public int CurrentShiftId => _configuration.General!.ShiftId;
+    public bool? ConveyorRunning { get; private set; }
 
     public async Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause)
     {
@@ -64,7 +65,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(),
                     activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
-                        .Where(tag => !string.IsNullOrWhiteSpace(tag)));
+                        .Where(tag => !string.IsNullOrWhiteSpace(tag)).Append(ConveyorMotion.MotionTag));
         var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         foreach (var line in activeLines.Where(line => !line.Enabled))
             logger.LogInformation("Ligne {Line} : démarrage automatique désactivé; appareils non connectés jusqu’au START", line.Id + 1);
@@ -75,11 +76,20 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 line.Id == primaryLine.Id, sortEngine,
                 loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke());
         });
-        if (_plc is DdePlcGateway dde) dde.TagChanged += OnPlcTagChanged;
+        if (_plc is DdePlcGateway dde) dde.TagChanged += RecordPlcTagChange;
     }
 
-    private void OnPlcTagChanged(string tag, string value)
+    internal void RecordPlcTagChange(string tag, string value)
     {
+        if (string.Equals(tag, ConveyorMotion.MotionTag, StringComparison.OrdinalIgnoreCase))
+        {
+            var state = value.Trim() switch { "1" => true, "0" => false, _ => (bool?)null };
+            if (state != ConveyorRunning)
+            {
+                ConveyorRunning = state;
+                Changed?.Invoke();
+            }
+        }
         foreach (var line in _configuration.GetConfiguredLines().Where(line => string.Equals(line.Plc.ChuteTag, tag, StringComparison.OrdinalIgnoreCase)))
             Get(line.Id).RecordPlcReception(value);
         foreach (var line in _configuration.GetConfiguredLines().Where(line => string.Equals(line.Plc.TransferTag, tag, StringComparison.OrdinalIgnoreCase)))
@@ -102,7 +112,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public override void Dispose()
     {
-        if (_plc is DdePlcGateway dde) dde.TagChanged -= OnPlcTagChanged;
+        if (_plc is DdePlcGateway dde) dde.TagChanged -= RecordPlcTagChange;
         (_plc as IDisposable)?.Dispose();
         base.Dispose();
     }
