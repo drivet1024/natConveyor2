@@ -10,21 +10,18 @@
     else
     {
         <p>Pourquoi arrêtez-vous le convoyeur ?</p>
-        <label>Cause
-            <select @bind="_cause" disabled="@Busy">
-                <option value="">Choisir une cause</option>
-                <option value="0">PAUSE</option>
-                <option value="1">JAM</option>
-                <option value="2">DOWN</option>
-            </select>
-        </label>
+        <div class="stop-reasons">
+            <button type="button" class="reason-button pause" disabled="@(Busy || Completed)" @onclick="() => Confirm(0)">PAUSE</button>
+            <button type="button" class="reason-button jam" disabled="@(Busy || Completed)" @onclick="() => Confirm(1)">JAM</button>
+            <button type="button" class="reason-button down" disabled="@(Busy || Completed)" @onclick="() => Confirm(2)">DOWN</button>
+        </div>
     }
     @if (!string.IsNullOrWhiteSpace(Message)) { <p role="status">@Message</p> }
     <div class="action-buttons">
         <button type="button" class="btn" disabled="@Busy" @onclick="OnClose">@(Completed ? "Fermer" : "Annuler")</button>
-        @if (!Completed)
+        @if (Start && !Completed)
         {
-        <button type="button" class="btn @(Start ? "btn-start" : "btn-stop")" disabled="@(Busy || (!Start && _cause is null))" @onclick="Confirm">@(Start ? "DÉMARRER" : "ARRÊTER")</button>
+        <button type="button" class="btn btn-start" disabled="@Busy" @onclick="() => Confirm(null)">DÉMARRER</button>
         }
     </div>
 </dialog>
@@ -36,11 +33,10 @@
     [Parameter] public string? Message { get; set; }
     [Parameter] public EventCallback<int?> OnConfirm { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
-    private int? _cause;
     private ElementReference _dialog;
     private IJSObjectReference? _module;
     private bool _disposed;
-    private Task Confirm() => OnConfirm.InvokeAsync(Start ? null : _cause);
+    private Task Confirm(int? cause) => Busy || Completed ? Task.CompletedTask : OnConfirm.InvokeAsync(cause);
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

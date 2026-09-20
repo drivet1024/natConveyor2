@@ -20,7 +20,7 @@
 
 @if (_motionStart is { } startMotion)
 {
-    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="_motionMessage" OnConfirm="ConfirmMotion" OnClose="() => _motionStart = null" />
+    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="@_motionMessage" OnConfirm="ConfirmMotion" OnClose="() => _motionStart = null" />
 }
 
 <header class="dashboard-header">

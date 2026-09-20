@@ -5,3 +5,13 @@ p, label { font-size: .9rem; }
 label { display: grid; gap: .4rem; }
 select { padding: .6rem; background: #0e1215; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
 .action-buttons { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+
+.stop-reasons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1.2rem 0; }
+.reason-button { min-height: 86px; padding: 1rem .4rem; border: 2px solid transparent; border-radius: 8px; font-size: 1.2rem; font-weight: 800; cursor: pointer; }
+.reason-button.pause { background: #f6c453; color: #201700; }
+.reason-button.jam { background: #f2992e; color: #251600; }
+.reason-button.down { background: #ba2635; color: #fff; }
+.reason-button:hover:not(:disabled) { filter: brightness(1.12); }
+.reason-button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.reason-button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 360px) { .stop-reasons { grid-template-columns: 1fr; } .reason-button { min-height: 60px; } }
