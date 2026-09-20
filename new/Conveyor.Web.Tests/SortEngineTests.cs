@@ -11,7 +11,7 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
-    public async Task Camera_waits_for_weight_and_dimensions_before_sending_chute()
+    public async Task Camera_uses_previously_received_weight_and_dimensions_then_sends_chute()
     {
         var line = Line();
         var ports = GetAvailablePorts(3);
@@ -35,10 +35,10 @@ public sealed class SortEngineTests
             await dimensioner.ConnectAsync(IPAddress.Loopback, line.DimensionPort);
             await scale.ConnectAsync(IPAddress.Loopback, line.ScalePort);
 
-            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
-            await Task.Delay(100);
             await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000012400810052\u0003"));
             await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002028.85LB\r\n"));
+            await Task.Delay(100);
+            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
 
             SortDecision? decision = null;
             for (var attempt = 0; attempt < 100 && decision is null; attempt++)
@@ -51,6 +51,17 @@ public sealed class SortEngineTests
             Assert.Equal(28.85m, decision.Weight);
             Assert.Equal(new Dimension(12.4m, 8.1m, 5.2m), decision.Dimension);
             Assert.Contains(plc.Commands, command => command.Tag == line.Plc.ChuteTag && command.Value == 4);
+
+            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678902\r"));
+            SortDecision? nextDecision = null;
+            for (var attempt = 0; attempt < 100 && nextDecision?.Barcode != "12345678902"; attempt++)
+            {
+                nextDecision = controller.Snapshot().LastDecision;
+                if (nextDecision?.Barcode != "12345678902") await Task.Delay(25);
+            }
+            Assert.NotNull(nextDecision);
+            Assert.Equal(-1, nextDecision.Weight);
+            Assert.Equal(Dimension.Missing, nextDecision.Dimension);
         }
         finally
         {
