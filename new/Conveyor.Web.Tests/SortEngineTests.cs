@@ -306,6 +306,27 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task NoReadIsNotAlsoCountedAsRejectedWhenBothUseTheSameChute()
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 1, NoReadChute = 1,
+                ValidateDimensionsAndWeight = false }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, "?", Dimension.Missing, -1);
+            var counters = supervisor.GetSnapshots()[0].Counters;
+            Assert.Equal(1, counters.TotalParcels);
+            Assert.Equal(1, counters.NoReads);
+            Assert.Equal(0, counters.Rejected);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Fact]
     public async Task ShipmentUpdateIsCachedAndReloadedAfterDataReset()
     {
         var updated = DateTimeOffset.Now.AddHours(-2);

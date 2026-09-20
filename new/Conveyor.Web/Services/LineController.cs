@@ -255,6 +255,7 @@ internal sealed class LineController
             dimension?.Timestamp,
             weight is not null && (timestamp - weight.Timestamp).Duration() <= window ? weight.Value : -1,
             weight?.Timestamp);
+        var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
         var rejectionCounted = false;
         try
@@ -264,7 +265,7 @@ internal sealed class LineController
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await _plc.SendChuteAsync(_options.Plc.ChuteTag, decision.PlcChute, _options.Plc.SendCount, token);
             _plcConnected = true;
-            if (decision.PlcChute == _options.RejectedChute)
+            if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
                 lock (_gate) _counters.Rejected++;
                 rejectionCounted = true;
@@ -277,8 +278,7 @@ internal sealed class LineController
                 _lastError = null;
                 _counters.DatabaseInserts++;
                 if (decision.Chute == 98) _counters.Code98++;
-                if (decision.Chute == _options.NoReadChute ||
-                    (parcel.CameraData.Contains('?') && string.IsNullOrEmpty(decision.Barcode))) _counters.NoReads++;
+                if (isNoRead) _counters.NoReads++;
                 else
                 {
                     // Measurement error rates use read parcels only, excluding no-reads.
@@ -299,7 +299,7 @@ internal sealed class LineController
             try
             {
                 await _plc.SendChuteAsync(_options.Plc.ChuteTag, _options.RejectedChute, 1, token);
-                if (!rejectionCounted)
+                if (!isNoRead && !rejectionCounted)
                     lock (_gate) _counters.Rejected++;
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
