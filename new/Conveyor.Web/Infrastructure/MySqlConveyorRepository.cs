@@ -58,7 +58,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         const string byShipping = """
             select shipping_id, customer_id, route_id, disable_code98, dest_postal_code
             from conveyor_shipment
-            where shipping_id = @shippingId
+            where left(trim(cast(shipping_id as char)), 9) = @shippingId
                or (reference_no = @reference and customer_id = 129326)
             limit 1
             """;

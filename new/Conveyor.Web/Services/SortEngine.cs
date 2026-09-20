@@ -44,6 +44,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             matchedShipment = shipment;
             if (barcode.Length >= 11) barcode = barcode[..11];
             goodBarcodes.Add(barcode);
+            reason = "Route de l'expédition non configurée";
             var configuredChute = await repository.FindChuteForRouteAsync(shiftId, shipment.RouteId, token);
             if (configuredChute is > 0)
             {

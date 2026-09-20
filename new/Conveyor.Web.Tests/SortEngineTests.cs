@@ -116,6 +116,15 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task Known_waybill_without_configured_route_is_not_reported_as_missing()
+    {
+        var engine = new SortEngine(new FakeRepository { RouteChute = null }, NullLogger<SortEngine>.Instance);
+        var result = await engine.DecideAsync(Line(), Parcel("12345678901"), CancellationToken.None);
+        Assert.Equal(16, result.Chute);
+        Assert.Equal("Route de l'expédition non configurée", result.Reason);
+    }
+
+    [Fact]
     public async Task Unknown_waybill_can_fall_back_to_postal_code()
     {
         var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
@@ -341,10 +350,11 @@ public sealed class SortEngineTests
         public bool FailCounts { get; set; }
         public bool FailSave { get; set; }
         public bool Disable98 { get; set; }
+        public int? RouteChute { get; set; } = 4;
         public bool IsSimulation { get; set; } = true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
             barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null);
-        public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult<int?>(4);
+        public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
