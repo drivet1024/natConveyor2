@@ -34,6 +34,7 @@ internal sealed class LineController
     private DeviceReception? _plcTransferInput;
     public void RecordPlcReception(string value)
     {
+        if (string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal)) return;
         lock (_gate)
         {
             if (_plcInput?.Raw == value) return;

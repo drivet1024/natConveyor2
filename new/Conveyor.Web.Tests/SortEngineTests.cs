@@ -11,6 +11,23 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
+    public void PlcDisplayIgnoresValue68AndKeepsThePreviousValue()
+    {
+        var line = Line();
+        var repository = new FakeRepository();
+        var controller = new LineController(line, false, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+
+        controller.RecordPlcReception("39");
+        controller.RecordPlcReception(" 68\0");
+
+        var input = controller.Snapshot().PlcInput;
+        Assert.NotNull(input);
+        Assert.Equal("39", input.Raw);
+        Assert.Equal(1, input.Sequence);
+    }
+
+    [Fact]
     public async Task Camera_uses_previously_received_weight_and_dimensions_then_sends_chute()
     {
         var line = Line();
