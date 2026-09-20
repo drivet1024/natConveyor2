@@ -4,6 +4,27 @@
 
 <PageTitle>Configuration</PageTitle>
 
+@if (!_configurationUnlocked)
+{
+    <header class="dashboard-header">
+        <div><span class="eyebrow">ACCÈS PROTÉGÉ</span><h1>Configuration</h1><p>Saisissez le NIP pour accéder aux paramètres.</p></div>
+    </header>
+    <section class="pin-gate" aria-labelledby="pin-gate-title">
+        <h2 id="pin-gate-title">NIP requis</h2>
+        <form @onsubmit="UnlockConfiguration" @onsubmit:preventDefault>
+            <label for="configuration-pin">NIP</label>
+            <input id="configuration-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+                   autocomplete="off" autofocus @bind="_submittedPin" @bind:event="oninput" />
+            <button type="submit" class="btn">Déverrouiller</button>
+        </form>
+        @if (!string.IsNullOrWhiteSpace(_pinError))
+        {
+            <div class="config-notice error" role="alert">@_pinError</div>
+        }
+    </section>
+}
+else
+{
 <header class="dashboard-header">
     <div><span class="eyebrow">PARAMÈTRES</span><h1>Configuration</h1><p>Paramètres communs aux deux lignes et connexions des appareils</p></div>
 </header>
@@ -125,8 +146,14 @@
         <span>Fichier : @Editor.FilePath</span>
     </div>
 </EditForm>
+}
 
 @code {
+    private bool _configurationUnlocked;
+    private string _submittedPin = "";
+    private string? _pinError;
+    private int _failedPinAttempts;
+    private DateTimeOffset? _pinLockedUntil;
     private ConveyorOptions _model = new();
     private GeneralOptions _general => _model.General!;
     private PlcOptions _plc => _model.Lines.OrderBy(line => line.Id).First().Plc;
@@ -137,6 +164,36 @@
     private bool _restarting;
     private string? _error;
     protected override void OnInitialized() => _model = Editor.GetEditableCopy();
+
+    private void UnlockConfiguration()
+    {
+        if (_pinLockedUntil is { } lockedUntil && lockedUntil > DateTimeOffset.Now)
+        {
+            _pinError = $"Trop de tentatives. Réessayez dans {Math.Ceiling((lockedUntil - DateTimeOffset.Now).TotalSeconds)} secondes.";
+            _submittedPin = "";
+            return;
+        }
+
+        if (ConfigurationAccess.VerifyPin(_submittedPin))
+        {
+            _configurationUnlocked = true;
+            _failedPinAttempts = 0;
+            _pinLockedUntil = null;
+            _pinError = null;
+        }
+        else
+        {
+            _failedPinAttempts++;
+            _pinError = "NIP incorrect.";
+            if (_failedPinAttempts >= 5)
+            {
+                _failedPinAttempts = 0;
+                _pinLockedUntil = DateTimeOffset.Now.AddSeconds(30);
+                _pinError = "Trop de tentatives. Accès bloqué pendant 30 secondes.";
+            }
+        }
+        _submittedPin = "";
+    }
 
     private async Task Save()
     {
