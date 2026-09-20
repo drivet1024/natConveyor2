@@ -254,10 +254,78 @@ public sealed class SortEngineTests
         Assert.Equal(2, repo.ShipmentDateReads);
     }
 
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, 0)]
+    [InlineData(false, 1)]
+    [InlineData(false, 2)]
+    public async Task MotionWritesStartTagOnceAndRecordsGlobalConveyorId(bool start, int? cause)
+    {
+        var plc = new MotionPlc();
+        var repo = new FakeRepository { IsSimulation = false };
+        var result = await ConveyorMotion.ExecuteAsync(plc, repo, 42, false, start, cause, NullLogger.Instance);
+        Assert.True(result.Recorded);
+        Assert.Equal(("START", start ? 1 : 0, 1), Assert.Single(plc.Commands));
+        Assert.Equal((42, start, cause), Assert.Single(repo.Actions));
+    }
+
+    [Fact]
+    public async Task MotionDoesNotSendWithoutIdOrValidStopCause()
+    {
+        var plc = new MotionPlc();
+        var repo = new FakeRepository { IsSimulation = false };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ConveyorMotion.ExecuteAsync(plc, repo, null, false, true, null, NullLogger.Instance));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ConveyorMotion.ExecuteAsync(plc, repo, 42, false, false, null, NullLogger.Instance));
+        Assert.Empty(plc.Commands);
+        Assert.Empty(repo.Actions);
+    }
+
+    [Fact]
+    public async Task MotionInsertFailureDoesNotResendCommand()
+    {
+        var plc = new MotionPlc();
+        var repo = new FakeRepository { IsSimulation = false, FailActionSave = true };
+        var result = await ConveyorMotion.ExecuteAsync(plc, repo, 42, false, false, 1, NullLogger.Instance);
+        Assert.False(result.Recorded);
+        Assert.Single(plc.Commands);
+    }
+
+    [Fact]
+    public async Task DisconnectedPlcDoesNotRecordAnAction()
+    {
+        var plc = new MotionPlc { IsConnected = false };
+        var repo = new FakeRepository { IsSimulation = false };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ConveyorMotion.ExecuteAsync(plc, repo, 42, false, true, null, NullLogger.Instance));
+        Assert.Empty(repo.Actions);
+        Assert.Empty(plc.Commands);
+    }
+
+    private sealed class MotionPlc : IPlcGateway
+    {
+        public bool IsConnected { get; set; } = true;
+        public List<(string Tag, int Value, int Repeat)> Commands { get; } = [];
+        public Task ConnectAsync(CancellationToken token) => Task.CompletedTask;
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(IsConnected);
+        public Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken token)
+        {
+            Commands.Add((tag, chute, repeat));
+            return Task.CompletedTask;
+        }
+    }
+
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public List<(int Id, bool Start, int? Cause)> Actions { get; } = [];
+        public bool FailActionSave { get; set; }
+        public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
+        {
+            if (FailActionSave) throw new IOException("Action insert failed");
+            Actions.Add((conveyorId, start, cause));
+            return Task.CompletedTask;
+        }
         public DateTimeOffset? ShipmentUpdate { get; set; }
         public long ParcelCount { get; set; }
         public int ShipmentDateReads { get; private set; }
@@ -273,7 +341,7 @@ public sealed class SortEngineTests
         public bool FailCounts { get; set; }
         public bool FailSave { get; set; }
         public bool Disable98 { get; set; }
-        public bool IsSimulation => true;
+        public bool IsSimulation { get; set; } = true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
             barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null);
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult<int?>(4);

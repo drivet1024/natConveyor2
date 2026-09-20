@@ -5,6 +5,7 @@ namespace Conveyor.Web.Services;
 public interface IConveyorRepository
 {
     bool IsSimulation { get; }
+    Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken);
     Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken);
     Task ResetDataAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken);
@@ -40,6 +41,7 @@ public interface IConveyorSupervisor
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }
     Task SetShiftAsync(int shiftId);
+    Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause);
     Task StartLineAsync(int lineId);
     Task RestartLineAsync(int lineId);
     Task StopLineAsync(int lineId);

@@ -97,3 +97,7 @@ enregistrée dans Configuration.
 ### Reset des convertisseurs
 
 L’engrenage à côté de 98 ouvre les commandes **Reset Balance** et **Reset Dimensionneur** de la ligne. Dans Configuration, chaque bloc appareil dispose d’un modèle **Vieux (Old)** / **Nouveau (New)** et d’une adresse IP de convertisseur distincte de la connexion TCP des mesures. Enregistrer et redémarrer pour appliquer ces paramètres. Les commandes reprennent les points d’accès HTTP et les identifiants par défaut du `SerialConverter` historique. Une commande acceptée ne confirme pas encore le retour des mesures : surveiller le voyant et les trames reçues. Les commandes matérielles sont désactivées en simulation.
+
+### Commandes de marche du convoyeur
+
+Configurer **Conveyor ID** dans les paramètres globaux, puis enregistrer et redémarrer. Les boutons **DÉMARRER / ARRÊTER** à côté d’AUTOMATE commandent ensemble les deux lignes via `START=1` / `START=0`, comme DDEFrm. Démarrer demande confirmation ; arrêter impose PAUSE (0), JAM (1) ou DOWN (2). Après l’envoi, une ligne est insérée dans `conveyor_action` avec la date locale, CONVEYOR_ID, ACTION (1/0) et CAUSE (NULL au démarrage). Un échec d’insertion après envoi est signalé sans renvoyer la commande. La simulation n’insère aucune action réelle. CONNECTER/DÉCONNECTER dans l’engrenage restent les commandes de connexion aux appareils.

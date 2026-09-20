@@ -11,11 +11,23 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
     private readonly IConfigurationEditor _editor;
+    private readonly SemaphoreSlim _motionGate = new(1, 1);
     private readonly SemaphoreSlim _shiftGate = new(1, 1);
     private readonly ConveyorOptions _configuration;
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
     public int CurrentShiftId => _configuration.General!.ShiftId;
+
+    public async Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause)
+    {
+        if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande convoyeur est déjà en cours.");
+        try
+        {
+            return await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
+                _configuration.Simulation, start, cause, _logger);
+        }
+        finally { _motionGate.Release(); Changed?.Invoke(); }
+    }
 
     public async Task SetShiftAsync(int shiftId)
     {

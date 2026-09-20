@@ -52,6 +52,7 @@ public sealed class ConveyorOptions
 
 public sealed class GeneralOptions
 {
+    public int? ConveyorId { get; set; }
     public string Name { get; set; } = "Convoyeur";
     public int DepotId { get; set; }
     public int ShiftId { get; set; }

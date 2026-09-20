@@ -14,3 +14,6 @@
 .database-summary { grid-template-columns: auto auto auto auto; }
 .reset-data-button { white-space: nowrap; padding: .4rem .6rem; font-size: .7rem; }
 @media (max-width: 850px) { .database-summary { grid-template-columns: auto auto auto; } }
+
+.plc-controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.plc-controls .btn { padding: .4rem .6rem; font-size: .7rem; }

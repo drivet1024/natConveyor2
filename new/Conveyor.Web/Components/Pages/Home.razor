@@ -18,10 +18,19 @@
     <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
 }
 
+@if (_motionStart is { } startMotion)
+{
+    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="_motionMessage" OnConfirm="ConfirmMotion" OnClose="() => _motionStart = null" />
+}
+
 <header class="dashboard-header">
     <div class="control-heading"><h1 class="eyebrow">CENTRE DE CONTRÔLE</h1><span class="software-version" title="Version du logiciel" aria-label="@($"Version du logiciel {SoftwareVersion}")">@SoftwareVersion</span></div>
     <div class="header-summary">
+        <div class="plc-controls">
         <div class="shared-status" title="@PlcTitle()"><span class="connection-led @PlcCss()"></span><div><small>AUTOMATE</small><strong>@PlcLabel()</strong></div></div>
+            <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
+            <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>
+        </div>
         <div class="database-summary">
             <div class="database-summary-title" title="@DatabaseTitle()"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
             <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
@@ -78,6 +87,30 @@
 </section>
 
 @code {
+    private bool? _motionStart;
+    private bool _motionBusy;
+    private bool _motionCompleted;
+    private string? _motionMessage;
+    private void OpenMotion(bool start)
+    {
+        _motionStart = start;
+        _motionCompleted = false;
+        _motionMessage = null;
+    }
+    private async Task ConfirmMotion(int? cause)
+    {
+        if (_motionBusy || _motionCompleted || _motionStart is not { } start) return;
+        _motionBusy = true;
+        _motionMessage = "Envoi de la commande…";
+        try
+        {
+            var result = await Supervisor.SetConveyorMotionAsync(start, cause);
+            _motionCompleted = true;
+            _motionMessage = result.Message;
+        }
+        catch (Exception exception) { _motionMessage = exception.Message; }
+        finally { _motionBusy = false; }
+    }
     private int? _converterLineId;
     private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Home).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');

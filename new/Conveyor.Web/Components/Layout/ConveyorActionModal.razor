@@ -1,0 +1,62 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<dialog @ref="_dialog" class="action-dialog" aria-labelledby="action-title">
+    <h2 id="action-title">@(Start ? "Démarrer le convoyeur" : "Arrêter le convoyeur")</h2>
+    @if (Start)
+    {
+        <p>Voulez-vous vraiment démarrer le convoyeur ?</p>
+    }
+    else
+    {
+        <p>Pourquoi arrêtez-vous le convoyeur ?</p>
+        <label>Cause
+            <select @bind="_cause" disabled="@Busy">
+                <option value="">Choisir une cause</option>
+                <option value="0">PAUSE</option>
+                <option value="1">JAM</option>
+                <option value="2">DOWN</option>
+            </select>
+        </label>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message)) { <p role="status">@Message</p> }
+    <div class="action-buttons">
+        <button type="button" class="btn" disabled="@Busy" @onclick="OnClose">@(Completed ? "Fermer" : "Annuler")</button>
+        @if (!Completed)
+        {
+        <button type="button" class="btn @(Start ? "btn-start" : "btn-stop")" disabled="@(Busy || (!Start && _cause is null))" @onclick="Confirm">@(Start ? "DÉMARRER" : "ARRÊTER")</button>
+        }
+    </div>
+</dialog>
+
+@code {
+    [Parameter] public bool Start { get; set; }
+    [Parameter] public bool Completed { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback<int?> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private int? _cause;
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private bool _disposed;
+    private Task Confirm() => OnConfirm.InvokeAsync(Start ? null : _cause);
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var module = await JS.InvokeAsync<IJSObjectReference>("import", "./data-wait-modal.js");
+            if (_disposed) { await module.DisposeAsync(); return; }
+            _module = module;
+            await module.InvokeVoidAsync("show", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); } catch (JSDisconnectedException) { }
+    }
+}

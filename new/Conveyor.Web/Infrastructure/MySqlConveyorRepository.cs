@@ -149,6 +149,20 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         return true;
     }
 
+    public async Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
+    {
+        if (start ? cause is not null : cause is not (0 or 1 or 2))
+            throw new ArgumentException("Cause invalide : PAUSE=0, JAM=1, DOWN=2 ; aucune cause pour un démarrage.");
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new MySqlCommand("insert into conveyor_action (DATE_INSERT, CONVEYOR_ID, ACTION, CAUSE) values (@date, @conveyor, @action, @cause)", connection);
+        command.Parameters.AddWithValue("@date", DateTime.Now);
+        command.Parameters.AddWithValue("@conveyor", conveyorId);
+        command.Parameters.AddWithValue("@action", start);
+        command.Parameters.AddWithValue("@cause", cause is null ? DBNull.Value : (object)cause.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task ResetDataAsync(CancellationToken cancellationToken)
     {
         await using var connection = CreateConnection();
@@ -251,6 +265,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     public bool IsSimulation => true;
+    public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken) => Task.FromResult<DateTimeOffset?>(null);
     public Task ResetDataAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]);
