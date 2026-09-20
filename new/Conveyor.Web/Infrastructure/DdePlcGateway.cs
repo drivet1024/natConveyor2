@@ -81,14 +81,26 @@ public sealed class DdePlcGateway(PlcOptions options, ILogger<DdePlcGateway> log
             for (var index = 0; index < Math.Clamp(repeat, 1, 3); index++)
             {
                 token.ThrowIfCancellationRequested();
-                await Task.Run(() => client.Poke(tag, chute.ToString(), 3_000), token);
-                logger.LogInformation("Chute {Chute} envoyée par DDE au tag {Tag}", chute, tag);
+                try
+                {
+                    await Task.Run(() => client.Poke(tag, chute.ToString(), 3_000), token);
+                    logger.LogInformation("Chute {Chute} envoyée par DDE au tag {Tag}", chute, tag);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException && IsParcelRoutingTag(tag))
+                {
+                    logger.LogWarning(exception,
+                        "Impossible d'envoyer la chute {Chute} par DDE au tag {Tag}; le traitement du colis se poursuit",
+                        chute, tag);
+                }
             }
         }
         finally { _gate.Release(); }
     }
 
     public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(IsConnected);
+
+    private static bool IsParcelRoutingTag(string tag) =>
+        tag.StartsWith("COLISDDE", StringComparison.OrdinalIgnoreCase);
 
     private void DisposeClient()
     {
