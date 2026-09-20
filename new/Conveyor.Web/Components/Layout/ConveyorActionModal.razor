@@ -1,7 +1,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<dialog @ref="_dialog" class="action-dialog" aria-labelledby="action-title">
+<dialog @ref="_dialog" class="action-dialog @(Start ? "" : "stop-dialog")" aria-labelledby="action-title">
     <h2 id="action-title">@(Start ? "Démarrer le convoyeur" : "Arrêter le convoyeur")</h2>
     @if (Start)
     {
