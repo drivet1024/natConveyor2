@@ -51,8 +51,6 @@
         <LastDecision Decision="line.LastDecision" />
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
         <div class="actions">
-            <button class="btn btn-start" disabled="@IsBusy(line.LineId)" title="Ouvrir ou relancer les connexions caméra, dimensionneur et balance" @onclick="() => StartConnections(line.LineId)">START</button>
-            <button class="btn btn-stop" disabled="@(!line.Running || IsBusy(line.LineId))" title="Fermer les connexions de cette ligne" @onclick="() => StopConnections(line.LineId)">STOP</button>
 
             @if (Options.Value.General?.DepotId == 2)
             {
@@ -110,7 +108,6 @@
     }
     private IReadOnlyList<LineSnapshot> _lines = [];
     private DatabaseReferenceCounts _database = new(0, 0, 0, false, true, DateTimeOffset.MinValue);
-    private readonly HashSet<int> _busyLines = [];
     protected override void OnInitialized() { Supervisor.Changed += OnChanged; DatabaseMetrics.Changed += OnChanged; Refresh(); }
     private RenderFragment Connection(string label, bool connected, bool simulated) => @<div class="connection-item" title="@(simulated ? "Simulation — aucune connexion physique" : connected ? "Connexion établie" : "Déconnecté")"><span class="connection-led @(simulated ? "sim" : connected ? "ok" : "ko")"></span><span>@label</span></div>;
     private RenderFragment ErrorMetric(string label, long errors, LineCounters counters) =>
@@ -121,23 +118,6 @@
         <span>@label</span>
     </div>;
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
-    private bool IsBusy(int id) => _busyLines.Contains(id);
-    private async Task StartConnections(int id)
-    {
-        _busyLines.Add(id);
-        try
-        {
-            var line = _lines.First(item => item.LineId == id);
-            if (line.Running) await Supervisor.RestartLineAsync(id); else await Supervisor.StartLineAsync(id);
-        }
-        finally { _busyLines.Remove(id); Refresh(); }
-    }
-    private async Task StopConnections(int id)
-    {
-        _busyLines.Add(id);
-        try { await Supervisor.StopLineAsync(id); }
-        finally { _busyLines.Remove(id); Refresh(); }
-    }
     private bool _resettingData;
     private string? _resetDataMessage;
     private async Task ResetData()
