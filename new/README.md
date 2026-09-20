@@ -93,3 +93,7 @@ enregistrée dans Configuration.
 3. Tester la passerelle automate avec le convoyeur physiquement isolé.
 4. Configurer les deux lignes et les tags automate propres au site.
 5. Installer le service derrière HTTPS et une authentification réseau; les commandes de contrôle ne doivent pas être exposées publiquement.
+
+### Reset des convertisseurs
+
+L’engrenage à côté de 98 ouvre les commandes **Reset Balance** et **Reset Dimensionneur** de la ligne. Dans Configuration, chaque bloc appareil dispose d’un modèle **Vieux (Old)** / **Nouveau (New)** et d’une adresse IP de convertisseur distincte de la connexion TCP des mesures. Enregistrer et redémarrer pour appliquer ces paramètres. Les commandes reprennent les points d’accès HTTP et les identifiants par défaut du `SerialConverter` historique. Une commande acceptée ne confirme pas encore le retour des mesures : surveiller le voyant et les trames reçues. Les commandes matérielles sont désactivées en simulation.

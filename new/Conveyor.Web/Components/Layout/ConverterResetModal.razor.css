@@ -1,0 +1,8 @@
+.converter-dialog { width: min(440px, calc(100vw - 2rem)); padding: 1.2rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.converter-dialog::backdrop { background: #0009; }
+h2 { font-size: 1rem; margin-bottom: 1rem; }
+.reset-buttons { display: flex; flex-wrap: wrap; gap: .6rem; }
+p { font-size: .8rem; margin-top: 1rem; }
+.error { color: var(--red); }
+.message { color: var(--muted); }
+.close-popup { display: block; margin: 1rem 0 0 auto; }

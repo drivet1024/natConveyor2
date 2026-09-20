@@ -91,6 +91,8 @@ public sealed class LineOptions
     public int DimensionPort { get; set; }
     public string DimensionHost { get; set; } = "";
     public bool DimensionConnectMode { get; set; }
+    public ConverterOptions ScaleConverter { get; set; } = new();
+    public ConverterOptions DimensionConverter { get; set; } = new();
     public string ScaleProtocol { get; set; } = "Delimited";
     public int RejectedChute { get; set; } = 16;
     public int NoReadChute { get; set; } = 1;
@@ -115,4 +117,10 @@ public sealed class PlcOptions
     public int Port { get; set; } = 7000;
     public string ChuteTag { get; set; } = "COLISDDE";
     public int SendCount { get; set; } = 1;
+}
+
+public sealed class ConverterOptions
+{
+    public string Type { get; set; } = "New";
+    public string IpAddress { get; set; } = "";
 }

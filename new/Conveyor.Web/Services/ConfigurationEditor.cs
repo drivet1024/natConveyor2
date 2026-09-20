@@ -89,6 +89,12 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         if (options.LineCount is < 1 or > 2 || options.LineCount > options.Lines.Count)
             throw new InvalidOperationException("Choisir une ou deux lignes avec leurs paramètres de connexion.");
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
+        foreach (var converter in options.Lines.SelectMany(line => new[] { line.ScaleConverter, line.DimensionConverter }))
+        {
+            if (converter.Type is not ("Old" or "New")) throw new InvalidOperationException("Modèle de convertisseur invalide.");
+            if (!string.IsNullOrWhiteSpace(converter.IpAddress) && !System.Net.IPAddress.TryParse(converter.IpAddress.Trim(), out _))
+                throw new InvalidOperationException("L’adresse du convertisseur doit être une adresse IP valide.");
+        }
         var devices = options.GetConfiguredLines().SelectMany(line => new[]
         {
             (Name: "Caméras", Port: line.CameraPort, Client: line.CameraConnectMode, Host: line.CameraHost, line.Enabled),

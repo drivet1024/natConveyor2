@@ -1,0 +1,54 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ConverterResetService ResetService
+
+<dialog @ref="_dialog" class="converter-dialog" aria-labelledby="converter-title">
+    <h2 id="converter-title">Appareils — ligne @(LineId + 1)</h2>
+    <div class="reset-buttons">
+        <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(true)">Reset Balance</button>
+        <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(false)">Reset Dimensionneur</button>
+    </div>
+    @if (_message is not null) { <p class="@(_error ? "error" : "message")" role="status">@_message</p> }
+    <button type="button" class="btn close-popup" disabled="@_busy" @onclick="OnClose">Fermer</button>
+</dialog>
+
+@code {
+    [Parameter] public int LineId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private bool _busy;
+    private bool _disposed;
+    private bool _error;
+    private string? _message;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var module = await JS.InvokeAsync<IJSObjectReference>("import", "./data-wait-modal.js");
+            if (_disposed) { await module.DisposeAsync(); return; }
+            _module = module;
+            await module.InvokeVoidAsync("show", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+    private async Task Reset(bool scale)
+    {
+        if (_busy) return;
+        _busy = true; _error = false; _message = "Reset en cours…";
+        try
+        {
+            await ResetService.ResetAsync(LineId, scale);
+            _message = "Commande envoyée. L’appareil se reconnectera après son redémarrage.";
+        }
+        catch (Exception exception) { _error = true; _message = exception.Message; }
+        finally { _busy = false; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); } catch (JSDisconnectedException) { }
+    }
+}

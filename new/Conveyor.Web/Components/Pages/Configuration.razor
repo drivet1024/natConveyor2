@@ -95,6 +95,8 @@
                         @TextField("Adresse IP du serveur", line.DimensionHost, value => line.DimensionHost = value)
                     }
                     @NumberField("Port de communication", line.DimensionPort, value => line.DimensionPort = value)
+                    <label><span>Convertisseur — modèle</span><InputSelect @bind-Value="line.DimensionConverter.Type"><option value="Old">Vieux (Old)</option><option value="New">Nouveau (New)</option></InputSelect></label>
+                    @TextField("Adresse IP du convertisseur (reset)", line.DimensionConverter.IpAddress, value => line.DimensionConverter.IpAddress = value)
                 </div>
             </div>
             <div class="config-block">
@@ -106,6 +108,8 @@
                         @TextField("Adresse IP du serveur", line.ScaleHost, value => line.ScaleHost = value)
                     }
                     @NumberField("Port de communication", line.ScalePort, value => line.ScalePort = value)
+                    <label><span>Convertisseur — modèle</span><InputSelect @bind-Value="line.ScaleConverter.Type"><option value="Old">Vieux (Old)</option><option value="New">Nouveau (New)</option></InputSelect></label>
+                    @TextField("Adresse IP du convertisseur (reset)", line.ScaleConverter.IpAddress, value => line.ScaleConverter.IpAddress = value)
                     <label><span>Protocole balance</span><InputSelect @bind-Value="line.ScaleProtocol"><option>Delimited</option><option>Fixed16From0</option><option>Fixed16From1</option></InputSelect></label>
                 </div>
             </div>

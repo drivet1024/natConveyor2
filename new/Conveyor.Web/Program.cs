@@ -51,6 +51,7 @@ builder.Services.AddSingleton<IConveyorRepository>(services =>
         : ActivatorUtilities.CreateInstance<MySqlConveyorRepository>(services));
 builder.Services.AddSingleton<SortEngine>();
 builder.Services.AddSingleton<IConfigurationEditor, ConfigurationEditor>();
+builder.Services.AddSingleton<ConverterResetService>();
 builder.Services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
 builder.Services.AddSingleton<DatabaseMetricsService>();
 builder.Services.AddSingleton<IDatabaseMetricsService>(services => services.GetRequiredService<DatabaseMetricsService>());

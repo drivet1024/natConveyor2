@@ -13,6 +13,11 @@
     <DataWaitModal Parcels="_database.Parcels" PostalCodes="_database.PostalCodes" />
 }
 
+@if (_converterLineId is { } converterLineId)
+{
+    <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
+}
+
 <header class="dashboard-header">
     <div class="control-heading"><h1 class="eyebrow">CENTRE DE CONTRÔLE</h1><span class="software-version" title="Version du logiciel" aria-label="@($"Version du logiciel {SoftwareVersion}")">@SoftwareVersion</span></div>
     <div class="header-summary">
@@ -69,12 +74,14 @@
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
                     title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
                     @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+            <button type="button" class="btn" title="Reset des appareils" aria-label="Ouvrir les commandes de reset des appareils" @onclick="() => _converterLineId = line.LineId">⚙</button>
         </div>
     </article>
 }
 </section>
 
 @code {
+    private int? _converterLineId;
     private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Home).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
     private IReadOnlyList<ConveyorShift> _shifts = [];
