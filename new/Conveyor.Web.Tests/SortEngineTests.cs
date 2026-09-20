@@ -28,6 +28,47 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task PersistentTransferCode68CountsEveryNewCameraParcelOnEachLine()
+    {
+        var config = new ConveyorOptions
+        {
+            Simulation = true,
+            Lines =
+            [
+                new() { Id = 0, CorrelationDelayMs = 0, Plc = new() { TransferTag = "TRANSFER_1" } },
+                new() { Id = 1, CorrelationDelayMs = 0, Plc = new() { TransferTag = "TRANSFER_2" } }
+            ]
+        };
+        config.ApplyGlobalSorting();
+        var repository = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repository,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            supervisor.RecordPlcTagChange("TRANSFER_1", "68");
+            supervisor.RecordPlcTagChange("TRANSFER_2", "67");
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
+            await supervisor.SimulateParcelAsync(0, "12345678902", new Dimension(12, 8, 5), 4.75m);
+            await supervisor.SimulateParcelAsync(1, "12345678901", new Dimension(12, 8, 5), 4.75m);
+            Assert.Equal(2, supervisor.GetSnapshots()[0].Counters.Code68);
+            Assert.Equal(0, supervisor.GetSnapshots()[1].Counters.Code68);
+
+            supervisor.RecordPlcTagChange("TRANSFER_2", "68");
+            await supervisor.SimulateParcelAsync(1, "12345678902", new Dimension(12, 8, 5), 4.75m);
+            Assert.Equal(1, supervisor.GetSnapshots()[1].Counters.Code68);
+
+            supervisor.ResetCounters(0);
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
+            Assert.Equal(1, supervisor.GetSnapshots()[0].Counters.Code68);
+        }
+        finally
+        {
+            await supervisor.StopLineAsync(0);
+            await supervisor.StopLineAsync(1);
+        }
+    }
+
+    [Fact]
     public async Task Camera_uses_previously_received_weight_and_dimensions_then_sends_chute()
     {
         var line = Line();

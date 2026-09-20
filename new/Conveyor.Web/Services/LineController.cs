@@ -179,7 +179,6 @@ internal sealed class LineController
             _counters = new LineCounters();
             _lastDecision = null;
             _plcInput = null;
-            _plcTransferInput = null;
             _cameraInput = null;
             _dimensionInput = null;
             _scaleInput = null;
@@ -258,7 +257,12 @@ internal sealed class LineController
 
     private async Task HandleCameraAsync(string frame, DateTimeOffset timestamp, CancellationToken token)
     {
-        lock (_gate) { _counters.CameraReads++; _counters.TotalParcels++; }
+        lock (_gate)
+        {
+            _counters.CameraReads++;
+            _counters.TotalParcels++;
+            if (IsCode68(_plcTransferInput?.Raw)) _counters.Code68++;
+        }
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
         var (dimension, weight) = CaptureMeasurements(timestamp, window);
         if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
@@ -359,6 +363,9 @@ internal sealed class LineController
     private static bool IsCorrelated<T>(TimedValue<T>? value, DateTimeOffset cameraTimestamp, TimeSpan window) =>
         value is not null && (cameraTimestamp - value.Timestamp).Duration() <= window;
 
+    private static bool IsCode68(string? value) =>
+        value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal);
+
     private async Task MonitorAsync(CancellationToken token)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
@@ -383,7 +390,8 @@ internal sealed class LineController
             var counters = new LineCounters
             {
                 CameraReads = _counters.CameraReads, DimensionReads = _counters.DimensionReads, ScaleReads = _counters.ScaleReads,
-                TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads, Code98 = _counters.Code98,
+                TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads,
+                Code98 = _counters.Code98, Code68 = _counters.Code68,
                 DimensionErrors = _counters.DimensionErrors, ScaleErrors = _counters.ScaleErrors,
                 SortedByWaybill = _counters.SortedByWaybill, SortedByPostalCode = _counters.SortedByPostalCode,
                 DatabaseInserts = _counters.DatabaseInserts

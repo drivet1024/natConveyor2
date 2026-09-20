@@ -42,6 +42,7 @@ public sealed class LineCounters
     public long Rejected { get; set; }
     public long NoReads { get; set; }
     public long Code98 { get; set; }
+    public long Code68 { get; set; }
     public long DimensionErrors { get; set; }
     public long ScaleErrors { get; set; }
     public long SortedByWaybill { get; set; }
