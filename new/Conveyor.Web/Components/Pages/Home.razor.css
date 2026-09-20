@@ -15,5 +15,7 @@
 .reset-data-button { white-space: nowrap; padding: .4rem .6rem; font-size: .7rem; }
 @media (max-width: 850px) { .database-summary { grid-template-columns: auto auto auto; } }
 
-.plc-controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.plc-controls .btn { padding: .4rem .6rem; font-size: .7rem; }
+.conveyor-controls { padding: .45rem .75rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.conveyor-controls h2 { margin: 0 0 .35rem; color: var(--orange); font-size: .65rem; font-weight: 800; letter-spacing: .09em; }
+.conveyor-buttons { display: flex; align-items: center; gap: .5rem; }
+.conveyor-buttons .btn { padding: .4rem .6rem; font-size: .7rem; white-space: nowrap; }
