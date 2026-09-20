@@ -5,6 +5,12 @@ namespace Conveyor.Web.Services;
 
 public static class SensorParsers
 {
+    public static bool IsDimensionControlFrame(string frame)
+    {
+        var value = frame.Trim('\u0002', '\u0003', '\r', '\n', ' ');
+        return value is "Q00003" or "Q000003";
+    }
+
     public static Dimension? ParseDimension(string frame)
     {
         var value = frame.Trim().Replace("Q00003", "", StringComparison.Ordinal);

@@ -15,6 +15,20 @@ public sealed class SensorParserTests
     }
 
     [Theory]
+    [InlineData("\r\n\u0002Q00003\u0003")]
+    [InlineData("\r\n\u0002Q000003\u0003")]
+    public void Dimension_control_frames_are_identified(string frame)
+    {
+        Assert.True(SensorParsers.IsDimensionControlFrame(frame));
+    }
+
+    [Fact]
+    public void Dimension_measurement_is_not_a_control_frame()
+    {
+        Assert.False(SensorParsers.IsDimensionControlFrame("\u00020000012400810052\u0003"));
+    }
+
+    [Theory]
     [InlineData("\u0002  12.50\r\n", "Delimited", 12.50)]
     [InlineData("000004.750      ", "Fixed16From0", 4.750)]
     [InlineData("X00004.750     ", "Fixed16From1", 4.750)]

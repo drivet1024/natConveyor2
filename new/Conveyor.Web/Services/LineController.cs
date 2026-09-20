@@ -137,12 +137,12 @@ internal sealed class LineController
             }
             if (_options.DimensionConnectMode)
             {
-                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", frame => RecordReception("dimension", frame));
+                _dimensionClient = new(_options.DimensionHost, _options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", RecordDimensionReception);
                 _tasks.Add(_dimensionClient.RunAsync(dimension.Writer, token));
             }
             else
             {
-                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", frame => RecordReception("dimension", frame));
+                _dimensionReceiver = new(_options.DimensionPort, "\u0003", _logger, _changed, "Dimensionneur", RecordDimensionReception);
                 _tasks.Add(_dimensionReceiver.RunAsync(dimension.Writer, token));
             }
         }
@@ -180,6 +180,12 @@ internal sealed class LineController
             _scaleInput = null;
         }
         _changed();
+    }
+
+    private void RecordDimensionReception(string frame)
+    {
+        if (!SensorParsers.IsDimensionControlFrame(frame))
+            RecordReception("dimension", frame);
     }
 
     public void SetCode98Enabled(bool enabled)
