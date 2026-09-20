@@ -16,3 +16,9 @@ select { padding: .6rem; background: #0e1215; color: var(--ink); border: 1px sol
 .reason-button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .reason-button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 360px) { .stop-reasons { grid-template-columns: 1fr; } .reason-button { min-height: 60px; } }
+
+.action-buttons.start-confirmation { align-items: center; justify-content: space-between; gap: 1.5rem; margin-top: 1.5rem; }
+.action-buttons .cancel-start { flex: 1; min-height: 76px; padding: 1rem 1.25rem; background: #ba2635; border: 2px solid #ef6674; color: #fff; font-size: 1.3rem; font-weight: 800; }
+.action-buttons .cancel-start:hover:not(:disabled) { background: #a91f2e; }
+.action-buttons .cancel-start:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (max-width: 360px) { .action-buttons.start-confirmation { flex-direction: column; align-items: stretch; } }

@@ -17,8 +17,8 @@
         </div>
     }
     @if (!string.IsNullOrWhiteSpace(Message)) { <p role="status">@Message</p> }
-    <div class="action-buttons">
-        <button type="button" class="btn" disabled="@Busy" @onclick="OnClose">@(Completed ? "Fermer" : "Annuler")</button>
+    <div class="action-buttons @(Start && !Completed ? "start-confirmation" : "")">
+        <button type="button" class="btn @(Start && !Completed ? "cancel-start" : "")" autofocus="@(Start && !Completed)" disabled="@Busy" @onclick="OnClose">@(Completed ? "Fermer" : "ANNULER")</button>
         @if (Start && !Completed)
         {
         <button type="button" class="btn btn-start" disabled="@Busy" @onclick="() => Confirm(null)">DÉMARRER</button>
