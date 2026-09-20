@@ -336,7 +336,7 @@ public sealed class SortEngineTests
         var repo = new FakeRepository { IsSimulation = false };
         var result = await ConveyorMotion.ExecuteAsync(plc, repo, 42, false, start, cause, NullLogger.Instance);
         Assert.True(result.Recorded);
-        Assert.Equal(("DEPART_SYSTEME", start ? 1 : 0, 1), Assert.Single(plc.Commands));
+        Assert.Equal(("DEPART_SYSTEMES", start ? 1 : 0, 1), Assert.Single(plc.Commands));
         Assert.Equal((42, start, cause), Assert.Single(repo.Actions));
     }
 
