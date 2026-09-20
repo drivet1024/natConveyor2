@@ -12,6 +12,10 @@
     <PackageReference Include="Specshell.NDde" Version="4.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Conveyor.Web.Tests" />
+  </ItemGroup>
+
   <Target Name="SetConveyorBuildVersion" BeforeTargets="GetAssemblyVersion" Condition="'$(DesignTimeBuild)' != 'true'">
     <PropertyGroup>
       <ConveyorVersionFile>$(MSBuildProjectDirectory)/.build-version</ConveyorVersionFile>

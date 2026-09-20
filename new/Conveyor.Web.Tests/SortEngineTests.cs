@@ -2,11 +2,62 @@ using Conveyor.Web.Domain;
 using Conveyor.Web.Options;
 using Conveyor.Web.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Fact]
+    public async Task Camera_waits_for_weight_and_dimensions_before_sending_chute()
+    {
+        var line = Line();
+        var ports = GetAvailablePorts(3);
+        line.CameraPort = ports[0];
+        line.DimensionPort = ports[1];
+        line.ScalePort = ports[2];
+        line.CorrelationDelayMs = 0;
+        line.CorrelationWindowMs = 2_000;
+        var repository = new FakeRepository();
+        var plc = new MotionPlc();
+        var controller = new LineController(line, false, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+
+        await controller.StartAsync();
+        using var camera = new TcpClient();
+        using var dimensioner = new TcpClient();
+        using var scale = new TcpClient();
+        try
+        {
+            await camera.ConnectAsync(IPAddress.Loopback, line.CameraPort);
+            await dimensioner.ConnectAsync(IPAddress.Loopback, line.DimensionPort);
+            await scale.ConnectAsync(IPAddress.Loopback, line.ScalePort);
+
+            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
+            await Task.Delay(100);
+            await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000012400810052\u0003"));
+            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002028.85LB\r\n"));
+
+            SortDecision? decision = null;
+            for (var attempt = 0; attempt < 100 && decision is null; attempt++)
+            {
+                decision = controller.Snapshot().LastDecision;
+                if (decision is null) await Task.Delay(25);
+            }
+
+            Assert.NotNull(decision);
+            Assert.Equal(28.85m, decision.Weight);
+            Assert.Equal(new Dimension(12.4m, 8.1m, 5.2m), decision.Dimension);
+            Assert.Contains(plc.Commands, command => command.Tag == line.Plc.ChuteTag && command.Value == 4);
+        }
+        finally
+        {
+            await controller.StopAsync();
+        }
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -324,6 +375,25 @@ public sealed class SortEngineTests
     }
 
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);
+
+    private static int[] GetAvailablePorts(int count)
+    {
+        var listeners = new List<TcpListener>();
+        try
+        {
+            for (var index = 0; index < count; index++)
+            {
+                var listener = new TcpListener(IPAddress.Loopback, 0);
+                listener.Start();
+                listeners.Add(listener);
+            }
+            return listeners.Select(listener => ((IPEndPoint)listener.LocalEndpoint).Port).ToArray();
+        }
+        finally
+        {
+            foreach (var listener in listeners) listener.Stop();
+        }
+    }
 
     private sealed class FakeRepository : IConveyorRepository
     {

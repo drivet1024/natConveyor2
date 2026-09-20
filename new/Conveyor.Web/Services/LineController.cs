@@ -27,6 +27,7 @@ internal sealed class LineController
     private TcpFrameClient? _scaleClient;
     private TimedValue<Dimension>? _lastDimension;
     private TimedValue<decimal>? _lastWeight;
+    private TaskCompletionSource _measurementsChanged = CreateMeasurementSignal();
     private SortDecision? _lastDecision;
     private DeviceReception? _plcInput;
     public void RecordPlcReception(string value)
@@ -224,7 +225,15 @@ internal sealed class LineController
         {
             var value = SensorParsers.ParseDimension(frame);
             if (value is null) continue;
-            lock (_gate) { _lastDimension = new(value, DateTimeOffset.Now); _counters.DimensionReads++; }
+            TaskCompletionSource signal;
+            lock (_gate)
+            {
+                _lastDimension = new(value, DateTimeOffset.Now);
+                _counters.DimensionReads++;
+                signal = _measurementsChanged;
+                _measurementsChanged = CreateMeasurementSignal();
+            }
+            signal.TrySetResult();
             _changed();
         }
     }
@@ -235,7 +244,15 @@ internal sealed class LineController
         {
             var value = SensorParsers.ParseWeight(frame, _options.ScaleProtocol);
             if (value is null) continue;
-            lock (_gate) { _lastWeight = new(value.Value, DateTimeOffset.Now); _counters.ScaleReads++; }
+            TaskCompletionSource signal;
+            lock (_gate)
+            {
+                _lastWeight = new(value.Value, DateTimeOffset.Now);
+                _counters.ScaleReads++;
+                signal = _measurementsChanged;
+                _measurementsChanged = CreateMeasurementSignal();
+            }
+            signal.TrySetResult();
             _changed();
         }
     }
@@ -243,11 +260,8 @@ internal sealed class LineController
     private async Task HandleCameraAsync(string frame, DateTimeOffset timestamp, CancellationToken token)
     {
         lock (_gate) { _counters.CameraReads++; _counters.TotalParcels++; }
-        if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
-        TimedValue<Dimension>? dimension;
-        TimedValue<decimal>? weight;
-        lock (_gate) { dimension = _lastDimension; weight = _lastWeight; }
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
+        var (dimension, weight) = await WaitForMeasurementsAsync(timestamp, window, token);
         var parcel = new ParcelContext(frame, timestamp,
             dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
             dimension?.Timestamp,
@@ -304,6 +318,44 @@ internal sealed class LineController
         }
         _changed();
     }
+
+    private async Task<(TimedValue<Dimension>? Dimension, TimedValue<decimal>? Weight)> WaitForMeasurementsAsync(
+        DateTimeOffset cameraTimestamp, TimeSpan window, CancellationToken token)
+    {
+        var deadline = cameraTimestamp + window;
+        if (_options.CorrelationDelayMs > 0)
+        {
+            var initialDelay = TimeSpan.FromMilliseconds(_options.CorrelationDelayMs);
+            var remaining = deadline - DateTimeOffset.Now;
+            if (remaining > TimeSpan.Zero)
+                await Task.Delay(initialDelay < remaining ? initialDelay : remaining, token);
+        }
+
+        while (true)
+        {
+            TimedValue<Dimension>? dimension;
+            TimedValue<decimal>? weight;
+            Task measurementsChanged;
+            lock (_gate)
+            {
+                dimension = IsCorrelated(_lastDimension, cameraTimestamp, window) ? _lastDimension : null;
+                weight = IsCorrelated(_lastWeight, cameraTimestamp, window) ? _lastWeight : null;
+                if (dimension is not null && weight is not null) return (dimension, weight);
+                measurementsChanged = _measurementsChanged.Task;
+            }
+
+            var remaining = deadline - DateTimeOffset.Now;
+            if (remaining <= TimeSpan.Zero) return (dimension, weight);
+            try { await measurementsChanged.WaitAsync(remaining, token); }
+            catch (TimeoutException) { return (dimension, weight); }
+        }
+    }
+
+    private static bool IsCorrelated<T>(TimedValue<T>? value, DateTimeOffset cameraTimestamp, TimeSpan window) =>
+        value is not null && (cameraTimestamp - value.Timestamp).Duration() <= window;
+
+    private static TaskCompletionSource CreateMeasurementSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private async Task MonitorAsync(CancellationToken token)
     {
