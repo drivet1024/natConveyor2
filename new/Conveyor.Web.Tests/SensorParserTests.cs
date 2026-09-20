@@ -36,4 +36,18 @@ public sealed class SensorParserTests
     {
         Assert.Equal(expected, SensorParsers.ParseWeight(frame, protocol));
     }
+
+    [Theory]
+    [InlineData("         4\u0003\u001F\u0003\u0003\u0003\u0003\u000B\u0002\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u0003\u007F\u0002001.65LB\r\n")]
+    [InlineData("garbage\u0002001.65LB")]
+    public void Stx_to_crlf_scale_format_uses_only_the_final_payload(string frame)
+    {
+        Assert.Equal(1.65m, SensorParsers.ParseWeight(frame, "StxToCrLf"));
+    }
+
+    [Fact]
+    public void Stx_to_crlf_scale_format_requires_stx()
+    {
+        Assert.Null(SensorParsers.ParseWeight("001.65LB\r\n", "StxToCrLf"));
+    }
 }

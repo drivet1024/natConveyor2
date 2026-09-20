@@ -25,7 +25,10 @@ public static class SensorParsers
 
     public static decimal? ParseWeight(string frame, string protocol)
     {
-        var value = frame.Trim('\u0002', '\u0003', '\r', '\n', ' ');
+        var value = protocol == "StxToCrLf"
+            ? ExtractBetweenLastStxAndCrLf(frame)
+            : frame.Trim('\u0002', '\u0003', '\r', '\n', ' ');
+        if (value is null) return null;
         value = protocol switch
         {
             "Fixed16From0" when value.Length >= 11 => value[..11].Trim(),
@@ -35,5 +38,15 @@ public static class SensorParsers
         var numeric = new string(value.Where(character => char.IsDigit(character) || character is '.' or '-' or ',').ToArray())
             .Replace(',', '.');
         return decimal.TryParse(numeric, NumberStyles.Number, CultureInfo.InvariantCulture, out var weight) ? weight : null;
+    }
+
+    private static string? ExtractBetweenLastStxAndCrLf(string frame)
+    {
+        var start = frame.LastIndexOf('\u0002');
+        if (start < 0) return null;
+        start++;
+        var end = frame.IndexOf("\r\n", start, StringComparison.Ordinal);
+        if (end < 0) end = frame.Length; // Le transport TCP retire déjà son délimiteur CR/LF.
+        return frame[start..end].Trim('\u0002', '\u0003', '\r', '\n', ' ');
     }
 }
