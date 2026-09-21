@@ -127,6 +127,41 @@ public sealed class SortEngineTests
         }
     }
 
+    [Fact]
+    public async Task Scale_fault_test_counts_three_parcels_and_sends_four_second_style_pulse()
+    {
+        var line = Line();
+        line.Id = 1;
+        line.CorrelationDelayMs = 0;
+        line.Plc.ScaleFaultTag = "FAUTE_M30";
+        line.Plc.ScaleFaultParcelThreshold = 3;
+        line.Plc.ScaleFaultPulseMs = 10;
+        var repository = new FakeRepository();
+        var plc = new MotionPlc();
+        var controller = new LineController(line, true, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+
+        controller.SetScaleFaultTestEnabled(true);
+        try
+        {
+            await controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
+            await controller.SimulateAsync("12345678902", new Dimension(12, 8, 5), 4.75m);
+            Assert.Equal(0, controller.Snapshot().Counters.ScaleFaults);
+
+            await controller.SimulateAsync("12345678903", new Dimension(12, 8, 5), 4.75m);
+            for (var attempt = 0; attempt < 100 && plc.Commands.Count(command => command.Tag == "FAUTE_M30") < 2; attempt++)
+                await Task.Delay(10);
+
+            Assert.Equal(1, controller.Snapshot().Counters.ScaleFaults);
+            Assert.True(controller.Snapshot().ScaleFaultTestEnabled);
+            Assert.Equal([1, 0], plc.Commands.Where(command => command.Tag == "FAUTE_M30").Select(command => command.Value).ToArray());
+        }
+        finally
+        {
+            await controller.StopAsync();
+        }
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

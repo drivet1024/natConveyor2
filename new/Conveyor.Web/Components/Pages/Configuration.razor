@@ -75,6 +75,9 @@ else
                 {
                     @TextField($"Tag chute automate — ligne {line.Id + 1}", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
                     @TextField($"Tag lecture transfert — ligne {line.Id + 1}", line.Plc.TransferTag, value => line.Plc.TransferTag = value)
+                    @TextField($"Tag faute balance — ligne {line.Id + 1}", line.Plc.ScaleFaultTag, value => line.Plc.ScaleFaultTag = value)
+                    @NumberField($"Colis sans balance avant faute — ligne {line.Id + 1}", line.Plc.ScaleFaultParcelThreshold, value => line.Plc.ScaleFaultParcelThreshold = value)
+                    @NumberField($"Durée impulsion faute (ms) — ligne {line.Id + 1}", line.Plc.ScaleFaultPulseMs, value => line.Plc.ScaleFaultPulseMs = value)
                 }
             </div>
         </div>

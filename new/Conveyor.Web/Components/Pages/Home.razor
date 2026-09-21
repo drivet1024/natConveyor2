@@ -59,7 +59,7 @@
         <div class="metrics"><div class="metric metric-parcels">
             <div><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis</span></div>
             <div class="registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><span>En attente</span></div>
-        </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")</div>
+        </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ScaleErrorMetric(line.Counters) @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")</div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
         <div class="desktop-only"><LastDecision Decision="line.LastDecision" /></div>
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error desktop-only">@line.LastError</div> }
@@ -69,6 +69,14 @@
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
                     title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
                     @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+
+            @if (line.LineId == 1)
+            {
+                <button type="button" class="btn btn-scale-test @(line.ScaleFaultTestEnabled ? "test-on" : null)"
+                        aria-pressed="@(line.ScaleFaultTestEnabled ? "true" : "false")"
+                        title="Simule l'absence de pesée. Après trois colis, l'impulsion de faute balance est envoyée."
+                        @onclick="() => Supervisor.SetScaleFaultTestEnabled(line.LineId, !line.ScaleFaultTestEnabled)">TEST BALANCE</button>
+            }
 
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
             @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
@@ -149,6 +157,13 @@
     private RenderFragment ErrorMetric(string label, long errors, LineCounters counters) =>
         PercentageMetric(label, errors, counters.TotalParcels - counters.NoReads,
             "Erreurs parmi les colis lus : erreurs ÷ (colis − sans lecture) × 100");
+    private RenderFragment ScaleErrorMetric(LineCounters counters) => @<div class="metric metric-scale" title="Erreurs de poids et nombre d'impulsions de faute balance">
+        <div>
+            <div class="metric-value-row"><strong>@counters.ScaleErrors.ToString("N0")</strong><span class="metric-percentage">@Percentage(counters.ScaleErrors, counters.TotalParcels - counters.NoReads).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
+            <span>Erreurs poids</span>
+        </div>
+        <div class="scale-fault-total"><strong>@counters.ScaleFaults.ToString("N0")</strong><span>Fautes balance</span></div>
+    </div>;
     private RenderFragment PercentageMetric(string label, long count, long total, string title) => @<div class="metric" title="@title">
         <div class="metric-value-row"><strong>@count.ToString("N0")</strong><span class="metric-percentage">@Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
         <span>@label</span>

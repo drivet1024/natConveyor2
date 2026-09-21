@@ -13,8 +13,8 @@ public sealed class GlobalSortingTests
     {
         var options = new ConveyorOptions
         {
-            Lines = [new() { Id = 1, Name = "Secondaire", DepotId = 99, Plc = new() { ChuteTag = "SECOND", TransferTag = "READ_SECOND" } },
-                new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN", TransferTag = "READ_MAIN" } }]
+            Lines = [new() { Id = 1, Name = "Secondaire", DepotId = 99, Plc = new() { ChuteTag = "SECOND", TransferTag = "READ_SECOND", ScaleFaultTag = "FAUTE_M30" } },
+                new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN", TransferTag = "READ_MAIN", ScaleFaultTag = "FAUTE_M31" } }]
         };
         options.ApplyGlobalSorting();
         Assert.Equal("Site", options.General!.Name);
@@ -35,6 +35,8 @@ public sealed class GlobalSortingTests
         Assert.Equal("MAIN", restored.Lines[1].Plc.ChuteTag);
         Assert.Equal("READ_SECOND", restored.Lines[0].Plc.TransferTag);
         Assert.Equal("READ_MAIN", restored.Lines[1].Plc.TransferTag);
+        Assert.Equal("FAUTE_M30", restored.Lines[0].Plc.ScaleFaultTag);
+        Assert.Equal("FAUTE_M31", restored.Lines[1].Plc.ScaleFaultTag);
     }
 
     [Fact]

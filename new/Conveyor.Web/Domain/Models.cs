@@ -45,6 +45,7 @@ public sealed class LineCounters
     public long Code68 { get; set; }
     public long DimensionErrors { get; set; }
     public long ScaleErrors { get; set; }
+    public long ScaleFaults { get; set; }
     public long SortedByWaybill { get; set; }
     public long SortedByPostalCode { get; set; }
     public long DatabaseInserts { get; set; }
@@ -74,4 +75,5 @@ public sealed record LineSnapshot(
     bool PlcTagSupported = false,
     DeviceReception? PlcTransferInput = null,
     string PlcTransferTag = "",
-    bool PlcTransferTagSupported = false);
+    bool PlcTransferTagSupported = false,
+    bool ScaleFaultTestEnabled = false);

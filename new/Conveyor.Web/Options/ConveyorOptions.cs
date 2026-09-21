@@ -118,6 +118,9 @@ public sealed class PlcOptions
     public int Port { get; set; } = 7000;
     public string ChuteTag { get; set; } = "COLISDDE";
     public string TransferTag { get; set; } = "";
+    public string ScaleFaultTag { get; set; } = "";
+    [Range(1, 100)] public int ScaleFaultParcelThreshold { get; set; } = 3;
+    [Range(1, 60_000)] public int ScaleFaultPulseMs { get; set; } = 4_000;
     public int SendCount { get; set; } = 1;
 }
 

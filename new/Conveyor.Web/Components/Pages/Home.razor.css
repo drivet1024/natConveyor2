@@ -25,6 +25,11 @@
 .conveyor-controls h2.running { color: var(--green); text-shadow: 0 0 8px #49d17d66; }
 .conveyor-buttons { display: flex; align-items: center; gap: .5rem; }
 .conveyor-buttons .btn { padding: .4rem .6rem; font-size: .7rem; white-space: nowrap; }
+.metric-scale { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+.metric-scale > div { min-width: 0; }
+.metric-scale > div > span { display: block; margin-top: .15rem; color: var(--muted); font-size: .72rem; }
+.scale-fault-total { margin-left: auto; text-align: right; }
+.btn-scale-test.test-on { color: var(--orange); border-color: var(--orange); background: #f2992e18; }
 
 @media (max-width: 768px) {
     .control-heading,
