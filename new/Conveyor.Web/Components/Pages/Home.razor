@@ -72,10 +72,11 @@
 
             @if (line.LineId == 1)
             {
-                <button type="button" class="btn btn-scale-test @(line.ScaleFaultTestEnabled ? "test-on" : null)"
-                        aria-pressed="@(line.ScaleFaultTestEnabled ? "true" : "false")"
-                        title="Simule l'absence de pesée. Après trois colis, l'impulsion de faute balance est envoyée."
-                        @onclick="() => Supervisor.SetScaleFaultTestEnabled(line.LineId, !line.ScaleFaultTestEnabled)">TEST BALANCE</button>
+                <button type="button" class="btn btn-scale-test @(_scaleFaultTestBusy ? "test-on" : null)"
+                        disabled="@_scaleFaultTestBusy"
+                        title="Envoie immédiatement 1 au tag de faute balance, puis 0 après quatre secondes."
+                        @onclick="() => TriggerScaleFaultTest(line.LineId)">@(_scaleFaultTestBusy ? "TEST EN COURS…" : "TEST BALANCE")</button>
+                @if (!string.IsNullOrWhiteSpace(_scaleFaultTestError)) { <span class="shift-error" role="alert">@_scaleFaultTestError</span> }
             }
 
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
@@ -171,6 +172,17 @@
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
     private bool _resettingData;
     private string? _resetDataMessage;
+    private bool _scaleFaultTestBusy;
+    private string? _scaleFaultTestError;
+    private async Task TriggerScaleFaultTest(int lineId)
+    {
+        if (_scaleFaultTestBusy) return;
+        _scaleFaultTestBusy = true;
+        _scaleFaultTestError = null;
+        try { await Supervisor.TriggerScaleFaultTestAsync(lineId); }
+        catch (Exception exception) { _scaleFaultTestError = exception.Message; }
+        finally { _scaleFaultTestBusy = false; }
+    }
     private async Task ResetData()
     {
         if (_resettingData) return;

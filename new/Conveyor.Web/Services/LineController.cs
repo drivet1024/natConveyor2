@@ -46,8 +46,8 @@ internal sealed class LineController
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
     private int _consecutiveParcelsWithoutScale;
-    private bool _scaleFaultTestEnabled;
     private Channel<bool> _scaleFaultRequests = Channel.CreateUnbounded<bool>();
+    private readonly SemaphoreSlim _scaleFaultPulseGate = new(1, 1);
 
     private void RecordReception(string device, string frame)
     {
@@ -175,7 +175,6 @@ internal sealed class LineController
         _stopping = null;
         lock (_gate)
         {
-            _scaleFaultTestEnabled = false;
             _consecutiveParcelsWithoutScale = 0;
         }
         _logger.LogInformation("Ligne {Line} arrêtée", _options.Id);
@@ -221,16 +220,7 @@ internal sealed class LineController
         _changed();
     }
 
-    public void SetScaleFaultTestEnabled(bool enabled)
-    {
-        lock (_gate)
-        {
-            _scaleFaultTestEnabled = enabled;
-            _consecutiveParcelsWithoutScale = 0;
-        }
-        _logger.LogWarning("Ligne {Line}: test de faute balance {State}", _options.Id + 1, enabled ? "activé" : "désactivé");
-        _changed();
-    }
+    public Task TriggerScaleFaultTestAsync() => SendScaleFaultPulseAsync(CancellationToken.None);
 
     public async Task SimulateAsync(string cameraData, Dimension dimension, decimal weight)
     {
@@ -288,7 +278,7 @@ internal sealed class LineController
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
         var (dimension, weight) = CaptureMeasurements(timestamp, window);
         var hasCorrelatedWeight = weight is not null && (timestamp - weight.Timestamp).Duration() <= window;
-        DetectMissingScale(hasCorrelatedWeight);
+        RecordScalePresenceForParcel(hasCorrelatedWeight);
         if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
         var parcel = new ParcelContext(frame, timestamp,
             dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
@@ -390,12 +380,12 @@ internal sealed class LineController
     private static bool IsCode68(string? value) =>
         value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal);
 
-    private void DetectMissingScale(bool receivedWeight)
+    internal void RecordScalePresenceForParcel(bool receivedWeight)
     {
         var raiseFault = false;
         lock (_gate)
         {
-            if (receivedWeight && !_scaleFaultTestEnabled)
+            if (receivedWeight)
             {
                 _consecutiveParcelsWithoutScale = 0;
                 return;
@@ -427,15 +417,9 @@ internal sealed class LineController
                 continue;
             }
 
-            var faultRaised = false;
             try
             {
-                await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 1, 1, token);
-                faultRaised = true;
-                await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(1, _options.Plc.ScaleFaultPulseMs)), token);
-                await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 0, 1, token);
-                faultRaised = false;
-                _logger.LogWarning("Ligne {Line}: impulsion de faute balance envoyée sur {Tag}", _options.Id + 1, _options.Plc.ScaleFaultTag);
+                await SendScaleFaultPulseAsync(token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { }
             catch (Exception exception)
@@ -443,18 +427,37 @@ internal sealed class LineController
                 _logger.LogError(exception, "Ligne {Line}: impossible d'envoyer l'impulsion de faute balance sur {Tag}",
                     _options.Id + 1, _options.Plc.ScaleFaultTag);
             }
-            finally
+        }
+    }
+
+    private async Task SendScaleFaultPulseAsync(CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Plc.ScaleFaultTag))
+            throw new InvalidOperationException($"Aucun tag de faute balance n'est configuré pour la ligne {_options.Id + 1}.");
+
+        await _scaleFaultPulseGate.WaitAsync(token);
+        var faultRaised = false;
+        try
+        {
+            await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 1, 1, token);
+            faultRaised = true;
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(1, _options.Plc.ScaleFaultPulseMs)), token);
+            await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 0, 1, token);
+            faultRaised = false;
+            _logger.LogWarning("Ligne {Line}: impulsion de faute balance envoyée sur {Tag}", _options.Id + 1, _options.Plc.ScaleFaultTag);
+        }
+        finally
+        {
+            if (faultRaised)
             {
-                if (faultRaised)
+                try { await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 0, 1, CancellationToken.None); }
+                catch (Exception exception)
                 {
-                    try { await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, 0, 1, CancellationToken.None); }
-                    catch (Exception exception)
-                    {
-                        _logger.LogError(exception, "Ligne {Line}: impossible de remettre le tag {Tag} à zéro",
-                            _options.Id + 1, _options.Plc.ScaleFaultTag);
-                    }
+                    _logger.LogError(exception, "Ligne {Line}: impossible de remettre le tag {Tag} à zéro",
+                        _options.Id + 1, _options.Plc.ScaleFaultTag);
                 }
             }
+            _scaleFaultPulseGate.Release();
         }
     }
 
@@ -496,7 +499,7 @@ internal sealed class LineController
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is DdePlcGateway, _plcTransferInput, _options.Plc.TransferTag,
-                _plc is DdePlcGateway && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _scaleFaultTestEnabled);
+                _plc is DdePlcGateway && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag));
         }
     }
 }

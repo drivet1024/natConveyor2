@@ -75,5 +75,4 @@ public sealed record LineSnapshot(
     bool PlcTagSupported = false,
     DeviceReception? PlcTransferInput = null,
     string PlcTransferTag = "",
-    bool PlcTransferTagSupported = false,
-    bool ScaleFaultTestEnabled = false);
+    bool PlcTransferTagSupported = false);

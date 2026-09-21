@@ -128,7 +128,7 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task Scale_fault_test_counts_three_parcels_and_sends_four_second_style_pulse()
+    public async Task Three_missing_scale_readings_count_fault_and_manual_test_sends_direct_pulse()
     {
         var line = Line();
         line.Id = 1;
@@ -141,20 +141,23 @@ public sealed class SortEngineTests
         var controller = new LineController(line, true, repository, plc, false,
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
 
-        controller.SetScaleFaultTestEnabled(true);
+        await controller.StartAsync();
         try
         {
-            await controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
-            await controller.SimulateAsync("12345678902", new Dimension(12, 8, 5), 4.75m);
+            controller.RecordScalePresenceForParcel(false);
+            controller.RecordScalePresenceForParcel(false);
             Assert.Equal(0, controller.Snapshot().Counters.ScaleFaults);
 
-            await controller.SimulateAsync("12345678903", new Dimension(12, 8, 5), 4.75m);
+            controller.RecordScalePresenceForParcel(false);
             for (var attempt = 0; attempt < 100 && plc.Commands.Count(command => command.Tag == "FAUTE_M30") < 2; attempt++)
                 await Task.Delay(10);
 
             Assert.Equal(1, controller.Snapshot().Counters.ScaleFaults);
-            Assert.True(controller.Snapshot().ScaleFaultTestEnabled);
             Assert.Equal([1, 0], plc.Commands.Where(command => command.Tag == "FAUTE_M30").Select(command => command.Value).ToArray());
+
+            await controller.TriggerScaleFaultTestAsync();
+            Assert.Equal(1, controller.Snapshot().Counters.ScaleFaults);
+            Assert.Equal([1, 0, 1, 0], plc.Commands.Where(command => command.Tag == "FAUTE_M30").Select(command => command.Value).ToArray());
         }
         finally
         {
