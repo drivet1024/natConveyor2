@@ -74,7 +74,7 @@
             {
                 <button type="button" class="btn btn-scale-test @(_scaleFaultTestBusy ? "test-on" : null)"
                         disabled="@_scaleFaultTestBusy"
-                        title="Envoie immédiatement 1 au tag de faute balance, puis 0 après quatre secondes."
+                        title="Envoie immédiatement 1 au tag de faute balance, puis 0 après sept secondes."
                         @onclick="() => TriggerScaleFaultTest(line.LineId)">@(_scaleFaultTestBusy ? "TEST EN COURS…" : "TEST BALANCE")</button>
                 @if (!string.IsNullOrWhiteSpace(_scaleFaultTestError)) { <span class="shift-error" role="alert">@_scaleFaultTestError</span> }
             }
