@@ -13,13 +13,6 @@
 .metrics .metric { grid-column: span 4; border-right: 1px solid var(--line); }
 .metrics .metric:nth-child(n + 4) { grid-column: span 3; }
 .metrics .metric:nth-child(3), .metrics .metric:last-child { border-right: 0; }
-@media (max-width: 600px) {
-    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .metrics .metric, .metrics .metric:nth-child(n + 4) { grid-column: span 1; }
-    .metrics .metric:nth-child(odd) { border-right: 1px solid var(--line); }
-    .metrics .metric:nth-child(even) { border-right: 0; }
-}
-
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
 
@@ -32,3 +25,56 @@
 .conveyor-controls h2.running { color: var(--green); text-shadow: 0 0 8px #49d17d66; }
 .conveyor-buttons { display: flex; align-items: center; gap: .5rem; }
 .conveyor-buttons .btn { padding: .4rem .6rem; font-size: .7rem; white-space: nowrap; }
+
+@media (max-width: 768px) {
+    .control-heading,
+    .conveyor-controls,
+    .desktop-only { display: none; }
+
+    .dashboard-header {
+        margin-bottom: .5rem;
+        padding-bottom: .5rem;
+        border-bottom: 0;
+    }
+
+    .header-summary {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        width: 100%;
+        gap: .45rem;
+    }
+
+    .shared-status,
+    .database-summary {
+        min-height: 54px;
+        padding: .4rem .6rem;
+    }
+
+    .database-summary {
+        grid-template-columns: auto auto auto auto;
+        gap: .7rem;
+    }
+
+    .database-summary-title { padding-right: .55rem; }
+    .database-count { min-width: 0; }
+    .database-count strong { font-size: .95rem; }
+    .reset-data-button { padding: .35rem .5rem; font-size: .62rem; }
+
+    .line-grid { gap: .5rem; }
+    .line-card { border-radius: 7px; box-shadow: none; }
+    .line-title.compact-line-title { padding: .5rem .85rem; }
+    .connections { padding: .45rem .85rem; }
+    .metrics .metric { padding: .35rem .85rem; }
+    .metrics .metric strong { font-size: 1.25rem; }
+    .metrics .metric span { font-size: .68rem; }
+    .metric-value-row { gap: .35rem; }
+}
+
+@media (max-width: 560px) {
+    .header-summary { grid-template-columns: auto 1fr; }
+    .database-summary { grid-column: 1 / -1; grid-row: 2; }
+    .header-summary ::deep .service-status { justify-self: end; }
+
+    .metrics .metric { padding-left: .55rem; padding-right: .55rem; }
+    .metric-parcels { gap: .35rem; }
+}

@@ -47,6 +47,14 @@ main {
     }
 }
 
+@media (max-width: 768px) {
+    .sidebar { display: none; }
+    .content {
+        max-width: none;
+        padding: .4rem !important;
+    }
+}
+
 @media (min-width: 641px) {
     .page {
         flex-direction: row;

@@ -60,10 +60,10 @@
             <div><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis</span></div>
             <div class="registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><span>En attente</span></div>
         </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ErrorMetric("Erreurs poids", line.Counters.ScaleErrors, line.Counters) @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")</div>
-        <DeviceFeed Line="line" />
-        <LastDecision Decision="line.LastDecision" />
-        @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error">@line.LastError</div> }
-        <div class="actions">
+        <div class="desktop-only"><DeviceFeed Line="line" /></div>
+        <div class="desktop-only"><LastDecision Decision="line.LastDecision" /></div>
+        @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error desktop-only">@line.LastError</div> }
+        <div class="actions desktop-only">
             <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
                     aria-pressed="@(line.Code98Enabled ? "true" : "false")"
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"

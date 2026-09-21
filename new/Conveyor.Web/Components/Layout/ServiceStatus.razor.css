@@ -25,6 +25,11 @@
 .uptime-value { color: var(--green); font-variant-numeric: tabular-nums; }
 .service-clock { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-@media (max-width: 600px) {
-    .service-status { align-items: flex-start; }
+@media (max-width: 768px) {
+    .service-status {
+        align-items: flex-end;
+        justify-content: center;
+        min-height: 54px;
+        font-size: .66rem;
+    }
 }
