@@ -290,11 +290,13 @@ internal sealed class LineController
             _counters.TotalParcels++;
             if (IsCode68(_plcTransferInput?.Raw)) _counters.Code68++;
         }
+        if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
+        // Wait first so measurements received shortly after the camera frame are
+        // included in the same parcel decision.
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
         var (dimension, weight) = CaptureMeasurements(timestamp, window);
         var hasCorrelatedWeight = weight is not null && (timestamp - weight.Timestamp).Duration() <= window;
         RecordScalePresenceForParcel(hasCorrelatedWeight);
-        if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
         var parcel = new ParcelContext(frame, timestamp,
             dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
             dimension?.Timestamp,

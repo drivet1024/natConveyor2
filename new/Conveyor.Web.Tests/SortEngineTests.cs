@@ -253,6 +253,49 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task Camera_waits_for_measurements_received_during_correlation_delay()
+    {
+        var line = Line();
+        var ports = GetAvailablePorts(3);
+        line.CameraPort = ports[0];
+        line.DimensionPort = ports[1];
+        line.ScalePort = ports[2];
+        line.CorrelationDelayMs = 300;
+        line.CorrelationWindowMs = 1_000;
+        var repository = new FakeRepository();
+        var controller = new LineController(line, false, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+
+        await controller.StartAsync();
+        using var camera = new TcpClient();
+        using var dimensioner = new TcpClient();
+        using var scale = new TcpClient();
+        try
+        {
+            await camera.ConnectAsync(IPAddress.Loopback, line.CameraPort);
+            await dimensioner.ConnectAsync(IPAddress.Loopback, line.DimensionPort);
+            await scale.ConnectAsync(IPAddress.Loopback, line.ScalePort);
+
+            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
+            await Task.Delay(75);
+            await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000012400810052\u0003"));
+            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002028.85LB\r\n"));
+
+            SortDecision? decision = null;
+            for (var attempt = 0; attempt < 100 && decision is null; attempt++)
+            {
+                decision = controller.Snapshot().LastDecision;
+                if (decision is null) await Task.Delay(25);
+            }
+
+            Assert.NotNull(decision);
+            Assert.Equal(28.85m, decision.Weight);
+            Assert.Equal(new Dimension(12.4m, 8.1m, 5.2m), decision.Dimension);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task Three_missing_scale_readings_count_fault_and_manual_test_sends_direct_pulse()
     {
         var line = Line();
