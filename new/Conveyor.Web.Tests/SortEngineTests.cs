@@ -263,7 +263,8 @@ public sealed class SortEngineTests
         line.CorrelationDelayMs = 300;
         line.CorrelationWindowMs = 1_000;
         var repository = new FakeRepository();
-        var controller = new LineController(line, false, repository, new MotionPlc(), false,
+        var plc = new MotionPlc();
+        var controller = new LineController(line, false, repository, plc, false,
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
 
         await controller.StartAsync();
@@ -280,6 +281,11 @@ public sealed class SortEngineTests
             await Task.Delay(75);
             await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000012400810052\u0003"));
             await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002028.85LB\r\n"));
+            await Task.Delay(75);
+
+            // Camera received, but the complete 300 ms correlation delay has
+            // not elapsed yet: no chute command may be sent to the PLC.
+            Assert.Empty(plc.Commands);
 
             SortDecision? decision = null;
             for (var attempt = 0; attempt < 100 && decision is null; attempt++)
@@ -291,6 +297,7 @@ public sealed class SortEngineTests
             Assert.NotNull(decision);
             Assert.Equal(28.85m, decision.Weight);
             Assert.Equal(new Dimension(12.4m, 8.1m, 5.2m), decision.Dimension);
+            Assert.Single(plc.Commands);
         }
         finally { await controller.StopAsync(); }
     }
