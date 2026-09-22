@@ -218,7 +218,7 @@ jobs:
       - self-hosted
       - Windows
       - X64
-      - convoyer-sth-bas
+      - conveyor-sth-bas
 
     concurrency:
       group: conveyor-deploy-conveyor-sth-bas
