@@ -35,13 +35,15 @@ public sealed class ShiftSelectionTests
     }
 
     [Fact]
-    public void ConveyorRunningReflectsDepartSystemesDdeValue()
+    public void ConveyorRunningReflectsConfiguredMotionTagValue()
     {
-        using var supervisor = CreateSupervisor(CreateOptions(1));
+        var options = CreateOptions(1);
+        options.General!.ConveyorStartTag = "START_CUSTOM";
+        using var supervisor = CreateSupervisor(options);
         Assert.Null(supervisor.ConveyorRunning);
-        supervisor.RecordPlcTagChange(ConveyorMotion.MotionTag, "1");
+        supervisor.RecordPlcTagChange("START_CUSTOM", "1");
         Assert.True(supervisor.ConveyorRunning);
-        supervisor.RecordPlcTagChange(ConveyorMotion.MotionTag, "0");
+        supervisor.RecordPlcTagChange("START_CUSTOM", "0");
         Assert.False(supervisor.ConveyorRunning);
         supervisor.RecordPlcTagChange("OTHER_TAG", "1");
         Assert.False(supervisor.ConveyorRunning);

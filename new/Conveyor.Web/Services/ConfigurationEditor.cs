@@ -88,6 +88,9 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");
         if (options.LineCount is < 1 or > 2 || options.LineCount > options.Lines.Count)
             throw new InvalidOperationException("Choisir une ou deux lignes avec leurs paramètres de connexion.");
+        if (string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag))
+            throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
+        options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
         PlcConfiguration.Validate(options.GetConfiguredLines().First().Plc);
         foreach (var converter in options.Lines.SelectMany(line => new[] { line.ScaleConverter, line.DimensionConverter }))

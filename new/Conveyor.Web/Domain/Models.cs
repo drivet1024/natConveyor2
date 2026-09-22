@@ -56,6 +56,8 @@ public sealed record ConnectionState(bool Camera, bool Dimensioner, bool Scale, 
 
 public sealed record DeviceReception(string Raw, DateTimeOffset ReceivedAt, long Sequence, bool Truncated = false);
 
+public sealed record PlcDispatch(DateTimeOffset SentAt, int Chute, long ElapsedMs, long Sequence);
+
 public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false, DateTimeOffset? LastShipmentUpdate = null);
 
 public sealed record LineSnapshot(
@@ -76,4 +78,5 @@ public sealed record LineSnapshot(
     bool PlcTagSupported = false,
     DeviceReception? PlcTransferInput = null,
     string PlcTransferTag = "",
-    bool PlcTransferTagSupported = false);
+    bool PlcTransferTagSupported = false,
+    PlcDispatch? LastPlcDispatch = null);

@@ -6,6 +6,9 @@
 .feed-row + .feed-row { border-top: 1px solid var(--line); }
 .feed-label strong { display: block; font-size: .61rem; color: var(--ink); }
 .feed-label small, .feed-empty { color: var(--muted); font-size: .65rem; }
+.feed-label small { display: block; }
+.feed-label .plc-dispatch-time { margin-top: .3rem; color: #e8edf2; font-variant-numeric: tabular-nums; }
+.feed-label .plc-dispatch-label { color: var(--green); font-size: .55rem; line-height: 1.25; }
 .feed-payload code { display: block; color: #e8edf2; font-size: .82rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5rem; overflow-y: auto; }
 .feed-time { display: flex; align-items: center; gap: .3rem; margin-top: .2rem; color: var(--muted); font-size: .6rem; font-variant-numeric: tabular-nums; }
 .receive-pulse { width: 5px; height: 5px; border-radius: 50%; background: #52616c; animation: received .7s ease-out; }

@@ -38,6 +38,27 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task PlcDispatchIsTimestampedAfterTheConfiguredCorrelationDelay()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var plc = new MotionPlc();
+        var line = Line();
+        line.CorrelationDelayMs = 60;
+        var controller = new LineController(line, true, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+
+            var dispatch = controller.Snapshot().LastPlcDispatch;
+            Assert.NotNull(dispatch);
+            Assert.Equal(4, dispatch.Chute);
+            Assert.True(dispatch.ElapsedMs >= line.CorrelationDelayMs);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task ConfiguredCloseTagAppliesToBothLinesAndZeroReopensChute39()
     {
         var configuration = new ConveyorOptions { Simulation = true, Lines =
@@ -551,13 +572,13 @@ public sealed class SortEngineTests
     [InlineData(false, 0)]
     [InlineData(false, 1)]
     [InlineData(false, 2)]
-    public async Task MotionWritesStartTagOnceAndRecordsGlobalConveyorId(bool start, int? cause)
+    public async Task MotionWritesConfiguredStartTagOnceAndRecordsGlobalConveyorId(bool start, int? cause)
     {
         var plc = new MotionPlc();
         var repo = new FakeRepository { IsSimulation = false };
-        var result = await ConveyorMotion.ExecuteAsync(plc, repo, 42, false, start, cause, NullLogger.Instance);
+        var result = await ConveyorMotion.ExecuteAsync(plc, repo, 42, false, start, cause, NullLogger.Instance, "START_CUSTOM");
         Assert.True(result.Recorded);
-        Assert.Equal(("DEPART_SYSTEMES", start ? 1 : 0, 1), Assert.Single(plc.Commands));
+        Assert.Equal(("START_CUSTOM", start ? 1 : 0, 1), Assert.Single(plc.Commands));
         Assert.Equal((42, start, cause), Assert.Single(repo.Actions));
     }
 

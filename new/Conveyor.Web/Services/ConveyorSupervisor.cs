@@ -17,6 +17,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
     private readonly string _closeChute39Tag;
+    private readonly string _motionTag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
 
@@ -26,7 +27,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         try
         {
             return await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
-                _configuration.Simulation, start, cause, _logger);
+                _configuration.Simulation, start, cause, _logger, _motionTag);
         }
         finally { _motionGate.Release(); Changed?.Invoke(); }
     }
@@ -61,9 +62,10 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var activeLines = configuration.GetConfiguredLines().ToArray();
         var primaryLine = activeLines.First();
         _closeChute39Tag = primaryLine.Plc.CloseChute39Tag;
+        _motionTag = configuration.General?.ConveyorStartTag?.Trim() ?? ConveyorMotion.DefaultMotionTag;
         PlcConfiguration.Validate(primaryLine.Plc);
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
-            .Append(_closeChute39Tag).Where(tag => !string.IsNullOrWhiteSpace(tag)).Append(ConveyorMotion.MotionTag).ToArray();
+            .Append(_closeChute39Tag).Append(_motionTag).Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
@@ -92,7 +94,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             if (state is "0" or "1")
                 foreach (var line in _lines.Values) line.SetChute39Closed(state == "1");
         }
-        if (string.Equals(tag, ConveyorMotion.MotionTag, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(tag, _motionTag, StringComparison.OrdinalIgnoreCase))
         {
             var state = value.Trim() switch { "1" => true, "0" => false, _ => (bool?)null };
             if (state != ConveyorRunning)

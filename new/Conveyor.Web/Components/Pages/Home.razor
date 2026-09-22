@@ -28,7 +28,7 @@
     <div class="header-summary">
         <section class="conveyor-controls" aria-labelledby="conveyor-controls-title">
             <h2 id="conveyor-controls-title" class="@(Supervisor.ConveyorRunning == true ? "running" : null)"
-                title="@(Supervisor.ConveyorRunning == true ? "Convoyeur en fonction — DEPART_SYSTEMES = 1" : Supervisor.ConveyorRunning == false ? "Convoyeur arrêté — DEPART_SYSTEMES = 0" : "État DEPART_SYSTEMES en attente")">CONVOYEUR</h2>
+                title="@(Supervisor.ConveyorRunning == true ? $"Convoyeur en fonction — {MotionTag} = 1" : Supervisor.ConveyorRunning == false ? $"Convoyeur arrêté — {MotionTag} = 0" : $"État {MotionTag} en attente")">CONVOYEUR</h2>
             <div class="conveyor-buttons">
                 <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
                 <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>
@@ -99,6 +99,7 @@
 </section>
 
 @code {
+    private string MotionTag => Options.Value.General?.ConveyorStartTag ?? ConveyorMotion.DefaultMotionTag;
     private bool? _motionStart;
     private bool _motionBusy;
     private bool _motionCompleted;

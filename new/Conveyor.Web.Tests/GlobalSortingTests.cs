@@ -20,9 +20,11 @@ public sealed class GlobalSortingTests
         Assert.Equal("Site", options.General!.Name);
         Assert.Equal(7, options.General.DepotId);
         Assert.Equal(3, options.General.ShiftId);
+        Assert.Equal("DEPART_SYSTEMES", options.General.ConveyorStartTag);
         options.General.Name = "Québec";
         options.General.DepotId = 8;
         options.General.ShiftId = 4;
+        options.General.ConveyorStartTag = "START_CUSTOM";
         var restored = JsonSerializer.Deserialize<ConveyorOptions>(JsonSerializer.Serialize(options))!;
         restored.ApplyGlobalSorting();
         Assert.All(restored.Lines, line =>
@@ -31,6 +33,7 @@ public sealed class GlobalSortingTests
             Assert.Equal(8, line.DepotId);
             Assert.Equal(4, line.ShiftId);
         });
+        Assert.Equal("START_CUSTOM", restored.General!.ConveyorStartTag);
         Assert.Equal("SECOND", restored.Lines[0].Plc.ChuteTag);
         Assert.Equal("MAIN", restored.Lines[1].Plc.ChuteTag);
         Assert.Equal("READ_SECOND", restored.Lines[0].Plc.TransferTag);

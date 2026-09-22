@@ -3,7 +3,7 @@
     @DeviceRow("DIMENSIONNEUR", Line.DimensionInput, Line.Connections.Dimensioner)
     @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale)
     <div class="camera-plc-row @(!string.IsNullOrWhiteSpace(Line.PlcTransferTag) ? "has-transfer" : null)">
-        @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera)
+        @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera, Line.LastPlcDispatch)
         @PlcReadout("AUTOMATE", Line.PlcTag, Line.PlcInput, Line.PlcTagSupported)
         @if (!string.IsNullOrWhiteSpace(Line.PlcTransferTag))
         {
@@ -26,8 +26,16 @@
             @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
         </div>
     </div>;
-    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected) => @<div class="feed-row">
-        <div class="feed-label"><strong>@name</strong><small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small></div>
+    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null) => @<div class="feed-row">
+        <div class="feed-label">
+            <strong>@name</strong>
+            <small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small>
+            @if (dispatch is not null)
+            {
+                <small @key="dispatch.Sequence" class="plc-dispatch-time">@dispatch.SentAt.ToString("HH:mm:ss.fff")</small>
+                <small class="plc-dispatch-label">Envoi automate · @dispatch.Chute (+@dispatch.ElapsedMs ms)</small>
+            }
+        </div>
         <div class="feed-payload">
             @if (input is null) { <span class="feed-empty">Aucune trame reçue</span> }
             else

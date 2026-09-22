@@ -78,6 +78,7 @@ else
                     @TextField("Adresse passerelle automate", _plc.Host, value => _plc.Host = value)
                     @NumberField("Port automate", _plc.Port, value => _plc.Port = value)
                 }
+                <label><span>Tag démarrage convoyeur</span><InputText @bind-Value="_general.ConveyorStartTag" /><small>Commun aux deux lignes : 1 démarre le convoyeur et 0 l’arrête.</small></label>
                 <label><span>Tag fermeture chute 39</span><InputText @bind-Value="_plc.CloseChute39Tag" /><small>Commun aux deux lignes : 1 détourne les colis de la chute 39 vers la recirculation 97 ; 0 rétablit la chute 39. Lu en DDE ou OPC DA.</small></label>
                 @foreach (var line in _model.GetConfiguredLines())
                 {

@@ -32,7 +32,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
         _logger = logger;
         _createConnection = createConnection;
         _time = time;
-        _tags = (monitoredTags ?? [options.ChuteTag, options.TransferTag, options.CloseChute39Tag, ConveyorMotion.MotionTag])
+        _tags = (monitoredTags ?? [options.ChuteTag, options.TransferTag, options.CloseChute39Tag, ConveyorMotion.DefaultMotionTag])
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase)
             .ToDictionary(tag => tag, _ => new TagState(), StringComparer.OrdinalIgnoreCase);
     }

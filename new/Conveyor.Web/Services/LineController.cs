@@ -59,6 +59,7 @@ internal sealed class LineController
     private DeviceReception? _cameraInput;
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
+    private PlcDispatch? _lastPlcDispatch;
     private int _consecutiveParcelsWithoutScale;
     private Channel<bool> _scaleFaultRequests = Channel.CreateUnbounded<bool>();
     private readonly SemaphoreSlim _scaleFaultPulseGate = new(1, 1);
@@ -205,6 +206,7 @@ internal sealed class LineController
             _cameraInput = null;
             _dimensionInput = null;
             _scaleInput = null;
+            _lastPlcDispatch = null;
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
             _consecutiveParcelsWithoutScale = 0;
@@ -315,7 +317,7 @@ internal sealed class LineController
             }
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
-            await _plc.SendChuteAsync(_options.Plc.ChuteTag, decision.PlcChute, _options.Plc.SendCount, token);
+            await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, timestamp, token);
             _plcConnected = true;
             if (decision.PlcChute == 97)
             {
@@ -356,13 +358,26 @@ internal sealed class LineController
             try
             {
                 var fallbackChute = ResolveClosedChute(_options.RejectedChute);
-                await _plc.SendChuteAsync(_options.Plc.ChuteTag, fallbackChute, 1, token);
+                await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
                 if (fallbackChute == 97 && !recirculationCounted)
                     lock (_gate) _counters.Code97++;
                 if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
                     lock (_gate) _counters.Rejected++;
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
+        }
+        _changed();
+    }
+
+    private async Task SendParcelToPlcAsync(int chute, int repeat, DateTimeOffset cameraTimestamp, CancellationToken token)
+    {
+        await _plc.SendChuteAsync(_options.Plc.ChuteTag, chute, repeat, token);
+        var sentAt = DateTimeOffset.Now;
+        lock (_gate)
+        {
+            _lastPlcDispatch = new(sentAt, chute,
+                Math.Max(0, (long)(sentAt - cameraTimestamp).TotalMilliseconds),
+                (_lastPlcDispatch?.Sequence ?? 0) + 1);
         }
         _changed();
     }
@@ -530,7 +545,7 @@ internal sealed class LineController
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
-                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag));
+                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch);
         }
     }
 }
