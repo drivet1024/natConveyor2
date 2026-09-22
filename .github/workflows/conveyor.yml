@@ -11,6 +11,7 @@ on:
         options:
           - CONV-QC
           - STH-CONV-H-11
+          - CONV-STH-BAS
           - Tous
 
 permissions:
@@ -191,6 +192,57 @@ jobs:
           CONVEYOR_DEPLOY_PATH: ${{ vars.CONVEYOR_STH_DEPLOY_PATH || vars.CONVEYOR_DEPLOY_PATH || 'C:\nationex\natconveyor2' }}
           CONVEYOR_TASK_NAME: ${{ vars.CONVEYOR_STH_TASK_NAME || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
           CONVEYOR_HEALTH_URL: ${{ vars.CONVEYOR_STH_HEALTH_URL || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
+
+        run: |
+          $package = Join-Path `
+            $env:RUNNER_TEMP `
+            "conveyor-package/$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+
+          & "$package/scripts/Deploy-Conveyor.ps1" `
+            -SourcePath "$package/app" `
+            -DeployPath $env:CONVEYOR_DEPLOY_PATH `
+            -TaskName $env:CONVEYOR_TASK_NAME `
+            -HealthUrl $env:CONVEYOR_HEALTH_URL
+
+# ============================================================
+  # DEPLOIEMENT ST-HUBERT-BAS
+  # ============================================================
+
+  deploy-sth-bas:
+    name: Installer sur CONV-STH-BAS
+    needs: build
+
+    if: ${{ inputs.conveyor == 'CONV-STH-BAS' || inputs.conveyor == 'Tous' }}
+
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - deploy-sth-bas
+
+    concurrency:
+      group: conveyor-deploy-conveyor-sth-bas
+      cancel-in-progress: false
+
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+
+      - name: Telecharger la publication
+        uses: actions/download-artifact@v8
+        with:
+          name: conveyor-windows-x64
+          path: ${{ runner.temp }}/conveyor-package/${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Deployer et redemarrer
+        env:
+          CONVEYOR_DEPLOY_PATH: ${{ vars.CONVEYOR_STH_BAS_DEPLOY_PATH || vars.CONVEYOR_DEPLOY_PATH || 'C:\nationex\natconveyor2' }}
+          CONVEYOR_TASK_NAME: ${{ vars.CONVEYOR_STH_BAS_TASK_NAME || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
+          CONVEYOR_HEALTH_URL: ${{ vars.CONVEYOR_STH_BAS_HEALTH_URL || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
 
         run: |
           $package = Join-Path `
