@@ -32,8 +32,10 @@
             <small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small>
             @if (dispatch is not null)
             {
-                <small @key="dispatch.Sequence" class="plc-dispatch-time">@dispatch.SentAt.ToString("HH:mm:ss.fff")</small>
-                <small class="plc-dispatch-label">Envoi automate · @dispatch.Chute (+@dispatch.ElapsedMs ms)</small>
+                <div @key="dispatch.Sequence" class="plc-dispatch">
+                    <small class="plc-dispatch-label">Envoi automate · @dispatch.Chute</small>
+                    <small class="plc-dispatch-time">@dispatch.SentAt.ToString("HH:mm:ss.fff")</small>
+                </div>
             }
         </div>
         <div class="feed-payload">
