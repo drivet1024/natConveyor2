@@ -60,17 +60,25 @@ else
         <div class="config-block">
             <h3>AUTOMATE</h3>
             <div class="config-grid">
-                <label><span>Protocole automate</span><InputSelect @bind-Value="_plc.Protocol"><option value="Dde">DDE / RSLinx</option><option value="Tcp">Passerelle TCP</option></InputSelect><small>Connexion commune, contrôlée par START/STOP de la ligne principale.</small></label>
+                <label><span>Protocole automate</span><InputSelect @bind-Value="_plc.Protocol"><option value="Dde">DDE / RSLinx</option><option value="OpcDa">OPC DA / RSLinx Classic</option><option value="Tcp">Passerelle TCP</option></InputSelect><small>Connexion commune aux deux lignes. Enregistrer et redémarrer pour appliquer.</small></label>
                 @if (string.Equals(_plc.Protocol, "Dde", StringComparison.OrdinalIgnoreCase))
                 {
                     @TextField("Service DDE", _plc.DdeService, value => _plc.DdeService = value)
                     @TextField("Sujet DDE", _plc.DdeTopic, value => _plc.DdeTopic = value)
+                }
+                else if (string.Equals(_plc.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase))
+                {
+                    @TextField("Serveur OPC DA (ProgID)", _plc.OpcProgId, value => _plc.OpcProgId = value)
+                    <label><span>Ordinateur du serveur OPC</span><InputText @bind-Value="_plc.OpcHost" placeholder="Vide = cet ordinateur" /><small>Nom ou adresse du serveur RSLinx ; accès distant par DCOM.</small></label>
+                    <label><span>Sujet OPC RSLinx</span><InputText @bind-Value="_plc.OpcTopic" /><small>Exemple : NATIONEX. Le tag COLISDDE devient [NATIONEX]COLISDDE. Un tag commençant par [ conserve son sujet.</small></label>
+                    @NumberField("Actualisation OPC demandée (ms)", _plc.OpcUpdateRateMs, value => _plc.OpcUpdateRateMs = value)
                 }
                 else
                 {
                     @TextField("Adresse passerelle automate", _plc.Host, value => _plc.Host = value)
                     @NumberField("Port automate", _plc.Port, value => _plc.Port = value)
                 }
+                <label><span>Tag fermeture chute 39</span><InputText @bind-Value="_plc.CloseChute39Tag" /><small>Commun aux deux lignes : 1 détourne les colis de la chute 39 vers la recirculation 97 ; 0 rétablit la chute 39. Lu en DDE ou OPC DA.</small></label>
                 @foreach (var line in _model.GetConfiguredLines())
                 {
                     @TextField($"Tag chute automate — ligne {line.Id + 1}", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)

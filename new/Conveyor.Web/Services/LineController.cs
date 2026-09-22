@@ -32,12 +32,26 @@ internal sealed class LineController
     private SortDecision? _lastDecision;
     private DeviceReception? _plcInput;
     private DeviceReception? _plcTransferInput;
+    private bool _chute39Closed;
+    public void SetChute39Closed(bool closed)
+    {
+        lock (_gate)
+        {
+            if (_chute39Closed == closed) return;
+            _chute39Closed = closed;
+        }
+        _logger.LogInformation("Ligne {Line} : chute 39 {State}", _options.Id + 1,
+            closed ? "fermée — recirculation vers 97" : "ouverte");
+    }
+    private int ResolveClosedChute(int chute)
+    {
+        lock (_gate) return _chute39Closed && chute == 39 ? 97 : chute;
+    }
     public void RecordPlcReception(string value)
     {
         if (string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal)) return;
         lock (_gate)
         {
-            if (_plcInput?.Raw == value) return;
             _plcInput = new(value, DateTimeOffset.Now, (_plcInput?.Sequence ?? 0) + 1);
         }
         _changed();
@@ -107,7 +121,7 @@ internal sealed class LineController
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _lastError = $"Automate DDE: {exception.Message}";
+                _lastError = $"Automate: {exception.Message}";
                 _logger.LogError(exception, "Impossible de démarrer la connexion automate pour la ligne principale");
             }
         }
@@ -201,7 +215,6 @@ internal sealed class LineController
     {
         lock (_gate)
         {
-            if (_plcTransferInput?.Raw == value) return;
             _plcTransferInput = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
         }
         _changed();
@@ -288,13 +301,27 @@ internal sealed class LineController
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
         var rejectionCounted = false;
+        var recirculationCounted = false;
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
+            var routingReason = decision.Reason;
+            var effectiveChute = ResolveClosedChute(decision.PlcChute);
+            if (effectiveChute != decision.PlcChute)
+            {
+                decision = decision with { Chute = effectiveChute, PlcChute = effectiveChute,
+                    Reason = $"Recirculation code 97 — chute 39 fermée ({routingReason})" };
+                _logger.LogInformation("Ligne {Line} : colis {Barcode}, chute 39 remplacée par 97", _options.Id + 1, decision.Barcode);
+            }
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await _plc.SendChuteAsync(_options.Plc.ChuteTag, decision.PlcChute, _options.Plc.SendCount, token);
             _plcConnected = true;
+            if (decision.PlcChute == 97)
+            {
+                lock (_gate) _counters.Code97++;
+                recirculationCounted = true;
+            }
             if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
                 lock (_gate) _counters.Rejected++;
@@ -315,8 +342,8 @@ internal sealed class LineController
                     if (!parcel.Dimension.IsValid(_options.MaximumDimension)) _counters.DimensionErrors++;
                     if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) _counters.ScaleErrors++;
                 }
-                if (decision.Reason == "Route de l'expédition") _counters.SortedByWaybill++;
-                if (decision.Reason == "Route du code postal") _counters.SortedByPostalCode++;
+                if (routingReason == "Route de l'expédition") _counters.SortedByWaybill++;
+                if (routingReason == "Route du code postal") _counters.SortedByPostalCode++;
                 _lastDimension = null;
                 _lastWeight = null;
             }
@@ -328,8 +355,11 @@ internal sealed class LineController
             _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}, étape : {Stage}; envoi vers le rejet", _options.Id + 1, stage);
             try
             {
-                await _plc.SendChuteAsync(_options.Plc.ChuteTag, _options.RejectedChute, 1, token);
-                if (!isNoRead && !rejectionCounted)
+                var fallbackChute = ResolveClosedChute(_options.RejectedChute);
+                await _plc.SendChuteAsync(_options.Plc.ChuteTag, fallbackChute, 1, token);
+                if (fallbackChute == 97 && !recirculationCounted)
+                    lock (_gate) _counters.Code97++;
+                if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
                     lock (_gate) _counters.Rejected++;
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
@@ -486,7 +516,7 @@ internal sealed class LineController
             {
                 CameraReads = _counters.CameraReads, DimensionReads = _counters.DimensionReads, ScaleReads = _counters.ScaleReads,
                 TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads,
-                Code98 = _counters.Code98, Code68 = _counters.Code68,
+                Code98 = _counters.Code98, Code68 = _counters.Code68, Code97 = _counters.Code97,
                 DimensionErrors = _counters.DimensionErrors, ScaleErrors = _counters.ScaleErrors, ScaleFaults = _counters.ScaleFaults,
                 SortedByWaybill = _counters.SortedByWaybill, SortedByPostalCode = _counters.SortedByPostalCode,
                 DatabaseInserts = _counters.DatabaseInserts
@@ -495,11 +525,12 @@ internal sealed class LineController
                 ? new ConnectionState(false, false, false, _databaseConnected, false, true, _repository.IsSimulation)
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
                     _dimensionReceiver?.Connected == true || _dimensionClient?.Connected == true,
-                    _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected, _plc.IsConnected, false, _repository.IsSimulation);
+                    _scaleReceiver?.Connected == true || _scaleClient?.Connected == true, _databaseConnected,
+                    _plc.IsConnected && (_plc is not IPlcReadback readback || readback.ReadsHealthy), false, _repository.IsSimulation);
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
-                _options.Plc.ChuteTag, _plc is DdePlcGateway, _plcTransferInput, _options.Plc.TransferTag,
-                _plc is DdePlcGateway && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag));
+                _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
+                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag));
         }
     }
 }

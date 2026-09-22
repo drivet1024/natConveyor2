@@ -1,0 +1,8 @@
+.flashing-value { display: contents; }
+.changed ::deep > * { animation: value-change .8s ease-out; }
+@keyframes value-change {
+    from { color: var(--green); text-shadow: 0 0 8px var(--green); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .changed ::deep > * { animation: none; }
+}

@@ -35,6 +35,12 @@ public interface IPlcGateway
     Task<bool> PingAsync(CancellationToken cancellationToken);
 }
 
+public interface IPlcReadback
+{
+    bool ReadsHealthy { get; }
+    event Action<string, string>? TagChanged;
+}
+
 public interface IConveyorSupervisor
 {
     event Action? Changed;

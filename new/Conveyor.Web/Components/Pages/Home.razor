@@ -59,7 +59,7 @@
         <div class="metrics"><div class="metric metric-parcels">
             <div><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis</span></div>
             <div class="registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><span>En attente</span></div>
-        </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ScaleErrorMetric(line.Counters) @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")</div>
+        </div> @PercentageMetric("Rejets", line.Counters.Rejected, line.Counters.TotalParcels, "Rejets ÷ total des colis × 100") @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100") @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100") @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100") @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters) @ScaleErrorMetric(line.Counters) @PercentageMetric("Code 97 · Recirculation", line.Counters.Code97, line.Counters.TotalParcels, "Colis envoyés vers la chute 97, y compris les détournements de la chute 39 fermée")</div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
         <div class="desktop-only"><LastDecision Decision="line.LastDecision" /></div>
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error desktop-only">@line.LastError</div> }
@@ -160,13 +160,13 @@
             "Erreurs parmi les colis lus : erreurs ÷ (colis − sans lecture) × 100");
     private RenderFragment ScaleErrorMetric(LineCounters counters) => @<div class="metric metric-scale" title="Erreurs de poids et nombre d'impulsions de faute balance">
         <div>
-            <div class="metric-value-row"><strong>@counters.ScaleErrors.ToString("N0")</strong><span class="metric-percentage">@Percentage(counters.ScaleErrors, counters.TotalParcels - counters.NoReads).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
+            <div class="metric-value-row"><FlashingValue Value="@(counters.ScaleErrors.ToString("N0"))"><strong>@counters.ScaleErrors.ToString("N0")</strong></FlashingValue><FlashingValue Value="@(Percentage(counters.ScaleErrors, counters.TotalParcels - counters.NoReads).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")))"><span class="metric-percentage">@Percentage(counters.ScaleErrors, counters.TotalParcels - counters.NoReads).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></FlashingValue></div>
             <span>Erreurs poids</span>
         </div>
-        <div class="scale-fault-total"><strong>@counters.ScaleFaults.ToString("N0")</strong><span>Fautes balance</span></div>
+        <div class="scale-fault-total"><FlashingValue Value="@(counters.ScaleFaults.ToString("N0"))"><strong>@counters.ScaleFaults.ToString("N0")</strong></FlashingValue><span>Fautes balance</span></div>
     </div>;
     private RenderFragment PercentageMetric(string label, long count, long total, string title) => @<div class="metric" title="@title">
-        <div class="metric-value-row"><strong>@count.ToString("N0")</strong><span class="metric-percentage">@Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
+        <div class="metric-value-row"><FlashingValue Value="@(count.ToString("N0"))"><strong>@count.ToString("N0")</strong></FlashingValue><FlashingValue Value="@(Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")))"><span class="metric-percentage">@Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></FlashingValue></div>
         <span>@label</span>
     </div>;
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;

@@ -1,0 +1,16 @@
+<span @key="_revision" class="flashing-value @(_revision > 0 ? "changed" : null)">@ChildContent</span>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private string? _previousValue;
+    private bool _initialized;
+    private long _revision;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialized && Value != _previousValue) _revision++;
+        _previousValue = Value;
+        _initialized = true;
+    }
+}

@@ -10,9 +10,8 @@
 .database-count.empty-count strong { color: var(--red); }
 
 .metrics { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-.metrics .metric { grid-column: span 4; border-right: 1px solid var(--line); }
-.metrics .metric:nth-child(n + 4) { grid-column: span 3; }
-.metrics .metric:nth-child(3), .metrics .metric:last-child { border-right: 0; }
+.metrics .metric { grid-column: span 3; border-right: 1px solid var(--line); }
+.metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
 

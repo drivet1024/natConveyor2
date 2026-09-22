@@ -17,6 +17,10 @@ if (int.TryParse(Environment.GetEnvironmentVariable("CONVEYOR_RESTART_WAIT_PID")
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(new ServiceUptime());
+builder.Services.AddSingleton<ConnectedUsers>();
+builder.Services.AddScoped<UserPresenceCircuit>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler>(
+    services => services.GetRequiredService<UserPresenceCircuit>());
 builder.Configuration.AddJsonFile("conveyor.settings.json", optional: true, reloadOnChange: false);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
@@ -62,6 +66,10 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Convey
 
 var app = builder.Build();
 
+var conveyorOptions = app.Services.GetRequiredService<IOptions<ConveyorOptions>>().Value;
+if (!conveyorOptions.Simulation && string.Equals(conveyorOptions.GetConfiguredLines().First().Plc.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase))
+    OpcDaConnection.Initialize();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -73,6 +81,16 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
 app.UseAntiforgery();
+
+app.Use(async (context, next) =>
+{
+    if (!Guid.TryParseExact(context.Request.Cookies[ConnectedUsers.CookieName], "N", out _))
+    {
+        context.Response.Cookies.Append(ConnectedUsers.CookieName, Guid.NewGuid().ToString("N"),
+            new CookieOptions { Path = "/", SameSite = SameSiteMode.Lax, Secure = context.Request.IsHttps, IsEssential = true });
+    }
+    await next(context);
+});
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

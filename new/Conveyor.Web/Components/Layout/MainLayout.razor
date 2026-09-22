@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
+@inject UserPresenceCircuit Presence
 
 <div class="page">
     <div class="sidebar @(_menuCollapsed ? "sidebar-collapsed" : "")">
@@ -15,6 +17,16 @@
 @code {
     private bool _menuCollapsed = true;
     private void ToggleMenu() => _menuCollapsed = !_menuCollapsed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./user-presence.js");
+            Presence.Identify(await module.InvokeAsync<string>("browserId"));
+        }
+        catch (JSDisconnectedException) { }
+    }
 }
 
 <div id="blazor-error-ui" data-nosnippet>

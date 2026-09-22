@@ -10,6 +10,110 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Theory]
+    [InlineData(true, 39, 97, 1)]
+    [InlineData(false, 39, 39, 0)]
+    [InlineData(true, 4, 4, 0)]
+    [InlineData(true, 98, 98, 0)]
+    public async Task ClosedChute39RedirectsOnlyItsParcelsAndPersistsEffectiveChute(bool closed, int routeChute, int expected, int count)
+    {
+        var repository = new FakeRepository { RouteChute = routeChute };
+        var plc = new MotionPlc();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            controller.SetChute39Closed(closed);
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            Assert.Equal(expected, Assert.Single(plc.Commands).Value);
+            var saved = Assert.Single(repository.SavedDecisions);
+            Assert.Equal(expected, saved.Chute);
+            Assert.Equal(expected, saved.PlcChute);
+            Assert.Equal(count, controller.Snapshot().Counters.Code97);
+            if (count == 1) Assert.Contains("chute 39 fermée", saved.Reason);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task ConfiguredCloseTagAppliesToBothLinesAndZeroReopensChute39()
+    {
+        var configuration = new ConveyorOptions { Simulation = true, Lines =
+            [new() { Id = 0, CorrelationDelayMs = 0, Plc = new() { CloseChute39Tag = "CUSTOM_CLOSE" } },
+             new() { Id = 1, CorrelationDelayMs = 0 }] };
+        configuration.ApplyGlobalSorting();
+        var repository = new FakeRepository { RouteChute = 39 };
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(configuration), repository,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            supervisor.RecordPlcTagChange("CUSTOM_CLOSE", " 1\0");
+            for (var id = 0; id < 2; id++)
+                await supervisor.SimulateParcelAsync(id, "12345678901", new(12, 8, 5), 4.75m);
+            Assert.All(supervisor.GetSnapshots(), snapshot =>
+            {
+                Assert.Equal(97, snapshot.LastDecision!.PlcChute);
+                Assert.Equal(1, snapshot.Counters.Code97);
+            });
+            supervisor.RecordPlcTagChange("CUSTOM_CLOSE", "invalid");
+            supervisor.ResetCounters(0);
+            await supervisor.SimulateParcelAsync(0, "12345678901", new(12, 8, 5), 4.75m);
+            Assert.Equal(97, supervisor.GetSnapshots()[0].LastDecision!.PlcChute);
+            Assert.Equal(1, supervisor.GetSnapshots()[0].Counters.Code97);
+            supervisor.RecordPlcTagChange("CUSTOM_CLOSE", "0");
+            for (var id = 0; id < 2; id++)
+                await supervisor.SimulateParcelAsync(id, "12345678901", new(12, 8, 5), 4.75m);
+            Assert.All(supervisor.GetSnapshots(), snapshot =>
+            {
+                Assert.Equal(39, snapshot.LastDecision!.PlcChute);
+                Assert.Equal(1, snapshot.Counters.Code97);
+            });
+        }
+        finally { await supervisor.StopAsync(default); }
+    }
+
+    [Fact]
+    public async Task DatabaseFailureDoesNotDoubleCountRecirculationOrSendToClosedFallbackChute()
+    {
+        var repository = new FakeRepository { RouteChute = 39, FailSave = true };
+        var plc = new MotionPlc();
+        var line = Line();
+        line.RejectedChute = 39;
+        line.PostalCodeSort = false;
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            controller.SetChute39Closed(true);
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            Assert.Equal(2, plc.Commands.Count);
+            Assert.All(plc.Commands, command => Assert.Equal(97, command.Value));
+            Assert.Equal(1, controller.Snapshot().Counters.Code97);
+            Assert.Empty(repository.SavedDecisions);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
+    public void IdenticalPlcValuesStillRefreshReceptionForBothReadouts()
+    {
+        var repository = new FakeRepository();
+        var controller = new LineController(Line(), false, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        controller.RecordPlcReception("39");
+        controller.RecordPlcTransferReception("68");
+        controller.RecordPlcReception("39");
+        controller.RecordPlcTransferReception("68");
+        var snapshot = controller.Snapshot();
+        Assert.Equal(2, snapshot.PlcInput!.Sequence);
+        Assert.Equal(2, snapshot.PlcTransferInput!.Sequence);
+        Assert.Equal("39", snapshot.PlcInput.Raw);
+        Assert.Equal("68", snapshot.PlcTransferInput.Raw);
+    }
+
     [Fact]
     public void PlcDisplayIgnoresValue68AndKeepsThePreviousValue()
     {
@@ -525,6 +629,7 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public List<SortDecision> SavedDecisions { get; } = [];
         public List<(int Id, bool Start, int? Cause)> Actions { get; } = [];
         public bool FailActionSave { get; set; }
         public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
@@ -556,8 +661,12 @@ public sealed class SortEngineTests
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-        public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token) =>
-            FailSave ? Task.FromException(new IOException("Insert failed")) : Task.CompletedTask;
+        public Task SaveScanAsync(int lineId, ParcelContext parcel, SortDecision decision, CancellationToken token)
+        {
+            if (FailSave) return Task.FromException(new IOException("Insert failed"));
+            SavedDecisions.Add(decision);
+            return Task.CompletedTask;
+        }
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
         public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) =>
             FailCounts ? Task.FromException<(long, long, long, bool)>(new IOException("Database unavailable"))

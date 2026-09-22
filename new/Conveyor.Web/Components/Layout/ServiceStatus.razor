@@ -1,11 +1,12 @@
 @implements IAsyncDisposable
 @inject ServiceUptime Uptime
-@inject IOptions<ConveyorOptions> Options
+@inject ConnectedUsers Users
 
+@{ var userCount = Users.Count; }
 <div class="service-status">
-    <span class="service-mode @(Options.Value.Simulation ? "simulation" : "production")">
+    <span class="service-mode" title="Profils de navigateur connectés à l’application. Plusieurs onglets du même profil comptent pour un seul utilisateur.">
         <span class="service-mode-dot" aria-hidden="true"></span>
-        @(Options.Value.Simulation ? "Simulation appareils" : "Mode production")
+        @userCount utilisateur@(userCount > 1 ? "s" : "") connecté@(userCount > 1 ? "s" : "")
     </span>
     <span class="service-uptime" title="Durée depuis le démarrage de l’application, commune à tous les navigateurs">
         En service depuis <span class="uptime-value">@FormatElapsed(Uptime.Elapsed)</span>

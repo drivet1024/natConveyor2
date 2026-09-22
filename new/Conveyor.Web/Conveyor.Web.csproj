@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="Specshell.NDde" Version="4.0.0" />
+    <PackageReference Include="TitaniumAS.Opc.Client.NetCore" Version="1.0.2.1" />
   </ItemGroup>
 
   <ItemGroup>

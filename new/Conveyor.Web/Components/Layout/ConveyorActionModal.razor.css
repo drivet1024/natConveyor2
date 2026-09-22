@@ -4,6 +4,10 @@
 h2 { font-size: 1.1rem; }
 p, label { font-size: .9rem; }
 label { display: grid; gap: .4rem; }
+.start-pin { display: grid; gap: .5rem; margin-top: 1rem; }
+.start-pin input { width: 100%; min-width: 0; padding: .65rem; color: var(--ink); background: #0e1215; border: 1px solid var(--line); border-radius: 4px; font-size: 1rem; letter-spacing: .2em; }
+.start-pin input:focus { outline: 1px solid var(--orange); border-color: var(--orange); }
+.start-pin small { color: var(--muted); }
 select { padding: .6rem; background: #0e1215; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
 .action-buttons { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 

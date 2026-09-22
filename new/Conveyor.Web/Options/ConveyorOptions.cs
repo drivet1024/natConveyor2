@@ -114,10 +114,15 @@ public sealed class PlcOptions
     public string Protocol { get; set; } = "Dde";
     public string DdeService { get; set; } = "RSLinx";
     public string DdeTopic { get; set; } = "NATIONEX";
+    public string OpcProgId { get; set; } = "RSLinx OPC Server";
+    public string OpcHost { get; set; } = "";
+    public string OpcTopic { get; set; } = "NATIONEX";
+    [Range(50, 60_000)] public int OpcUpdateRateMs { get; set; } = 100;
     public string Host { get; set; } = "127.0.0.1";
     public int Port { get; set; } = 7000;
     public string ChuteTag { get; set; } = "COLISDDE";
     public string TransferTag { get; set; } = "";
+    public string CloseChute39Tag { get; set; } = "CLOSE_CHUTE_39";
     public string ScaleFaultTag { get; set; } = "";
     [Range(1, 100)] public int ScaleFaultParcelThreshold { get; set; } = 3;
     [Range(1, 60_000)] public int ScaleFaultPulseMs { get; set; } = 7_000;
