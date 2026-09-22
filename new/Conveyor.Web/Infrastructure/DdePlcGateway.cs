@@ -88,7 +88,8 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             // StopAdvise may leave the old subscription alive. Recreate the
             // conversation instead of starting a duplicate loop in that case.
             if (restart) DisposeClient();
-            _logger.LogWarning(exception, "Impossible de surveiller le tag DDE {Tag}; nouvelle tentative au prochain contrôle", tag);
+            _logger.LogWarning("Impossible de surveiller le tag DDE {Tag}: {Error}. Le service continue et réessaiera au prochain contrôle",
+                tag, exception.Message);
         }
     }
 
@@ -140,13 +141,14 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 lock (_receptionGate) { _tags[tag].ReadFailed = true; UpdateReadHealth(); }
-                _logger.LogWarning(exception, "Lecture directe DDE échouée pour {Tag}; conversation connectée: {Connected}", tag, client.IsConnected);
+                _logger.LogWarning("Lecture directe DDE échouée pour {Tag}: {Error}. La conversation reste connectée et les autres tags continuent",
+                    tag, exception.Message);
                 if (++_consecutiveReadFailures >= Math.Max(3, _tags.Count))
                 {
                     _logger.LogWarning("Échecs consécutifs des lectures DDE; reconnexion au prochain contrôle");
                     DisposeClient();
                 }
-                return false;
+                return ReadsHealthy;
             }
             _consecutiveReadFailures = 0;
             bool restart;
@@ -214,7 +216,10 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
     }
 
     private static string Normalize(string value) => value.TrimEnd('\0', '\r', '\n');
-    private void UpdateReadHealth() => _readsHealthy = _tags.Values.All(state => state.Subscribed && !state.ReadFailed);
+    // A bad or missing tag must not report the whole DDE conversation as disconnected.
+    // The unavailable tag remains marked for retry while healthy tags continue to operate.
+    private void UpdateReadHealth() =>
+        _readsHealthy = _tags.Count == 0 || _tags.Values.Any(state => state.Subscribed && !state.ReadFailed);
 
     private void DisposeClient()
     {
@@ -227,8 +232,18 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             foreach (var state in _tags.Values) { state.Subscribed = false; state.ReadFailed = false; state.Value = null; state.Version = 0; }
         }
         if (client is null) return;
-        client.Advise -= _adviseHandler;
-        client.Dispose();
+        try { client.Advise -= _adviseHandler; }
+        catch (Exception exception)
+        {
+            _logger.LogWarning("Impossible de retirer le gestionnaire DDE pendant la fermeture: {Error}. Le service continue",
+                exception.Message);
+        }
+        try { client.Dispose(); }
+        catch (Exception exception)
+        {
+            _logger.LogWarning("Impossible de fermer proprement la conversation DDE: {Error}. Le service continue",
+                exception.Message);
+        }
     }
 
     public void Dispose()

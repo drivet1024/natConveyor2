@@ -154,11 +154,29 @@ public sealed class DdePlcGatewayTests
         Assert.True(await gateway.PingAsync(default));
     }
 
+    [Fact]
+    public async Task FailedTagAndFailedConversationDisposalDoNotStopRecovery()
+    {
+        var first = new FakeConnection { FailStop = true, FailDispose = true };
+        var second = new FakeConnection();
+        var connections = new Queue<FakeConnection>([first, second]);
+        var clock = new Clock();
+        using var gateway = Create(() => connections.Dequeue(), clock);
+        await gateway.ConnectAsync(default);
+        first.Emit("39");
+
+        Assert.False(await gateway.PingAsync(default));
+
+        clock.Advance();
+        Assert.True(await gateway.PingAsync(default));
+        Assert.True(second.IsConnected);
+    }
+
     private static DdePlcGateway Create(Func<IDdeConnection> create, TimeProvider time) =>
         new(new PlcOptions(), NullLogger<DdePlcGateway>.Instance, ["COLISDDE"], create, time);
 
     [Fact]
-    public async Task OneInvalidTagDoesNotContinuouslyReconnectHealthyTags()
+    public async Task OneInvalidTagKeepsHealthyTagsAndConnectionOperational()
     {
         var client = new FakeConnection();
         client.FailedTags.Add("INVALID");
@@ -169,11 +187,11 @@ public sealed class DdePlcGatewayTests
         await gateway.ConnectAsync(default);
         for (var index = 0; index < 8; index++)
         {
-            await gateway.PingAsync(default);
+            Assert.True(await gateway.PingAsync(default));
             clock.Advance();
         }
         Assert.Equal(1, created);
-        Assert.False(gateway.ReadsHealthy);
+        Assert.True(gateway.ReadsHealthy);
         Assert.True(gateway.IsConnected);
         client.FailedTags.Clear();
         await gateway.PingAsync(default);
@@ -216,7 +234,7 @@ public sealed class DdePlcGatewayTests
     {
         public bool IsConnected { get; set; }
         public event Action<string, string>? Advise;
-        public bool FailConnect, FailSubscribe, FailRequest, FailStop, Disposed;
+        public bool FailConnect, FailSubscribe, FailRequest, FailStop, FailDispose, Disposed;
         public int Subscriptions, Stops, Requests;
         public string Value = "16";
         public Action? DuringRequest;
@@ -247,6 +265,11 @@ public sealed class DdePlcGatewayTests
             return Value;
         }
         public void Poke(string tag, string value, int timeout) { DuringPoke?.Invoke(); Writes.Add((tag, value)); }
-        public void Dispose() { Disposed = true; IsConnected = false; }
+        public void Dispose()
+        {
+            Disposed = true;
+            IsConnected = false;
+            if (FailDispose) throw new IOException("Dispose failed");
+        }
     }
 }
