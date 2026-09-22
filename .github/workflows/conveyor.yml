@@ -1,57 +1,92 @@
 name: Conveyor Windows
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
-      deploy:
-        description: Deployer sur le serveur (decocher pour preparer la premiere installation)
-        type: boolean
-        default: true
+      conveyor:
+        description: Choisir le convoyeur a deployer
+        required: true
+        type: choice
+        default: CONV-QC
+        options:
+          - CONV-QC
+          - STH-CONV-H-11
+          - Tous
 
 permissions:
   contents: read
 
 jobs:
+
+  # ============================================================
+  # BUILD
+  # ============================================================
+
   build:
     name: Compiler et tester sur GitHub
     runs-on: windows-latest
     timeout-minutes: 30
+
     defaults:
       run:
         shell: pwsh
+
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
+
     steps:
-      - uses: actions/checkout@v7
+
+      - name: Recuperer le code
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@v6
+      - name: Installer .NET
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Restaurer
-        run: dotnet restore new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj
+        run: |
+          dotnet restore new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj
 
       - name: Compiler
-        run: dotnet build new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj --configuration Release --no-restore
+        run: |
+          dotnet build new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj `
+            --configuration Release `
+            --no-restore
 
       - name: Tester
-        run: dotnet test new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj --configuration Release --no-build --logger trx --results-directory "$env:RUNNER_TEMP/conveyor-tests/$env:GITHUB_RUN_ID"
+        run: |
+          dotnet test new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj `
+            --configuration Release `
+            --no-build `
+            --logger trx `
+            --results-directory "$env:RUNNER_TEMP/conveyor-tests/$env:GITHUB_RUN_ID"
 
       - name: Publier
-        run: dotnet publish new/Conveyor.Web/Conveyor.Web.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:RUNNER_TEMP/conveyor-package/app"
+        run: |
+          dotnet publish new/Conveyor.Web/Conveyor.Web.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output "$env:RUNNER_TEMP/conveyor-package/app"
 
       - name: Verifier les verrous de deploiement
-        run: ./scripts/Test-DeploymentFileLocks.ps1
+        run: |
+          ./scripts/Test-DeploymentFileLocks.ps1
 
       - name: Inclure les scripts d'installation
         run: |
-          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/conveyor-package/scripts" -Force | Out-Null
-          Copy-Item -LiteralPath scripts/Deploy-Conveyor.ps1,scripts/Register-ConveyorTask.ps1 -Destination "$env:RUNNER_TEMP/conveyor-package/scripts"
+          New-Item `
+            -ItemType Directory `
+            -Path "$env:RUNNER_TEMP/conveyor-package/scripts" `
+            -Force | Out-Null
+
+          Copy-Item `
+            -LiteralPath scripts/Deploy-Conveyor.ps1,scripts/Register-ConveyorTask.ps1 `
+            -Destination "$env:RUNNER_TEMP/conveyor-package/scripts"
 
       - name: Transmettre la publication
         uses: actions/upload-artifact@v7
@@ -64,33 +99,35 @@ jobs:
             !${{ runner.temp }}/conveyor-package/app/**/appsettings*.json
             !${{ runner.temp }}/conveyor-package/app/**/conveyor.settings.json*
 
-  deploy:
-    name: Installer sur ${{ matrix.target.name }}
+
+  # ============================================================
+  # DEPLOIEMENT QUEBEC
+  # ============================================================
+
+  deploy-qc:
+    name: Installer sur CONV-QC
     needs: build
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.deploy)
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - name: CONV-QC
-            label: conveyor-qc
-            path_variable: CONVEYOR_QC_DEPLOY_PATH
-            task_variable: CONVEYOR_QC_TASK_NAME
-            health_variable: CONVEYOR_QC_HEALTH_URL
-          - name: STH-CONV-H-11
-            label: conveyor-sth
-            path_variable: CONVEYOR_STH_DEPLOY_PATH
-            task_variable: CONVEYOR_STH_TASK_NAME
-            health_variable: CONVEYOR_STH_HEALTH_URL
-    runs-on: [self-hosted, Windows, X64, '${{ matrix.target.label }}']
+
+    if: ${{ inputs.conveyor == 'CONV-QC' || inputs.conveyor == 'Tous' }}
+
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - conveyor-qc
+
     concurrency:
-      group: conveyor-deploy-${{ matrix.target.label }}
+      group: conveyor-deploy-conveyor-qc
       cancel-in-progress: false
+
     timeout-minutes: 10
+
     defaults:
       run:
         shell: pwsh
+
     steps:
+
       - name: Telecharger la publication
         uses: actions/download-artifact@v8
         with:
@@ -99,9 +136,69 @@ jobs:
 
       - name: Deployer et redemarrer
         env:
-          CONVEYOR_DEPLOY_PATH: ${{ vars[matrix.target.path_variable] || vars.CONVEYOR_DEPLOY_PATH || 'C:\natconveyor2-dev' }}
-          CONVEYOR_TASK_NAME: ${{ vars[matrix.target.task_variable] || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
-          CONVEYOR_HEALTH_URL: ${{ vars[matrix.target.health_variable] || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
+          CONVEYOR_DEPLOY_PATH: ${{ vars.CONVEYOR_QC_DEPLOY_PATH || vars.CONVEYOR_DEPLOY_PATH || 'C:\nationex\natconveyor2' }}
+          CONVEYOR_TASK_NAME: ${{ vars.CONVEYOR_QC_TASK_NAME || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
+          CONVEYOR_HEALTH_URL: ${{ vars.CONVEYOR_QC_HEALTH_URL || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
+
         run: |
-          $package = Join-Path $env:RUNNER_TEMP "conveyor-package/$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          & "$package/scripts/Deploy-Conveyor.ps1" -SourcePath "$package/app" -DeployPath $env:CONVEYOR_DEPLOY_PATH -TaskName $env:CONVEYOR_TASK_NAME -HealthUrl $env:CONVEYOR_HEALTH_URL
+          $package = Join-Path `
+            $env:RUNNER_TEMP `
+            "conveyor-package/$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+
+          & "$package/scripts/Deploy-Conveyor.ps1" `
+            -SourcePath "$package/app" `
+            -DeployPath $env:CONVEYOR_DEPLOY_PATH `
+            -TaskName $env:CONVEYOR_TASK_NAME `
+            -HealthUrl $env:CONVEYOR_HEALTH_URL
+
+
+  # ============================================================
+  # DEPLOIEMENT ST-HUBERT
+  # ============================================================
+
+  deploy-sth:
+    name: Installer sur STH-CONV-H-11
+    needs: build
+
+    if: ${{ inputs.conveyor == 'STH-CONV-H-11' || inputs.conveyor == 'Tous' }}
+
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - conveyor-sth
+
+    concurrency:
+      group: conveyor-deploy-conveyor-sth
+      cancel-in-progress: false
+
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+
+      - name: Telecharger la publication
+        uses: actions/download-artifact@v8
+        with:
+          name: conveyor-windows-x64
+          path: ${{ runner.temp }}/conveyor-package/${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Deployer et redemarrer
+        env:
+          CONVEYOR_DEPLOY_PATH: ${{ vars.CONVEYOR_STH_DEPLOY_PATH || vars.CONVEYOR_DEPLOY_PATH || 'C:\nationex\natconveyor2' }}
+          CONVEYOR_TASK_NAME: ${{ vars.CONVEYOR_STH_TASK_NAME || vars.CONVEYOR_TASK_NAME || 'Conveyor.Web' }}
+          CONVEYOR_HEALTH_URL: ${{ vars.CONVEYOR_STH_HEALTH_URL || vars.CONVEYOR_HEALTH_URL || 'http://localhost:5164/api/lines' }}
+
+        run: |
+          $package = Join-Path `
+            $env:RUNNER_TEMP `
+            "conveyor-package/$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+
+          & "$package/scripts/Deploy-Conveyor.ps1" `
+            -SourcePath "$package/app" `
+            -DeployPath $env:CONVEYOR_DEPLOY_PATH `
+            -TaskName $env:CONVEYOR_TASK_NAME `
+            -HealthUrl $env:CONVEYOR_HEALTH_URL
