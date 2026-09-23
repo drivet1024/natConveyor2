@@ -27,7 +27,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             copy.Lines.Add(new LineOptions
             {
                 Id = copy.Lines[0].Id == 0 ? 1 : 0, Name = "Convoyeur secondaire",
-                SourceId = 3, CameraPort = 5102, ScalePort = 5100, DimensionPort = 1801
+                CameraPort = 5102, ScalePort = 5100, DimensionPort = 1801
             });
         copy.ApplyGlobalSorting();
         return copy;
