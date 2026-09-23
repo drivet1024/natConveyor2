@@ -92,9 +92,9 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
         options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
-        if (options.Lines.Any(line => line.SourceId is <= 0)) throw new InvalidOperationException("Lorsqu’il est renseigné, le Source ID doit être supérieur à zéro.");
-        var sourceIds = options.Lines.Where(line => line.SourceId.HasValue).Select(line => line.SourceId!.Value).ToArray();
-        if (sourceIds.Distinct().Count() != sourceIds.Length) throw new InvalidOperationException("Les Source ID renseignés doivent être uniques.");
+        if (options.Lines.Any(line => line.DatabaseLineId is <= 0)) throw new InvalidOperationException("Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.");
+        var databaseLineIds = options.Lines.Where(line => line.DatabaseLineId.HasValue).Select(line => line.DatabaseLineId!.Value).ToArray();
+        if (databaseLineIds.Distinct().Count() != databaseLineIds.Length) throw new InvalidOperationException("Les lineId MySQL renseignés doivent être uniques.");
         PlcConfiguration.Validate(options.GetConfiguredLines().First().Plc);
         foreach (var converter in options.Lines.SelectMany(line => new[] { line.ScaleConverter, line.DimensionConverter }))
         {

@@ -38,12 +38,12 @@ builder.Services.AddOptions<ConveyorOptions>()
     .ValidateDataAnnotations()
     .Validate(options => !string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag), "Le tag de démarrage du convoyeur est obligatoire.")
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
-    .Validate(options => options.GetConfiguredLines().All(line => line.SourceId is null or > 0), "Lorsqu’il est renseigné, le Source ID doit être supérieur à zéro.")
+    .Validate(options => options.GetConfiguredLines().All(line => line.DatabaseLineId is null or > 0), "Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.")
     .Validate(options =>
     {
-        var sourceIds = options.GetConfiguredLines().Where(line => line.SourceId.HasValue).Select(line => line.SourceId!.Value).ToArray();
-        return sourceIds.Distinct().Count() == sourceIds.Length;
-    }, "Les Source ID renseignés doivent être uniques.")
+        var databaseLineIds = options.GetConfiguredLines().Where(line => line.DatabaseLineId.HasValue).Select(line => line.DatabaseLineId!.Value).ToArray();
+        return databaseLineIds.Distinct().Count() == databaseLineIds.Length;
+    }, "Les lineId MySQL renseignés doivent être uniques.")
     .Validate(options => options.LineCount <= options.Lines.Count, "Paramètres manquants pour le nombre de lignes choisi.")
     .Validate(options =>
     {

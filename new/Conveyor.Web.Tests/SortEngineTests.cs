@@ -59,12 +59,12 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task ConfiguredSourceIdIsPassedWhenSavingTheScan()
+    public async Task ConfiguredDatabaseLineIdIsPassedUnchangedWhenSavingTheScan()
     {
         var repository = new FakeRepository { RouteChute = 4 };
         var line = Line();
         line.Id = 1;
-        line.SourceId = 3;
+        line.DatabaseLineId = 3;
         line.CorrelationDelayMs = 0;
         var controller = new LineController(line, true, repository, new MotionPlc(), false,
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
@@ -72,17 +72,17 @@ public sealed class SortEngineTests
         {
             await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
 
-            Assert.Equal(3, Assert.Single(repository.SavedSourceIds));
+            Assert.Equal(3, Assert.Single(repository.SavedDatabaseLineIds));
         }
         finally { await controller.StopAsync(); }
     }
 
     [Fact]
-    public async Task EmptySourceIdIsPassedAsNullWhenSavingTheScan()
+    public async Task EmptyDatabaseLineIdIsPassedAsNullWhenSavingTheScan()
     {
         var repository = new FakeRepository { RouteChute = 4 };
         var line = Line();
-        line.SourceId = null;
+        line.DatabaseLineId = null;
         line.CorrelationDelayMs = 0;
         var controller = new LineController(line, true, repository, new MotionPlc(), false,
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
@@ -90,7 +90,7 @@ public sealed class SortEngineTests
         {
             await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
 
-            Assert.Null(Assert.Single(repository.SavedSourceIds));
+            Assert.Null(Assert.Single(repository.SavedDatabaseLineIds));
         }
         finally { await controller.StopAsync(); }
     }
@@ -523,7 +523,7 @@ public sealed class SortEngineTests
         Assert.Equal(98, result.Chute);
     }
 
-    private static LineOptions Line() => new() { Id = 0, SourceId = 1, ShiftId = 1, RejectedChute = 16, NoReadChute = 1 };
+    private static LineOptions Line() => new() { Id = 0, DatabaseLineId = 1, ShiftId = 1, RejectedChute = 16, NoReadChute = 1 };
     [Theory]
     [InlineData(true, "12345678901", 0, 12, 98)]
     [InlineData(true, "12345678901", 5, 0, 98)]
@@ -745,7 +745,7 @@ public sealed class SortEngineTests
     private sealed class FakeRepository : IConveyorRepository
     {
         public List<SortDecision> SavedDecisions { get; } = [];
-        public List<int?> SavedSourceIds { get; } = [];
+        public List<int?> SavedDatabaseLineIds { get; } = [];
         public List<(int Id, bool Start, int? Cause)> Actions { get; } = [];
         public bool FailActionSave { get; set; }
         public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
@@ -777,11 +777,11 @@ public sealed class SortEngineTests
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-        public Task SaveScanAsync(int lineId, int? sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token)
+        public Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken token)
         {
             if (FailSave) return Task.FromException(new IOException("Insert failed"));
             SavedDecisions.Add(decision);
-            SavedSourceIds.Add(sourceId);
+            SavedDatabaseLineIds.Add(databaseLineId);
             return Task.CompletedTask;
         }
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);

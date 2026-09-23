@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Conveyor.Web.Options;
 
@@ -36,6 +37,10 @@ public sealed class ConveyorOptions
         };
         foreach (var line in Lines)
         {
+            // Preserve values saved briefly under the incorrect SourceId name.
+            // Only the setting name changes; its numeric value is not translated.
+            if (line.DatabaseLineId is null && line.SourceId is not null) line.DatabaseLineId = line.SourceId;
+            line.SourceId = null;
             line.Name = General.Name;
             line.DepotId = General.DepotId;
             line.ShiftId = General.ShiftId;
@@ -83,7 +88,8 @@ public sealed class DatabaseOptions
 public sealed class LineOptions
 {
     [Range(0, 1)] public int Id { get; set; }
-    [Range(1, int.MaxValue)] public int? SourceId { get; set; }
+    [Range(1, int.MaxValue)] public int? DatabaseLineId { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? SourceId { get; set; }
     public string Name { get; set; } = "Ligne";
     public bool Enabled { get; set; } = true;
     public int DepotId { get; set; }

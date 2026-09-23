@@ -14,7 +14,7 @@ public interface IConveyorRepository
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
     Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken cancellationToken);
     Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken cancellationToken);
-    Task SaveScanAsync(int lineId, int? sourceId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
+    Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
     Task<bool> PingAsync(CancellationToken cancellationToken);
     Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken cancellationToken);
 }

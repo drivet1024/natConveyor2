@@ -22,7 +22,7 @@ public sealed class GlobalSortingTests
         Assert.Equal(7, options.General.DepotId);
         Assert.Equal(3, options.General.ShiftId);
         Assert.Equal("DEPART_SYSTEMES", options.General.ConveyorStartTag);
-        Assert.All(options.Lines, line => Assert.Null(line.SourceId));
+        Assert.All(options.Lines, line => Assert.Null(line.DatabaseLineId));
         options.General.Name = "Québec";
         options.General.DepotId = 8;
         options.General.ShiftId = 4;
@@ -94,6 +94,23 @@ public sealed class GlobalSortingTests
             Assert.Equal(22, line.RejectedChute);
             Assert.False(line.PostalCodeSort);
         });
+    }
+
+    [Fact]
+    public void LegacySourceIdIsPreservedAsDatabaseLineId()
+    {
+        var options = new ConveyorOptions
+        {
+            Lines = [new() { Id = 0, SourceId = 3 }]
+        };
+
+        options.ApplyGlobalSorting();
+
+        Assert.Equal(3, options.Lines[0].DatabaseLineId);
+        Assert.Null(options.Lines[0].SourceId);
+        var json = JsonSerializer.Serialize(options, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Contains("\"databaseLineId\":3", json);
+        Assert.DoesNotContain("sourceId", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
