@@ -29,7 +29,9 @@ public sealed class ConveyorOptions
             MaximumWeight = primary.MaximumWeight,
             MaximumDimension = primary.MaximumDimension,
             PostalCodeSort = primary.PostalCodeSort,
-            ValidateDimensionsAndWeight = primary.ValidateDimensionsAndWeight,
+            // Code 98 is opt-in. Legacy configurations without a global
+            // sorting section restart with the safe global default: OFF.
+            ValidateDimensionsAndWeight = false,
             EnableCode86 = primary.EnableCode86
         };
         foreach (var line in Lines)
@@ -69,7 +71,7 @@ public sealed class SortingOptions
     public decimal MaximumWeight { get; set; } = 150;
     public decimal MaximumDimension { get; set; } = 100;
     public bool PostalCodeSort { get; set; } = true;
-    public bool ValidateDimensionsAndWeight { get; set; } = true;
+    public bool ValidateDimensionsAndWeight { get; set; }
     public bool EnableCode86 { get; set; }
 }
 
@@ -101,7 +103,7 @@ public sealed class LineOptions
     public int RejectedChute { get; set; } = 16;
     public int NoReadChute { get; set; } = 1;
     public bool PostalCodeSort { get; set; } = true;
-    public bool ValidateDimensionsAndWeight { get; set; } = true;
+    public bool ValidateDimensionsAndWeight { get; set; }
     public bool EnableCode86 { get; set; }
     public int Code86Retry { get; set; } = 3;
     public int CorrelationDelayMs { get; set; } = 120;

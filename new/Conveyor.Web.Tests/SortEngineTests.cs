@@ -517,7 +517,9 @@ public sealed class SortEngineTests
     {
         var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
         var parcel = Parcel("12345678901") with { Weight = -1, Dimension = Dimension.Missing };
-        var result = await engine.DecideAsync(Line(), parcel, CancellationToken.None);
+        var line = Line();
+        line.ValidateDimensionsAndWeight = true;
+        var result = await engine.DecideAsync(line, parcel, CancellationToken.None);
         Assert.Equal(98, result.Chute);
     }
 
@@ -546,7 +548,12 @@ public sealed class SortEngineTests
     [Fact]
     public async Task Code98_toggle_is_independent_reactivates_and_counter_resets()
     {
-        var config = new ConveyorOptions { Simulation = true, Lines = [new() { Id = 0, CorrelationDelayMs = 0 }, new() { Id = 1 }] };
+        var config = new ConveyorOptions
+        {
+            Simulation = true,
+            Sorting = new() { ValidateDimensionsAndWeight = true },
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0 }, new() { Id = 1 }]
+        };
         config.ApplyGlobalSorting();
         var repo = new FakeRepository();
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,

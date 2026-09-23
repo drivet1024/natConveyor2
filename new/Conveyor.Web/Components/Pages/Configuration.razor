@@ -100,7 +100,7 @@ else
                 @DecimalField("Poids maximal", _sorting.MaximumWeight, value => _sorting.MaximumWeight = value)
                 @DecimalField("Dimension maximale", _sorting.MaximumDimension, value => _sorting.MaximumDimension = value)
                 <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.PostalCodeSort" /><span>Tri par code postal</span></label>
-                <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.ValidateDimensionsAndWeight" /><span>Activer le code 98 (poids et dimensions)</span></label>
+                <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.ValidateDimensionsAndWeight" /><span>Mode 98 actif au démarrage</span><small>OFF par défaut. Cette valeur est réappliquée aux deux lignes après chaque redémarrage.</small></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.EnableCode86" /><span>Activer le code 86</span></label>
                 </div>
             </div>

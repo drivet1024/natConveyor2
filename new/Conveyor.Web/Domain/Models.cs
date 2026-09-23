@@ -69,7 +69,7 @@ public sealed record LineSnapshot(
     SortDecision? LastDecision,
     string? LastError,
     DateTimeOffset UpdatedAt,
-    bool Code98Enabled = true,
+    bool Code98Enabled = false,
     DeviceReception? CameraInput = null,
     DeviceReception? DimensionInput = null,
     DeviceReception? ScaleInput = null,

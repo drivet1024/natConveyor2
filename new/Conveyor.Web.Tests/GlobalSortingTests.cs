@@ -17,6 +17,7 @@ public sealed class GlobalSortingTests
                 new() { Id = 0, Name = "Site", DepotId = 7, ShiftId = 3, Plc = new() { ChuteTag = "MAIN", TransferTag = "READ_MAIN", ScaleFaultTag = "FAUTE_M31" } }]
         };
         options.ApplyGlobalSorting();
+        Assert.False(options.Sorting!.ValidateDimensionsAndWeight);
         Assert.Equal("Site", options.General!.Name);
         Assert.Equal(7, options.General.DepotId);
         Assert.Equal(3, options.General.ShiftId);
@@ -102,12 +103,14 @@ public sealed class GlobalSortingTests
         options.ApplyGlobalSorting();
         options.Sorting!.MaximumWeight = 75;
         options.Sorting.EnableCode86 = true;
+        options.Sorting.ValidateDimensionsAndWeight = false;
         var restored = JsonSerializer.Deserialize<ConveyorOptions>(JsonSerializer.Serialize(options))!;
         restored.ApplyGlobalSorting();
         Assert.All(restored.Lines, line =>
         {
             Assert.Equal(75, line.MaximumWeight);
             Assert.True(line.EnableCode86);
+            Assert.False(line.ValidateDimensionsAndWeight);
         });
     }
 }
