@@ -85,6 +85,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
 
     private static void Validate(ConveyorOptions options)
     {
+        if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");
         if (options.LineCount is < 1 or > 2 || options.LineCount > options.Lines.Count)
             throw new InvalidOperationException("Choisir une ou deux lignes avec leurs paramètres de connexion.");

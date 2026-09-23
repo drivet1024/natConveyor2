@@ -17,6 +17,7 @@ internal sealed class LineController
     private readonly SortEngine _sortEngine;
     private readonly ILogger _logger;
     private readonly Action _changed;
+    private readonly ISmsAlerts? _sms;
     private CancellationTokenSource? _stopping;
     private List<Task> _tasks = [];
     private TcpFrameReceiver? _cameraReceiver;
@@ -88,7 +89,7 @@ internal sealed class LineController
 
     public LineController(LineOptions options, bool simulation, IConveyorRepository repository, IPlcGateway plc,
         bool controlsPlcConnection,
-        SortEngine sortEngine, ILogger logger, Action changed)
+        SortEngine sortEngine, ILogger logger, Action changed, ISmsAlerts? sms = null)
     {
         _options = options;
         _simulation = simulation;
@@ -98,6 +99,7 @@ internal sealed class LineController
         _sortEngine = sortEngine;
         _logger = logger;
         _changed = changed;
+        _sms = sms;
     }
 
     public bool Running => _stopping is { IsCancellationRequested: false };
@@ -171,6 +173,7 @@ internal sealed class LineController
             }
         }
         _logger.LogInformation("Ligne {Line} démarrée", _options.Id);
+        _sms?.Notify("Connexion des appareils activée (vérifier les voyants)", _options.Id);
         _changed();
     }
 
@@ -193,6 +196,7 @@ internal sealed class LineController
             _consecutiveParcelsWithoutScale = 0;
         }
         _logger.LogInformation("Ligne {Line} arrêtée", _options.Id);
+        _sms?.Notify("Déconnexion des appareils effectuée", _options.Id);
         _changed();
     }
 
@@ -211,6 +215,7 @@ internal sealed class LineController
             _lastUsedScaleSequence = 0;
             _consecutiveParcelsWithoutScale = 0;
         }
+        _sms?.Notify("Reset compteurs effectué", _options.Id);
         _changed();
     }
     public void RecordPlcTransferReception(string value)

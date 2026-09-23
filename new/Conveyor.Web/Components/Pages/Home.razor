@@ -5,6 +5,7 @@
 @inject IConveyorSupervisor Supervisor
 @inject IOptions<ConveyorOptions> Options
 @inject IDatabaseMetricsService DatabaseMetrics
+@inject ISmsAlerts SmsAlerts
 
 <PageTitle>Contrôle des convoyeurs</PageTitle>
 
@@ -192,10 +193,12 @@
         try
         {
             await Repository.ResetDataAsync(CancellationToken.None);
+            SmsAlerts.Notify(Repository.IsSimulation ? "Reset Data simulé" : "Reset Data effectué");
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Échec du Reset Data");
+            SmsAlerts.Notify("Reset Data interrompu ; suppression potentiellement partielle");
             _resetDataMessage = "Reset Data interrompu. Des tables peuvent déjà avoir été vidées ; consulter les journaux.";
         }
         finally

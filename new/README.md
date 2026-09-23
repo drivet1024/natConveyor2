@@ -1,5 +1,38 @@
 # Conveyor Control
 
+## Alertes SMS Twilio
+
+Dans **Configuration → SMS Twilio**, activer les alertes et saisir AccountSid,
+AuthToken, le numéro Twilio émetteur et les numéros destinataires au format
+international (`+15145551234`). Séparer les destinataires par point-virgule,
+virgule ou saut de ligne ; les doublons sont supprimés. Utiliser **Enregistrer
+et redémarrer** pour appliquer. Un champ AuthToken vide conserve le token actuel,
+qui n’est jamais réaffiché. Ces paramètres, dont le token en clair, sont enregistrés
+dans le fichier local `conveyor.settings.json`, exclu de Git : limiter son accès
+au compte du service et aux administrateurs.
+
+Les alertes couvrent le Reset Data terminé ou interrompu (suppression possiblement
+partielle), les resets de compteurs manuels ou quotidiens, les commandes de
+démarrage/arrêt envoyées à l’automate (avec cause d’arrêt), et l’activation ou
+l’arrêt des connexions appareils par ligne, y compris au démarrage/arrêt de
+l’application. Une activation des connexions ne confirme pas la connexion
+physique de chaque appareil : les voyants restent la référence. Les coupures
+TCP spontanées ne déclenchent pas de SMS. Les messages identifient le site,
+le dépôt, le convoyeur, la ligne ou toutes les lignes, et l’heure locale.
+
+Les SMS sont désactivés par défaut et aucun appel Twilio n’est effectué en mode
+simulation. L’envoi utilise une file en mémoire de 200 alertes, avec un délai
+maximal de 10 secondes par destinataire. Les échecs sont consignés dans les
+journaux sans bloquer les commandes ni les autres destinataires. Aucun nouvel
+essai automatique n’est effectué pour éviter les doublons après un délai dépassé.
+Une file pleine rejette la nouvelle alerte avec un avertissement ; un arrêt brutal
+peut perdre les alertes en attente. « Accepté par Twilio » ne confirme pas la
+livraison au téléphone ; vérifier la console Twilio pour le suivi.
+
+L’émetteur doit appartenir au compte Twilio et permettre les SMS. Avec un compte
+d’essai, les destinataires doivent être vérifiés chez Twilio. Référence :
+[API Messages Twilio](https://www.twilio.com/docs/messaging/api/message-resource).
+
 Remplacement ASP.NET Core/Blazor de l'application WinForms `Nat_Conveyor`. Une instance supervise jusqu'à deux lignes indépendantes.
 
 ## Démarrage sécurisé

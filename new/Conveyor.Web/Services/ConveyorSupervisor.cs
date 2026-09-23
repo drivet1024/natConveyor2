@@ -16,6 +16,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly ConveyorOptions _configuration;
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
+    private readonly ISmsAlerts? _sms;
     private readonly string _closeChute39Tag;
     private readonly string _motionTag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
@@ -26,8 +27,11 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande convoyeur est déjà en cours.");
         try
         {
-            return await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
+            var result = await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
                 _configuration.Simulation, start, cause, _logger, _motionTag);
+            var action = start ? "Commande démarrer convoyeur envoyée" : $"Commande arrêter convoyeur envoyée ({cause switch { 0 => "PAUSE", 1 => "JAM", _ => "DOWN" }})";
+            _sms?.Notify(action + (result.Recorded ? "" : " ; échec enregistrement MySQL"));
+            return result;
         }
         finally { _motionGate.Release(); Changed?.Invoke(); }
     }
@@ -52,11 +56,12 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public event Action? Changed;
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
-        SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor)
+        SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null)
     {
         var configuration = options.Value;
         _configuration = configuration;
         _editor = editor;
+        _sms = sms;
         _repository = repository;
         _logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         var activeLines = configuration.GetConfiguredLines().ToArray();
@@ -81,7 +86,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         {
             return new LineController(line, configuration.Simulation, repository, _plc,
                 line.Id == primaryLine.Id, sortEngine,
-                loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke());
+                loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke(), sms);
         });
         if (_plc is IPlcReadback readback) readback.TagChanged += RecordPlcTagChange;
     }

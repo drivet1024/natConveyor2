@@ -106,6 +106,17 @@ else
             </div>
     </section>
 
+    <section class="config-section">
+        <div class="config-section-title"><div><span class="eyebrow">ALERTES</span><h2>SMS Twilio</h2></div></div>
+        <div class="config-grid">
+            <label class="toggle-field"><InputCheckbox @bind-Value="_model.Sms.Enabled" /><span>Activer les alertes SMS</span><small>Reset Data, reset compteurs, commandes de marche et connexion/déconnexion des appareils. Aucun SMS envoyé en mode simulation.</small></label>
+            @TextField("AccountSid Twilio", _model.Sms.AccountSid, value => _model.Sms.AccountSid = value)
+            <label><span>Nouvel AuthToken Twilio</span><InputText type="password" autocomplete="new-password" @bind-Value="_newSmsAuthToken" placeholder="Laisser vide pour conserver le token actuel" /><small>Le token enregistré n’est jamais affiché. Les secrets sont conservés dans le fichier local de configuration, exclu de Git.</small></label>
+            <label><span>Numéro Twilio émetteur</span><InputText @bind-Value="_model.Sms.FromNumber" placeholder="+15145551234" /><small>Numéro de votre compte Twilio capable d’envoyer des SMS.</small></label>
+            <label class="wide-field"><span>Numéros destinataires</span><InputTextArea @bind-Value="_model.Sms.Recipients" rows="3" placeholder="+15145551234; +14165551234" /><small>Format international avec + et indicatif pays. Séparer par point-virgule, virgule ou saut de ligne. Enregistrer et redémarrer pour appliquer.</small></label>
+        </div>
+    </section>
+
     @foreach (var line in _model.GetConfiguredLines())
     {
         <section class="config-section">
@@ -177,6 +188,7 @@ else
     private PlcOptions _plc => _model.Lines.OrderBy(line => line.Id).First().Plc;
     private SortingOptions _sorting => _model.Sorting!;
     private string _newConnectionString = "";
+    private string _newSmsAuthToken = "";
     private bool _saving;
     private bool _saved;
     private bool _restarting;
@@ -216,7 +228,12 @@ else
     private async Task Save()
     {
         _saving = true; _saved = false; _error = null;
-        try { await Editor.SaveAsync(_model, _newConnectionString); _newConnectionString = ""; _saved = true; }
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_newSmsAuthToken)) _model.Sms.AuthToken = _newSmsAuthToken.Trim();
+            await Editor.SaveAsync(_model, _newConnectionString);
+            _newConnectionString = ""; _newSmsAuthToken = ""; _saved = true;
+        }
         catch (Exception exception) { _error = exception.Message; }
         finally { _saving = false; }
     }

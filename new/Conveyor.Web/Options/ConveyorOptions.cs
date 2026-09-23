@@ -10,6 +10,7 @@ public sealed class ConveyorOptions
     [Range(1, 2)] public int LineCount { get => _lineCount ?? Math.Clamp(Lines.Count, 1, 2); set => _lineCount = value; }
     public bool Simulation { get; set; } = true;
     public DatabaseOptions Database { get; set; } = new();
+    public SmsOptions Sms { get; set; } = new();
     public GeneralOptions? General { get; set; }
     public SortingOptions? Sorting { get; set; }
     [MinLength(1), MaxLength(2)] public List<LineOptions> Lines { get; set; } = [];
