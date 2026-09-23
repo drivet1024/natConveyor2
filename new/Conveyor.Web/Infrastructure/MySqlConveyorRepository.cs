@@ -199,7 +199,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         await command.ExecuteNonQueryAsync(token);
     }
 
-    public async Task SaveScanAsync(int lineId, int sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token)
+    public async Task SaveScanAsync(int lineId, int? sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token)
     {
         var validBarcode = decision.Barcode.Length is 11 or 12;
         var table = validBarcode ? "scan_history" : "scan_noWB";
@@ -220,7 +220,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         // Keep the legacy 19-character local timestamp (also supported by VARCHAR(19) columns).
         command.Parameters.AddWithValue("@date", parcel.CameraTimestamp.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("@line", lineId);
-        command.Parameters.AddWithValue("@source", sourceId);
+        command.Parameters.AddWithValue("@source", sourceId is null ? DBNull.Value : sourceId.Value);
         var affected = await command.ExecuteNonQueryAsync(token);
         if (affected != 1)
             throw new InvalidOperationException($"Insertion dans {table} : {affected} ligne(s) affectée(s), 1 attendue.");
@@ -277,7 +277,7 @@ public sealed class SimulationConveyorRepository : IConveyorRepository
     public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(postalCode.StartsWith('H') ? 7 : 8);
     public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
     public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-    public Task SaveScanAsync(int lineId, int sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
+    public Task SaveScanAsync(int lineId, int? sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
     public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
     public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) => Task.FromResult((0L, 0L, 0L, false));
 }

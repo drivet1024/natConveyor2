@@ -34,9 +34,6 @@ public sealed class ConveyorOptions
         };
         foreach (var line in Lines)
         {
-            // Legacy configurations had no SourceId. The upper conveyor maps
-            // to source 1 and the lower conveyor maps to source 3.
-            if (line.SourceId <= 0) line.SourceId = line.Id == 1 ? 3 : 1;
             line.Name = General.Name;
             line.DepotId = General.DepotId;
             line.ShiftId = General.ShiftId;
@@ -84,7 +81,7 @@ public sealed class DatabaseOptions
 public sealed class LineOptions
 {
     [Range(0, 1)] public int Id { get; set; }
-    [Range(1, int.MaxValue)] public int SourceId { get; set; }
+    [Range(1, int.MaxValue)] public int? SourceId { get; set; }
     public string Name { get; set; } = "Ligne";
     public bool Enabled { get; set; } = true;
     public int DepotId { get; set; }

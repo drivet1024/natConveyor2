@@ -78,6 +78,24 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task EmptySourceIdIsPassedAsNullWhenSavingTheScan()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.SourceId = null;
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+
+            Assert.Null(Assert.Single(repository.SavedSourceIds));
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task ConfiguredCloseTagAppliesToBothLinesAndZeroReopensChute39()
     {
         var configuration = new ConveyorOptions { Simulation = true, Lines =
@@ -720,7 +738,7 @@ public sealed class SortEngineTests
     private sealed class FakeRepository : IConveyorRepository
     {
         public List<SortDecision> SavedDecisions { get; } = [];
-        public List<int> SavedSourceIds { get; } = [];
+        public List<int?> SavedSourceIds { get; } = [];
         public List<(int Id, bool Start, int? Cause)> Actions { get; } = [];
         public bool FailActionSave { get; set; }
         public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
@@ -752,7 +770,7 @@ public sealed class SortEngineTests
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-        public Task SaveScanAsync(int lineId, int sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token)
+        public Task SaveScanAsync(int lineId, int? sourceId, ParcelContext parcel, SortDecision decision, CancellationToken token)
         {
             if (FailSave) return Task.FromException(new IOException("Insert failed"));
             SavedDecisions.Add(decision);

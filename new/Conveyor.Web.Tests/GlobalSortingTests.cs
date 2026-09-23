@@ -21,7 +21,7 @@ public sealed class GlobalSortingTests
         Assert.Equal(7, options.General.DepotId);
         Assert.Equal(3, options.General.ShiftId);
         Assert.Equal("DEPART_SYSTEMES", options.General.ConveyorStartTag);
-        Assert.Equal([3, 1], options.Lines.Select(line => line.SourceId).ToArray());
+        Assert.All(options.Lines, line => Assert.Null(line.SourceId));
         options.General.Name = "Québec";
         options.General.DepotId = 8;
         options.General.ShiftId = 4;
