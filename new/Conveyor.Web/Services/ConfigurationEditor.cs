@@ -27,7 +27,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             copy.Lines.Add(new LineOptions
             {
                 Id = copy.Lines[0].Id == 0 ? 1 : 0, Name = "Convoyeur secondaire",
-                CameraPort = 5102, ScalePort = 5100, DimensionPort = 1801
+                SourceId = 3, CameraPort = 5102, ScalePort = 5100, DimensionPort = 1801
             });
         copy.ApplyGlobalSorting();
         return copy;
@@ -92,6 +92,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
         options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
+        if (options.Lines.Any(line => line.SourceId <= 0)) throw new InvalidOperationException("Le Source ID de chaque ligne doit être supérieur à zéro.");
+        if (options.Lines.Select(line => line.SourceId).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les Source ID des lignes doivent être uniques.");
         PlcConfiguration.Validate(options.GetConfiguredLines().First().Plc);
         foreach (var converter in options.Lines.SelectMany(line => new[] { line.ScaleConverter, line.DimensionConverter }))
         {

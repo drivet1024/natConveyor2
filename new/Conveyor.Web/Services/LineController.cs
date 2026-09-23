@@ -332,7 +332,7 @@ internal sealed class LineController
                 rejectionCounted = true;
             }
             stage = "insertion MySQL du scan";
-            await _repository.SaveScanAsync(_options.Id, parcel, decision, token);
+            await _repository.SaveScanAsync(_options.Id, _options.SourceId, parcel, decision, token);
             lock (_gate)
             {
                 _lastDecision = decision;

@@ -111,6 +111,12 @@ else
         <section class="config-section">
             <div class="config-section-title"><div><span class="eyebrow">LIGNE @(line.Id + 1)</span></div><label class="inline-toggle"><InputCheckbox @bind-Value="line.Enabled" /> Activée au démarrage</label></div>
             <div class="config-block">
+                <h3>IDENTIFICATION</h3>
+                <div class="config-grid">
+                    <label><span>Source ID</span><InputNumber @bind-Value="line.SourceId" min="1" /><small>Identifiant de cette ligne enregistré dans la colonne source_id de scan_history et scan_noWB.</small></label>
+                </div>
+            </div>
+            <div class="config-block">
                 <h3>CAMÉRAS</h3>
                 <div class="config-grid">
                     <label><span>Mode TCP/IP</span><InputSelect @bind-Value="line.CameraConnectMode"><option value="false">Serveur — l’appareil se connecte</option><option value="true">Client — connexion vers le serveur</option></InputSelect></label>

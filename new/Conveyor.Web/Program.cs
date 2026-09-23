@@ -38,6 +38,8 @@ builder.Services.AddOptions<ConveyorOptions>()
     .ValidateDataAnnotations()
     .Validate(options => !string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag), "Le tag de démarrage du convoyeur est obligatoire.")
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
+    .Validate(options => options.GetConfiguredLines().All(line => line.SourceId > 0), "Le Source ID de chaque ligne doit être supérieur à zéro.")
+    .Validate(options => options.GetConfiguredLines().Select(line => line.SourceId).Distinct().Count() == options.LineCount, "Les Source ID des lignes doivent être uniques.")
     .Validate(options => options.LineCount <= options.Lines.Count, "Paramètres manquants pour le nombre de lignes choisi.")
     .Validate(options =>
     {
