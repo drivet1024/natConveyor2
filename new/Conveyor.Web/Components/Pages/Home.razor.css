@@ -11,6 +11,9 @@
 
 .metrics { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .metrics .metric { grid-column: span 3; border-right: 1px solid var(--line); }
+.metrics .metric strong { color: #fff; }
+.metrics .metric .registered-total.overdue strong { color: #fff; }
+.metrics .metric .metric-percentage { color: var(--muted); }
 .metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
