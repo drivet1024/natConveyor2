@@ -14,14 +14,20 @@
     </div>
 
     <div class="realtime-sections">
-        <section class="metric-section" aria-labelledby="flow-title">
-            <h3 id="flow-title">Traitement et qualité</h3>
-            <div class="metric-grid">
-                @Metric("Sans lecture", Counters.NoReads, Counters.TotalParcels)
+        <section class="metric-section" aria-labelledby="production-title">
+            <h3 id="production-title">Production</h3>
+            <div class="metric-grid production-grid">
                 @Metric("Code 98", Counters.Code98, Counters.TotalParcels)
                 @Metric("Code 68", Counters.Code68, Counters.TotalParcels)
                 @Metric("Code 97 · Recirculation", Counters.Code97, Counters.TotalParcels)
                 @Metric("Colis triés", Counters.SortedByWaybill + Counters.SortedByPostalCode, Counters.TotalParcels)
+            </div>
+        </section>
+
+        <section class="metric-section" aria-labelledby="quality-title">
+            <h3 id="quality-title">Qualité</h3>
+            <div class="metric-grid quality-grid">
+                @Metric("Sans lecture", Counters.NoReads, Counters.TotalParcels)
                 @Metric("Fautes balance", Counters.ScaleFaults, null, "Nombre d’impulsions de faute reçues")
             </div>
         </section>
