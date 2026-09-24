@@ -54,6 +54,7 @@ public sealed class MaintenanceTests
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
         await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetConveyorMotionAsync(true, null, true));
         Assert.False(supervisor.Maintenance);
+        Assert.False(supervisor.HasStartedOperatingMode);
         await supervisor.StartLineAsync(0);
         try
         {
@@ -63,14 +64,17 @@ public sealed class MaintenanceTests
             Assert.False(supervisor.CanChangeOperatingMode);
             await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetConveyorMotionAsync(true, null, true));
             Assert.False(supervisor.Maintenance);
+            Assert.False(supervisor.HasStartedOperatingMode);
             supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "0");
             Assert.True(supervisor.CanChangeOperatingMode);
             await supervisor.SetConveyorMotionAsync(true, null, true);
+            Assert.True(supervisor.HasStartedOperatingMode);
             Assert.True(supervisor.Maintenance);
             Assert.All(supervisor.GetSnapshots(), line => Assert.True(line.Maintenance));
             supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "1");
             await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetConveyorMotionAsync(true, null));
             await supervisor.SetConveyorMotionAsync(false, 0);
+            Assert.True(supervisor.HasStartedOperatingMode);
             Assert.True(supervisor.Maintenance);
             await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetConveyorMotionAsync(true, null));
             supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "0");

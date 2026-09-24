@@ -25,6 +25,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
     public bool Maintenance => _configuration.General?.Maintenance == true;
+    public bool HasStartedOperatingMode { get; private set; }
     private volatile bool _rslinxRestartInProgress;
     public bool RslinxRestartInProgress => _rslinxRestartInProgress;
     public bool CanChangeOperatingMode => ConveyorRunning == false && _plc.IsConnected
@@ -44,6 +45,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 {
                     if (!start) return;
                     _configuration.General!.Maintenance = maintenance;
+                    HasStartedOperatingMode = true;
                     foreach (var line in _lines.Values) line.SetMaintenance(maintenance);
                     try { await _editor.SaveMaintenanceAsync(maintenance); }
                     catch (Exception exception)

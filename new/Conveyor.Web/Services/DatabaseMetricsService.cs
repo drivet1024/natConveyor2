@@ -7,15 +7,34 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
 {
     private DateTimeOffset _lastShipmentCheck = DateTimeOffset.MinValue;
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private long? _cachedPostalCodes;
     private DatabaseReferenceCounts _current = new(0, 0, 0, false, repository.IsSimulation, DateTimeOffset.MinValue);
     public event Action? Changed;
     public DatabaseReferenceCounts Current { get { lock (_gate) return _current; } }
 
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshCoreAsync(false, cancellationToken);
+    public Task RefreshAfterResetAsync(CancellationToken cancellationToken = default) => RefreshCoreAsync(true, cancellationToken);
+
+    private async Task RefreshCoreAsync(bool afterReset, CancellationToken cancellationToken)
+    {
+        await _refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (afterReset) _cachedPostalCodes = null;
+            await ReadCountsAsync(cancellationToken);
+        }
+        finally { _refreshGate.Release(); }
+        Changed?.Invoke();
+    }
+
+    private async Task ReadCountsAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var counts = await repository.GetReferenceCountsAsync(cancellationToken);
+            var counts = await repository.GetReferenceCountsAsync(cancellationToken, _cachedPostalCodes);
+            // Keep polling while empty; once repopulated, freeze until the next Reset Data.
+            if (counts.PostalCodes > 0) _cachedPostalCodes = counts.PostalCodes;
             var lastUpdate = Current.LastShipmentUpdate;
             if (counts.Parcels == 0) lastUpdate = null;
             else if (Current.Parcels == 0 || DateTimeOffset.UtcNow - _lastShipmentCheck >= TimeSpan.FromSeconds(30))
@@ -32,7 +51,6 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
             lock (_gate) _current = _current with { Connected = false, UpdatedAt = DateTimeOffset.Now };
             logger.LogWarning(exception, "Impossible de lire les compteurs de la base locale");
         }
-        Changed?.Invoke();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

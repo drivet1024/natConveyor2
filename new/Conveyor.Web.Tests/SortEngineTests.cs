@@ -465,6 +465,51 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task Postal_count_freezes_until_reset_and_freezes_again_after_reload()
+    {
+        var repository = new FakeRepository { PostalCount = 100, ScanCount = 5 };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        repository.PostalCount = 200;
+        repository.ScanCount = 8;
+        await metrics.RefreshAsync();
+        Assert.Equal(100, metrics.Current.PostalCodes);
+        Assert.Equal(8, metrics.Current.Scans);
+        Assert.Equal(1, repository.PostalCountReads);
+        repository.PostalCount = 0;
+        await metrics.RefreshAfterResetAsync();
+        Assert.Equal(0, metrics.Current.PostalCodes);
+        await metrics.RefreshAsync();
+        Assert.Equal(0, metrics.Current.PostalCodes);
+        repository.PostalCount = 300;
+        await metrics.RefreshAsync();
+        Assert.Equal(300, metrics.Current.PostalCodes);
+        var reads = repository.PostalCountReads;
+        repository.PostalCount = 400;
+        await metrics.RefreshAsync();
+        Assert.Equal(300, metrics.Current.PostalCodes);
+        Assert.Equal(reads, repository.PostalCountReads);
+    }
+
+    [Fact]
+    public async Task Postal_count_retries_failed_refresh_after_reset()
+    {
+        var repository = new FakeRepository { PostalCount = 100 };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        repository.FailCounts = true;
+        await metrics.RefreshAfterResetAsync();
+        Assert.False(metrics.Current.Connected);
+        repository.FailCounts = false;
+        repository.PostalCount = 0;
+        await metrics.RefreshAsync();
+        Assert.Equal(0, metrics.Current.PostalCodes);
+        repository.PostalCount = 200;
+        await metrics.RefreshAsync();
+        Assert.Equal(200, metrics.Current.PostalCodes);
+    }
+
+    [Fact]
     public async Task Database_counter_keeps_last_total_when_read_fails()
     {
         var repository = new FakeRepository { ScanCount = 1234 };
@@ -785,8 +830,13 @@ public sealed class SortEngineTests
             return Task.CompletedTask;
         }
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
-        public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token) =>
-            FailCounts ? Task.FromException<(long, long, long, bool)>(new IOException("Database unavailable"))
-                : Task.FromResult((ParcelCount, 0L, ScanCount, HasOverdueScans));
+        public long PostalCount { get; set; }
+        public int PostalCountReads { get; private set; }
+        public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token, long? cachedPostalCodes = null)
+        {
+            if (FailCounts) throw new IOException("Database unavailable");
+            if (cachedPostalCodes is null) PostalCountReads++;
+            return Task.FromResult((ParcelCount, cachedPostalCodes ?? PostalCount, ScanCount, HasOverdueScans));
+        }
     }
 }

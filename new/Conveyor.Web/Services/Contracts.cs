@@ -16,7 +16,7 @@ public interface IConveyorRepository
     Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken cancellationToken);
     Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
     Task<bool> PingAsync(CancellationToken cancellationToken);
-    Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken cancellationToken);
+    Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken cancellationToken, long? cachedPostalCodes = null);
 }
 
 public interface IDatabaseMetricsService
@@ -24,6 +24,7 @@ public interface IDatabaseMetricsService
     event Action? Changed;
     DatabaseReferenceCounts Current { get; }
     Task RefreshAsync(CancellationToken cancellationToken = default);
+    Task RefreshAfterResetAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IPlcGateway
@@ -48,6 +49,7 @@ public interface IConveyorSupervisor
     int CurrentShiftId { get; }
     bool? ConveyorRunning { get; }
     bool Maintenance { get; }
+    bool HasStartedOperatingMode { get; }
     bool CanChangeOperatingMode { get; }
     Task SetShiftAsync(int shiftId);
     Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause, bool maintenance = false);
