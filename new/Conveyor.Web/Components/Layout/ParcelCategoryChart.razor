@@ -1,0 +1,101 @@
+@using System.Globalization
+
+<section class="parcel-profile-panel" aria-labelledby="parcel-profile-title">
+    <div class="parcel-profile-heading">
+        <div><span class="eyebrow">30 DERNIERS JOURS</span><h2 id="parcel-profile-title">Profil des colis</h2></div>
+        <div class="parcel-profile-legend" aria-label="Légende">
+            <span class="light"><i></i>Colis légers</span>
+            <span class="small"><i></i>Petits colis</span>
+        </div>
+    </div>
+
+    @if (!HasData)
+    {
+        <div class="parcel-profile-empty">Aucune donnée de colis légers ou de petits colis pour cette période.</div>
+    }
+    else
+    {
+        <div class="parcel-profile-kpis">
+            <div><strong>@FormatNullable(LastLight)</strong><span>colis légers au dernier shift disponible</span></div>
+            <div><strong>@FormatNullable(LastSmall)</strong><span>petits colis au dernier shift disponible</span></div>
+        </div>
+        <div class="parcel-profile-scroll">
+            <svg class="parcel-profile-chart" viewBox="0 0 1000 340" role="img" aria-labelledby="parcel-profile-title parcel-profile-description">
+                <desc id="parcel-profile-description">Graphique à lignes des nombres de colis légers et de petits colis sur les 30 derniers jours.</desc>
+                @for (var i = 0; i <= 4; i++)
+                {
+                    var y = Top + PlotHeight * i / 4d;
+                    <g>
+                        <line class="grid-line" x1="@Left" y1="@F(y)" x2="@(Width - Right)" y2="@F(y)" />
+                        <text class="axis-label count-axis" x="@(Left - 12)" y="@F(y + 4)">@FormatAxis(Maximum * (4 - i) / 4d)</text>
+                    </g>
+                }
+                @for (var i = 0; i < 5; i++)
+                {
+                    var date = PeriodStart.AddDays(i == 4 ? 29 : i * 7);
+                    <g><text class="axis-label date-axis" x="@F(X(date))" y="@(Height - 13)">@date.ToString("dd MMM", CultureInfo.GetCultureInfo("fr-CA"))</text></g>
+                }
+                <text class="axis-title" x="12" y="18">COLIS</text>
+                @foreach (var segment in Segments(point => point.LightParcels))
+                {
+                    <polyline class="series light" points="@Polyline(segment, point => point.LightParcels!.Value)" />
+                }
+                @foreach (var segment in Segments(point => point.SmallParcels))
+                {
+                    <polyline class="series small" points="@Polyline(segment, point => point.SmallParcels!.Value)" />
+                }
+                @foreach (var point in Points)
+                {
+                    @if (point.LightParcels is { } light)
+                    {
+                        <circle class="point light" cx="@F(X(point.ShiftStart))" cy="@F(Y(light))" r="4"><title>@Tooltip(point, "Colis légers", light)</title></circle>
+                    }
+                    @if (point.SmallParcels is { } small)
+                    {
+                        <circle class="point small" cx="@F(X(point.ShiftStart))" cy="@F(Y(small))" r="4"><title>@Tooltip(point, "Petits colis", small)</title></circle>
+                    }
+                }
+            </svg>
+        </div>
+        @if (Points.Any(point => point.LightParcels is null || point.SmallParcels is null))
+        {
+            <p class="parcel-profile-note">Les périodes antérieures à l’ajout des colonnes restent absentes et ne sont pas remplacées par zéro.</p>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<StatisticsHistoryPoint> Points { get; set; } = [];
+    private const double Width = 1000, Height = 340, Left = 72, Right = 36, Top = 30, Bottom = 52;
+    private const double PlotHeight = Height - Top - Bottom;
+    private DateTime PeriodStart => DateTime.Today.AddDays(-29);
+    private bool HasData => Points.Any(point => point.LightParcels.HasValue || point.SmallParcels.HasValue);
+    private long? LastLight => Points.LastOrDefault(point => point.LightParcels.HasValue)?.LightParcels;
+    private long? LastSmall => Points.LastOrDefault(point => point.SmallParcels.HasValue)?.SmallParcels;
+    private double Maximum => NiceMaximum(Points.SelectMany(point => new[] { point.LightParcels, point.SmallParcels })
+        .Where(value => value.HasValue).Max(value => (double)value!.Value), 10);
+    private double X(DateTime date) => Left + Math.Clamp((date.Date - PeriodStart).TotalDays / 29d, 0, 1) * (Width - Left - Right);
+    private double Y(long value) => Top + PlotHeight * (1 - value / Maximum);
+    private string Polyline(IEnumerable<StatisticsHistoryPoint> points, Func<StatisticsHistoryPoint, long> value) =>
+        string.Join(' ', points.Select(point => $"{F(X(point.ShiftStart))},{F(Y(value(point)))}"));
+    private IEnumerable<IReadOnlyList<StatisticsHistoryPoint>> Segments(Func<StatisticsHistoryPoint, long?> value)
+    {
+        List<StatisticsHistoryPoint> segment = [];
+        foreach (var point in Points)
+        {
+            if (value(point).HasValue) segment.Add(point);
+            else if (segment.Count > 0) { yield return segment.ToArray(); segment.Clear(); }
+        }
+        if (segment.Count > 0) yield return segment;
+    }
+    private static double NiceMaximum(double value, double minimum)
+    {
+        if (value <= minimum) return minimum;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(value)));
+        return Math.Ceiling(value / magnitude * 2) / 2 * magnitude;
+    }
+    private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    private static string FormatAxis(double value) => value >= 1000 ? $"{value / 1000:0.#} k" : $"{value:0}";
+    private static string FormatNullable(long? value) => value?.ToString("N0") ?? "—";
+    private static string Tooltip(StatisticsHistoryPoint point, string metric, long value) => $"{point.ShiftStart:yyyy-MM-dd HH:mm} — {metric} : {value:N0}";
+}

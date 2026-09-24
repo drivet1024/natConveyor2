@@ -30,7 +30,10 @@ else if (_loading)
 }
 else
 {
-    <StatisticsHistoryChart Points="_points" />
+    <div class="history-charts">
+        <StatisticsHistoryChart Points="_points" />
+        <ParcelCategoryChart Points="_points" />
+    </div>
 }
 
 @code {

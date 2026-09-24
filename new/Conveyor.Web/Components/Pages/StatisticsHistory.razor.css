@@ -1,1 +1,2 @@
 .history-loading{padding:4rem 1rem;text-align:center;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px}.history-toolbar{display:flex;align-items:end;gap:1rem;padding:1rem;margin-bottom:1rem;background:var(--panel);border:1px solid var(--line);border-radius:8px}.history-toolbar label{display:grid;gap:.35rem;color:var(--muted);font-size:.72rem}.history-toolbar select{min-width:240px;padding:.55rem .65rem;color:var(--ink);background:#0e1215;border:1px solid var(--line);border-radius:4px}
+.history-charts{display:grid;gap:1.2rem}
