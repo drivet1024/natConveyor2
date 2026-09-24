@@ -1,4 +1,5 @@
 @using System.Globalization
+@inject IOptions<ConveyorOptions> Options
 
 <section class="realtime-panel" aria-labelledby="realtime-title">
     <div class="realtime-heading">
@@ -35,7 +36,7 @@
         <section class="metric-section" aria-labelledby="profile-title">
             <h3 id="profile-title">Profil des colis</h3>
             <div class="metric-grid profile-grid">
-                @Metric("Colis légers", Counters.LightParcels, Counters.TotalParcels)
+                @Metric("Colis légers", Counters.LightParcels, Counters.TotalParcels, null, LightParcelRule)
                 @Metric("Petits colis", Counters.SmallParcels, Counters.TotalParcels)
                 @Metric("Dimensions inversées", Counters.InverseLengthParcels, Counters.TotalParcels, "2e mesure ≥ 1re mesure + 2 po")
             </div>
@@ -47,6 +48,16 @@
     [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
+    private string LightParcelRule
+    {
+        get
+        {
+            var threshold = Options.Value.Sorting?.LightParcelMaximumWeight ?? 0;
+            return threshold > 0
+                ? $"poids < {threshold.ToString("0.##", CultureInfo.GetCultureInfo("fr-CA"))} lb"
+                : "seuil désactivé";
+        }
+    }
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
     private static string FormatPercent(decimal value) => value.ToString("0.#", CultureInfo.GetCultureInfo("fr-CA")) + " %";
     private RenderFragment Headline(string label, long count, decimal? percent, string title) => @<div class="headline" title="@title">
@@ -54,9 +65,9 @@
         @if (percent.HasValue) { <span class="rate">@FormatPercent(percent.Value)</span> }
         <span class="label">@label</span>
     </div>;
-    private RenderFragment Metric(string label, long count, long? denominator, string? detail = null) => @<div class="realtime-metric">
+    private RenderFragment Metric(string label, long count, long? denominator, string? detail = null, string? inlineDetail = null) => @<div class="realtime-metric">
         <div><strong>@count.ToString("N0")</strong>@if (denominator.HasValue) { <span class="rate">@FormatPercent(Percentage(count, denominator.Value))</span> }</div>
-        <span class="label">@label</span>
+        <span class="label">@label@if (inlineDetail is not null) { <small class="inline-detail">· @inlineDetail</small> }</span>
         @if (detail is not null) { <small>@detail</small> }
     </div>;
 }
