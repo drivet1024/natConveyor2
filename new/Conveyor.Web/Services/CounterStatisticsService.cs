@@ -42,7 +42,7 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
                     var pending = _state!.Pending.LastOrDefault(row => row.DepotId == configuration.General!.DepotId
                         && row.LineId == line.DatabaseLineId && row.ShiftStartedAt == shift && row.Destination == destination);
                     if (pending is not null) return pending.RestoreCounters();
-                    return await store.LoadAsync(configuration.General!.DepotId, line.DatabaseLineId!.Value, shift, destination, token);
+                    return await store.LoadAsync(configuration.General!.DepotId, line.DatabaseLineId, shift, destination, token);
                 }
                 restored.Add((line.Id, await Load(StatisticsDestination.ProductionLine), await Load(StatisticsDestination.Maintenance)));
             }
@@ -119,14 +119,14 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
         {
             for (var i = 0; i < lines.Length; i++)
                 result.Add(CounterStatistics.Capture(configuration.General!.DepotId,
-                    lines[i].DatabaseLineId ?? throw new InvalidOperationException("Configurer l’ID de ligne MySQL pour sauvegarder les statistiques."),
+                    lines[i].DatabaseLineId,
                     shiftStart, production[i]));
             result.Add(CounterStatistics.CaptureCombined(configuration.General!.DepotId, shiftStart, production));
         }
         if (maintenanceActive || maintenance.Any(counters => counters.TotalParcels > 0))
             for (var i = 0; i < lines.Length; i++)
                 result.Add(CounterStatistics.Capture(configuration.General!.DepotId,
-                    lines[i].DatabaseLineId ?? throw new InvalidOperationException("Configurer l’ID de ligne MySQL pour sauvegarder les statistiques de maintenance."),
+                    lines[i].DatabaseLineId,
                     shiftStart, maintenance[i]) with { Destination = StatisticsDestination.Maintenance });
         return result.ToArray();
     }

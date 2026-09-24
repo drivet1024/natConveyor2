@@ -9,7 +9,7 @@ namespace Conveyor.Web.Services;
 public interface ICounterStatisticsStore
 {
     Task SaveAsync(CounterStatistics statistics, CancellationToken token);
-    Task<LineCounters> LoadAsync(int depotId, int lineId, DateTime shiftStart, StatisticsDestination destination, CancellationToken token);
+    Task<LineCounters> LoadAsync(int depotId, int? lineId, DateTime shiftStart, StatisticsDestination destination, CancellationToken token);
 }
 
 public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : ICounterStatisticsStore
@@ -36,7 +36,7 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
         _schemaReady = true;
     }
 
-    public async Task<LineCounters> LoadAsync(int depotId, int lineId, DateTime shiftStart,
+    public async Task<LineCounters> LoadAsync(int depotId, int? lineId, DateTime shiftStart,
         StatisticsDestination destination, CancellationToken token)
     {
         await using var connection = new MySqlConnection(options.Value.Database.ConnectionString);
@@ -44,7 +44,7 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
         await EnsureSchemaAsync(connection, token);
         await using var exact = new MySqlCommand("SELECT counters_json FROM conveyor_counter_state WHERE depot_id=@depot AND line_id=@line AND shift_start=@date AND mode=@mode", connection);
         exact.Parameters.AddWithValue("@depot", depotId);
-        exact.Parameters.AddWithValue("@line", lineId);
+        exact.Parameters.AddWithValue("@line", lineId ?? 0);
         exact.Parameters.AddWithValue("@date", shiftStart);
         exact.Parameters.AddWithValue("@mode", (int)destination);
         if (await exact.ExecuteScalarAsync(token) is string json)
@@ -52,9 +52,9 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
 
         // Compatibility with shifts saved before the detailed counter table existed.
         var (table, _) = GetDestination(destination);
-        await using var legacy = new MySqlCommand($"SELECT NB_SCANNED, NB_REJECTED, NB_RECYCLED, NB_SORTED, PC_CODE98, PC_CODE68, NB_WEIGHT_ERROR, NB_SCALE_ERROR FROM {table} WHERE DEPOT_ID=@depot AND line_id=@line AND INSERT_DATE=@date ORDER BY ID DESC LIMIT 1", connection);
+        await using var legacy = new MySqlCommand($"SELECT NB_SCANNED, NB_REJECTED, NB_RECYCLED, NB_SORTED, PC_CODE98, PC_CODE68, NB_WEIGHT_ERROR, NB_SCALE_ERROR FROM {table} WHERE DEPOT_ID=@depot AND line_id <=> @line AND INSERT_DATE=@date ORDER BY ID DESC LIMIT 1", connection);
         legacy.Parameters.AddWithValue("@depot", depotId);
-        legacy.Parameters.AddWithValue("@line", lineId);
+        legacy.Parameters.AddWithValue("@line", lineId is null ? DBNull.Value : lineId.Value);
         legacy.Parameters.AddWithValue("@date", shiftStart);
         await using var reader = await legacy.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return new();
@@ -69,16 +69,15 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
     public async Task SaveAsync(CounterStatistics statistics, CancellationToken token)
     {
         var (table, perLine) = GetDestination(statistics.Destination);
-        if (perLine && statistics.LineId <= 0) throw new InvalidOperationException("Statistiques : ID de ligne MySQL manquant dans la capture locale.");
         await using var connection = new MySqlConnection(options.Value.Database.ConnectionString);
         await connection.OpenAsync(token);
         await EnsureSchemaAsync(connection, token);
         await using var transaction = await connection.BeginTransactionAsync(token);
         // One application writes this local database. Checking the shift also makes a retry
         // safe if the INSERT succeeded but its response or the local acknowledgement was lost.
-        await using var existing = new MySqlCommand($"SELECT ID FROM {table} WHERE DEPOT_ID=@depot AND {(perLine ? "line_id=@line AND " : "")}INSERT_DATE=@date ORDER BY ID DESC LIMIT 1 FOR UPDATE", connection, transaction);
+        await using var existing = new MySqlCommand($"SELECT ID FROM {table} WHERE DEPOT_ID=@depot AND {(perLine ? "line_id <=> @line AND " : "")}INSERT_DATE=@date ORDER BY ID DESC LIMIT 1 FOR UPDATE", connection, transaction);
         existing.Parameters.AddWithValue("@depot", statistics.DepotId);
-        existing.Parameters.AddWithValue("@line", statistics.LineId);
+        existing.Parameters.AddWithValue("@line", statistics.LineId is null ? DBNull.Value : statistics.LineId.Value);
         existing.Parameters.AddWithValue("@date", statistics.ShiftStartedAt);
         var id = await existing.ExecuteScalarAsync(token);
 
@@ -98,7 +97,7 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
             """, connection, transaction);
         command.Parameters.AddWithValue("@id", id);
         command.Parameters.AddWithValue("@depot", statistics.DepotId);
-        command.Parameters.AddWithValue("@line", statistics.LineId);
+        command.Parameters.AddWithValue("@line", statistics.LineId is null ? DBNull.Value : statistics.LineId.Value);
         command.Parameters.AddWithValue("@date", statistics.ShiftStartedAt);
         command.Parameters.AddWithValue("@scanned", checked((int)statistics.Scanned));
         command.Parameters.AddWithValue("@rejected", checked((int)statistics.Rejected));
@@ -121,7 +120,9 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
                 ON DUPLICATE KEY UPDATE counters_json=@json
                 """, connection, transaction);
             detail.Parameters.AddWithValue("@depot", statistics.DepotId);
-            detail.Parameters.AddWithValue("@line", statistics.LineId);
+            // The private state table keeps 0 as its internal key for an unconfigured line;
+            // the public statistics tables still receive an actual SQL NULL.
+            detail.Parameters.AddWithValue("@line", statistics.LineId ?? 0);
             detail.Parameters.AddWithValue("@date", statistics.ShiftStartedAt);
             detail.Parameters.AddWithValue("@mode", (int)statistics.Destination);
             detail.Parameters.AddWithValue("@json", JsonSerializer.Serialize(statistics.Counters));

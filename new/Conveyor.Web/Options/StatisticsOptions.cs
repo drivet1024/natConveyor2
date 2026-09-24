@@ -16,10 +16,11 @@ public sealed class StatisticsOptions
     public string? ValidationError(IEnumerable<LineOptions> lines)
     {
         if (!Enabled) return null;
-        var configuredLines = lines.ToArray();
-        if (configuredLines.Any(line => line.DatabaseLineId is null or <= 0) ||
-            configuredLines.Select(line => line.DatabaseLineId).Distinct().Count() != configuredLines.Length)
-            return "Statistiques : renseigner un ID de ligne MySQL positif et distinct pour chaque ligne utilisée.";
+        var configuredLineIds = lines.Where(line => line.DatabaseLineId.HasValue)
+            .Select(line => line.DatabaseLineId!.Value).ToArray();
+        if (configuredLineIds.Any(lineId => lineId <= 0) ||
+            configuredLineIds.Distinct().Count() != configuredLineIds.Length)
+            return "Statistiques : les ID de ligne MySQL renseignés doivent être positifs et distincts.";
         return null;
     }
 }

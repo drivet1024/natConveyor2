@@ -74,7 +74,7 @@ public sealed class CounterStatisticsTests
         Assert.Equal(3, global.Code98Percent);
         var maintenance = rows.Where(row => row.Destination == StatisticsDestination.Maintenance).ToArray();
         Assert.Equal(2, maintenance.Length);
-        Assert.Equal(new[] { 31, 30 }, maintenance.Select(row => row.LineId));
+        Assert.Equal(new int?[] { 31, 30 }, maintenance.Select(row => row.LineId));
         Assert.Equal(new long[] { 10, 40 }, maintenance.Select(row => row.Scanned));
         Assert.Equal(new double[] { 50, 12.5 }, maintenance.Select(row => row.RejectedPercent));
         Assert.Equal(("conveyor_stats_dde_global", false), CounterStatisticsStore.GetDestination(global.Destination));
@@ -119,6 +119,21 @@ public sealed class CounterStatisticsTests
         Assert.Equal(0, empty.Code68Percent);
     }
 
+    [Fact]
+    public void MissingDatabaseLineIdIsCapturedAsNull()
+    {
+        using var fixture = new Fixture();
+        fixture.Options.Lines[0].DatabaseLineId = null;
+        var counters = new LineCounters { TotalParcels = 1 };
+        var snapshot = new LineSnapshot(0, "Test", true, new(false, false, false, false, false), counters,
+            null, null, DateTimeOffset.Now, ProductionCounters: counters);
+
+        var rows = CounterStatisticsService.Capture(fixture.Options,
+            new Dictionary<int, LineSnapshot> { [0] = snapshot }, DateTime.Today);
+
+        Assert.Null(rows.Single(row => row.Destination == StatisticsDestination.ProductionLine).LineId);
+    }
+
     [Theory]
     [InlineData(20, 0, 8, 20, 22)]
     [InlineData(6, 0, 15, 0, 23)]
@@ -136,6 +151,7 @@ public sealed class CounterStatisticsTests
         var boundary = new DateTime(2026, 9, 23, 20, 0, 0);
         Assert.Equal(boundary, options.GetShiftStart(boundary));
         Assert.Equal(boundary.AddDays(-1), options.GetShiftStart(boundary.AddTicks(-1)));
+        Assert.Null(options.ValidationError([new() { DatabaseLineId = null }]));
         Assert.Null(options.ValidationError([new() { DatabaseLineId = 31 }]));
         Assert.NotNull(options.ValidationError([new() { DatabaseLineId = 31 }, new() { DatabaseLineId = 31 }]));
     }
@@ -338,7 +354,7 @@ public sealed class CounterStatisticsTests
     {
         public bool Fail { get; set; }
         public List<CounterStatistics> Rows { get; } = [];
-        public Task<LineCounters> LoadAsync(int depotId, int lineId, DateTime shift, StatisticsDestination destination, CancellationToken token)
+        public Task<LineCounters> LoadAsync(int depotId, int? lineId, DateTime shift, StatisticsDestination destination, CancellationToken token)
         {
             if (Fail) throw new IOException("Database unavailable");
             return Task.FromResult(Rows.SingleOrDefault(row => row.DepotId == depotId && row.LineId == lineId

@@ -2,7 +2,7 @@ namespace Conveyor.Web.Domain;
 
 public enum StatisticsDestination { ProductionLine, ProductionGlobal, Maintenance }
 
-public sealed record CounterStatistics(int DepotId, int LineId, DateTime ShiftStartedAt, long Scanned, long Rejected,
+public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftStartedAt, long Scanned, long Rejected,
     long Recycled, long Sorted, double RejectedPercent, double RecycledPercent, double Code98Percent, double Code68Percent)
 {
     public StatisticsDestination Destination { get; init; }
@@ -40,7 +40,7 @@ public sealed record CounterStatistics(int DepotId, int LineId, DateTime ShiftSt
         return Capture(depotId, 0, shiftStartedAt, total) with
         { Destination = StatisticsDestination.ProductionGlobal };
     }
-    public static CounterStatistics Capture(int depotId, int lineId, DateTime shiftStartedAt, LineCounters counters)
+    public static CounterStatistics Capture(int depotId, int? lineId, DateTime shiftStartedAt, LineCounters counters)
     {
         var scanned = counters.TotalParcels;
         double Percent(long count) => scanned == 0 ? 0 : Math.Round(100d * count / scanned, 2);
