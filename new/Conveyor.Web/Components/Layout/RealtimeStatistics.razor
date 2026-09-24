@@ -9,6 +9,7 @@
 
     <div class="headline-kpis">
         @Headline("Total colis", Counters.TotalParcels, null, "Tous les colis reçus par les caméras")
+        @Headline("Colis triés", SortedParcels, Percentage(SortedParcels, Counters.TotalParcels), "Tris par expédition et par code postal ÷ total des colis")
         @Headline("Rejets", Counters.Rejected, Percentage(Counters.Rejected, Counters.TotalParcels), "Rejets ÷ total des colis")
         @Headline("Erreurs balance", Counters.ScaleErrors, Percentage(Counters.ScaleErrors, EligibleParcels), "Erreurs poids ÷ colis lus")
         @Headline("Erreurs dimensionneur", Counters.DimensionErrors, Percentage(Counters.DimensionErrors, EligibleParcels), "Erreurs dimensions ÷ colis lus")
@@ -21,7 +22,6 @@
                 @Metric("Code 98", Counters.Code98, Counters.TotalParcels)
                 @Metric("Code 68", Counters.Code68, Counters.TotalParcels)
                 @Metric("Code 97 · Recirculation", Counters.Code97, Counters.TotalParcels)
-                @Metric("Colis triés", Counters.SortedByWaybill + Counters.SortedByPostalCode, Counters.TotalParcels)
             </div>
         </section>
 
@@ -48,6 +48,7 @@
     [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
+    private long SortedParcels => Counters.SortedByWaybill + Counters.SortedByPostalCode;
     private string LightParcelRule
     {
         get
