@@ -9,8 +9,6 @@
 
 <PageTitle>Contrôle des convoyeurs</PageTitle>
 
-<div class="config-notice" role="status">Mode <strong>@(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</strong> — les compteurs affichés correspondent à ce mode.</div>
-
 @if (_database.Parcels == 0 || _database.PostalCodes == 0)
 {
     <DataWaitModal Parcels="_database.Parcels" PostalCodes="_database.PostalCodes" />
@@ -62,7 +60,7 @@
 @foreach (var line in _lines)
 {
     <article class="line-card">
-        <div class="line-title compact-line-title"><h2 class="line-number">LIGNE @(line.LineId + 1)</h2><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
+        <div class="line-title compact-line-title"><h2 class="line-number">LIGNE @(line.LineId + 1) - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</h2><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
         <div class="metrics"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
