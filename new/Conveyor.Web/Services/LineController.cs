@@ -348,6 +348,7 @@ internal sealed class LineController
         {
             if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide)) parcelCounters.SmallParcels++;
             if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
+            if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
         }
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
@@ -480,6 +481,9 @@ internal sealed class LineController
 
     internal static bool IsLightParcel(decimal weight, decimal maximumWeight) =>
         maximumWeight > 0 && weight > 0 && weight < maximumWeight;
+
+    internal static bool IsInverseLengthParcel(Dimension dimension) =>
+        dimension.Length > 0 && dimension.Width > 0 && dimension.Width > dimension.Length;
 
     internal void RecordScalePresenceForParcel(bool receivedWeight, LineCounters? parcelCounters = null)
     {

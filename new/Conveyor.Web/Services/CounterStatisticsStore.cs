@@ -52,7 +52,7 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
 
         // Compatibility with shifts saved before the detailed counter table existed.
         var (table, _) = GetDestination(destination);
-        await using var legacy = new MySqlCommand($"SELECT NB_SCANNED, NB_REJECTED, NB_RECYCLED, NB_SORTED, PC_CODE98, PC_CODE68, NB_WEIGHT_ERROR, NB_SCALE_ERROR, NB_LIGHT_PARCEL, NB_SMALL_PARCEL FROM {table} WHERE DEPOT_ID=@depot AND line_id <=> @line AND INSERT_DATE=@date ORDER BY ID DESC LIMIT 1", connection);
+        await using var legacy = new MySqlCommand($"SELECT NB_SCANNED, NB_REJECTED, NB_RECYCLED, NB_SORTED, PC_CODE98, PC_CODE68, NB_WEIGHT_ERROR, NB_SCALE_ERROR, NB_LIGHT_PARCEL, NB_SMALL_PARCEL, NB_INVERSE_LENGHT_PARCEL FROM {table} WHERE DEPOT_ID=@depot AND line_id <=> @line AND INSERT_DATE=@date ORDER BY ID DESC LIMIT 1", connection);
         legacy.Parameters.AddWithValue("@depot", depotId);
         legacy.Parameters.AddWithValue("@line", lineId is null ? DBNull.Value : lineId.Value);
         legacy.Parameters.AddWithValue("@date", shiftStart);
@@ -63,7 +63,8 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
         long FromPercent(int index) => reader.IsDBNull(index) ? 0 : (long)Math.Round(scanned * reader.GetDouble(index) / 100d);
         return new() { TotalParcels = scanned, CameraReads = scanned, Rejected = Count(1), Code97 = Count(2),
             SortedByWaybill = Count(3), Code98 = FromPercent(4), Code68 = FromPercent(5),
-            ScaleErrors = Count(6), ScaleFaults = Count(7), LightParcels = Count(8), SmallParcels = Count(9) };
+            ScaleErrors = Count(6), ScaleFaults = Count(7), LightParcels = Count(8), SmallParcels = Count(9),
+            InverseLengthParcels = Count(10) };
     }
 
     public async Task SaveAsync(CounterStatistics statistics, CancellationToken token)
@@ -86,17 +87,18 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
                 NB_RECYCLED=@recycled, PC_RECYCLED=@pcRecycled, PC_CODE98=@pc98, PC_CODE68=@pc68,
                 NB_SORTED=@sorted, NB_WEIGHT_ERROR=@weightErrors, PC_WEIGHT_ERROR=@pcWeightErrors,
                 NB_SCALE_ERROR=@scaleErrors, PC_SCALE_ERROR=@pcScaleErrors,
-                NB_LIGHT_PARCEL=@lightParcels, NB_SMALL_PARCEL=@smallParcels WHERE ID=@id
+                NB_LIGHT_PARCEL=@lightParcels, NB_SMALL_PARCEL=@smallParcels,
+                NB_INVERSE_LENGHT_PARCEL=@inverseLengthParcels WHERE ID=@id
             """ : $"""
             INSERT INTO {table}
                 (DEPOT_ID, {(perLine ? "line_id, " : "")}NB_SCANNED, NB_REJECTED, PC_REJECTED, NB_RECYCLED, PC_RECYCLED,
                  INSERT_DATE, PC_FULLCHUTE, PC_CODE98, PC_CODE42, PC_CODE68, NB_SORTED,
                  NB_WEIGHT_ERROR, PC_WEIGHT_ERROR, NB_SCALE_ERROR, PC_SCALE_ERROR,
-                 NB_LIGHT_PARCEL, NB_SMALL_PARCEL)
+                 NB_LIGHT_PARCEL, NB_SMALL_PARCEL, NB_INVERSE_LENGHT_PARCEL)
             VALUES (@depot, {(perLine ? "@line, " : "")}@scanned, @rejected, @pcRejected, @recycled, @pcRecycled,
                     @date, NULL, @pc98, NULL, @pc68, @sorted,
                     @weightErrors, @pcWeightErrors, @scaleErrors, @pcScaleErrors,
-                    @lightParcels, @smallParcels)
+                    @lightParcels, @smallParcels, @inverseLengthParcels)
             """, connection, transaction);
         command.Parameters.AddWithValue("@id", id);
         command.Parameters.AddWithValue("@depot", statistics.DepotId);
@@ -116,6 +118,7 @@ public sealed class CounterStatisticsStore(IOptions<ConveyorOptions> options) : 
         command.Parameters.AddWithValue("@pcScaleErrors", statistics.ScaleErrorPercent);
         command.Parameters.AddWithValue("@lightParcels", checked((int)statistics.LightParcels));
         command.Parameters.AddWithValue("@smallParcels", checked((int)statistics.SmallParcels));
+        command.Parameters.AddWithValue("@inverseLengthParcels", checked((int)statistics.InverseLengthParcels));
         await command.ExecuteNonQueryAsync(token);
         if (perLine && statistics.Counters is not null)
         {

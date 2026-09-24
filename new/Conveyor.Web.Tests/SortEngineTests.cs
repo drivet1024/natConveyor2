@@ -32,6 +32,17 @@ public sealed class SortEngineTests
         Assert.Equal(expected, LineController.IsLightParcel(weight, threshold));
     }
 
+    [Theory]
+    [InlineData(4, 8, true)]
+    [InlineData(8, 8, false)]
+    [InlineData(9, 8, false)]
+    [InlineData(-1, 8, false)]
+    public void InverseLengthParcelRequiresTheSecondPositiveMeasureToBeGreater(
+        decimal firstMeasure, decimal secondMeasure, bool expected)
+    {
+        Assert.Equal(expected, LineController.IsInverseLengthParcel(new(firstMeasure, secondMeasure, 3)));
+    }
+
     [Fact]
     public async Task ParcelProfilesAreCountedFromTheCorrelatedMeasurements()
     {
@@ -45,11 +56,12 @@ public sealed class SortEngineTests
         try
         {
             await controller.SimulateAsync("12345678901", new(4, 8, 3), 4.99m);
-            await controller.SimulateAsync("12345678902", new(7, 8, 9), 5m);
+            await controller.SimulateAsync("12345678902", new(9, 8, 7), 5m);
 
             var counters = controller.Snapshot().Counters;
             Assert.Equal(1, counters.SmallParcels);
             Assert.Equal(1, counters.LightParcels);
+            Assert.Equal(1, counters.InverseLengthParcels);
         }
         finally { await controller.StopAsync(); }
     }

@@ -11,6 +11,7 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
     public long ScaleErrors => Counters?.ScaleFaults ?? 0;
     public long LightParcels => Counters?.LightParcels ?? 0;
     public long SmallParcels => Counters?.SmallParcels ?? 0;
+    public long InverseLengthParcels => Counters?.InverseLengthParcels ?? 0;
     public double WeightErrorPercent => Percentage(WeightErrors, Scanned - (Counters?.NoReads ?? 0));
     public double ScaleErrorPercent => Percentage(ScaleErrors, Scanned);
 
@@ -38,6 +39,7 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             ScaleFaults = counters.Sum(line => line.ScaleFaults),
             LightParcels = counters.Sum(line => line.LightParcels),
             SmallParcels = counters.Sum(line => line.SmallParcels),
+            InverseLengthParcels = counters.Sum(line => line.InverseLengthParcels),
             SortedByWaybill = counters.Sum(line => line.SortedByWaybill),
             SortedByPostalCode = counters.Sum(line => line.SortedByPostalCode)
         };
