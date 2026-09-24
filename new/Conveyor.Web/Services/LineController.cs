@@ -18,6 +18,7 @@ internal sealed class LineController
     private readonly ILogger _logger;
     private readonly Action _changed;
     private readonly ISmsAlerts? _sms;
+    private readonly bool _automaticCounterReset;
     private CancellationTokenSource? _stopping;
     private List<Task> _tasks = [];
     private TcpFrameReceiver? _cameraReceiver;
@@ -81,7 +82,24 @@ internal sealed class LineController
         }
         _changed();
     }
-    private LineCounters _counters = new();
+    private LineCounters _productionCounters = new();
+    private LineCounters _maintenanceCounters = new();
+    private bool _maintenance;
+    private LineCounters _counters
+    {
+        get => _maintenance ? _maintenanceCounters : _productionCounters;
+        set { if (_maintenance) _maintenanceCounters = value; else _productionCounters = value; }
+    }
+
+    public void SetMaintenance(bool maintenance)
+    {
+        lock (_gate)
+        {
+            _maintenance = maintenance;
+            _lastDecision = null;
+            _consecutiveParcelsWithoutScale = 0;
+        }
+    }
     private string? _lastError;
     private bool _databaseConnected;
     private bool _plcConnected;
@@ -89,7 +107,7 @@ internal sealed class LineController
 
     public LineController(LineOptions options, bool simulation, IConveyorRepository repository, IPlcGateway plc,
         bool controlsPlcConnection,
-        SortEngine sortEngine, ILogger logger, Action changed, ISmsAlerts? sms = null)
+        SortEngine sortEngine, ILogger logger, Action changed, ISmsAlerts? sms = null, bool automaticCounterReset = true)
     {
         _options = options;
         _simulation = simulation;
@@ -100,6 +118,12 @@ internal sealed class LineController
         _logger = logger;
         _changed = changed;
         _sms = sms;
+        _automaticCounterReset = automaticCounterReset;
+        // With scheduled capture enabled, a startup before today's reset must still
+        // reset today, otherwise tomorrow's snapshot would contain two shifts.
+        var now = DateTime.Now;
+        if (!automaticCounterReset && TimeOnly.FromDateTime(now) < options.EndOfDay)
+            _lastReset = DateOnly.FromDateTime(now).AddDays(-1);
     }
 
     public bool Running => _stopping is { IsCancellationRequested: false };
@@ -289,11 +313,13 @@ internal sealed class LineController
 
     private async Task HandleCameraAsync(string frame, DateTimeOffset timestamp, CancellationToken token)
     {
+        LineCounters parcelCounters;
         lock (_gate)
         {
-            _counters.CameraReads++;
-            _counters.TotalParcels++;
-            if (IsCode68(_plcTransferInput?.Raw)) _counters.Code68++;
+            parcelCounters = _counters;
+            parcelCounters.CameraReads++;
+            parcelCounters.TotalParcels++;
+            if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
         }
         if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
         // Wait first so measurements received shortly after the camera frame are
@@ -301,7 +327,7 @@ internal sealed class LineController
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
         var (dimension, weight) = CaptureMeasurements(timestamp, window);
         var hasCorrelatedWeight = weight is not null && (timestamp - weight.Timestamp).Duration() <= window;
-        RecordScalePresenceForParcel(hasCorrelatedWeight);
+        RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
         var parcel = new ParcelContext(frame, timestamp,
             dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
             dimension?.Timestamp,
@@ -328,12 +354,12 @@ internal sealed class LineController
             _plcConnected = true;
             if (decision.PlcChute == 97)
             {
-                lock (_gate) _counters.Code97++;
+                lock (_gate) parcelCounters.Code97++;
                 recirculationCounted = true;
             }
             if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
-                lock (_gate) _counters.Rejected++;
+                lock (_gate) parcelCounters.Rejected++;
                 rejectionCounted = true;
             }
             stage = "insertion MySQL du scan";
@@ -342,17 +368,17 @@ internal sealed class LineController
             {
                 _lastDecision = decision;
                 _lastError = null;
-                _counters.DatabaseInserts++;
-                if (decision.Chute == 98) _counters.Code98++;
-                if (isNoRead) _counters.NoReads++;
+                parcelCounters.DatabaseInserts++;
+                if (decision.Chute == 98) parcelCounters.Code98++;
+                if (isNoRead) parcelCounters.NoReads++;
                 else
                 {
                     // Measurement error rates use read parcels only, excluding no-reads.
-                    if (!parcel.Dimension.IsValid(_options.MaximumDimension)) _counters.DimensionErrors++;
-                    if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) _counters.ScaleErrors++;
+                    if (!parcel.Dimension.IsValid(_options.MaximumDimension)) parcelCounters.DimensionErrors++;
+                    if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) parcelCounters.ScaleErrors++;
                 }
-                if (routingReason == "Route de l'expédition") _counters.SortedByWaybill++;
-                if (routingReason == "Route du code postal") _counters.SortedByPostalCode++;
+                if (routingReason == "Route de l'expédition") parcelCounters.SortedByWaybill++;
+                if (routingReason == "Route du code postal") parcelCounters.SortedByPostalCode++;
                 _lastDimension = null;
                 _lastWeight = null;
             }
@@ -367,9 +393,9 @@ internal sealed class LineController
                 var fallbackChute = ResolveClosedChute(_options.RejectedChute);
                 await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
                 if (fallbackChute == 97 && !recirculationCounted)
-                    lock (_gate) _counters.Code97++;
+                    lock (_gate) parcelCounters.Code97++;
                 if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
-                    lock (_gate) _counters.Rejected++;
+                    lock (_gate) parcelCounters.Rejected++;
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }
@@ -432,7 +458,7 @@ internal sealed class LineController
     private static bool IsCode68(string? value) =>
         value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal);
 
-    internal void RecordScalePresenceForParcel(bool receivedWeight)
+    internal void RecordScalePresenceForParcel(bool receivedWeight, LineCounters? parcelCounters = null)
     {
         var raiseFault = false;
         lock (_gate)
@@ -447,7 +473,7 @@ internal sealed class LineController
             if (_consecutiveParcelsWithoutScale >= Math.Max(1, _options.Plc.ScaleFaultParcelThreshold))
             {
                 _consecutiveParcelsWithoutScale = 0;
-                _counters.ScaleFaults++;
+                (parcelCounters ?? _counters).ScaleFaults++;
                 raiseFault = true;
             }
         }
@@ -520,29 +546,28 @@ internal sealed class LineController
         {
             _databaseConnected = await _repository.PingAsync(token);
             _plcConnected = await _plc.PingAsync(token);
-            var now = DateTime.Now;
-            if (DateOnly.FromDateTime(now) > _lastReset && TimeOnly.FromDateTime(now) >= _options.EndOfDay)
-            {
-                ResetCounters();
-                _lastReset = DateOnly.FromDateTime(now);
-            }
+            if (_automaticCounterReset) ResetCountersIfDue(DateTime.Now);
             _changed();
         }
+    }
+
+    public void ResetCountersIfDue(DateTime now)
+    {
+        if (!Running || DateOnly.FromDateTime(now) <= _lastReset || TimeOnly.FromDateTime(now) < _options.EndOfDay) return;
+        ResetCounters();
+        lock (_gate)
+        {
+            _productionCounters = new();
+            _maintenanceCounters = new();
+        }
+        _lastReset = DateOnly.FromDateTime(now);
     }
 
     public LineSnapshot Snapshot()
     {
         lock (_gate)
         {
-            var counters = new LineCounters
-            {
-                CameraReads = _counters.CameraReads, DimensionReads = _counters.DimensionReads, ScaleReads = _counters.ScaleReads,
-                TotalParcels = _counters.TotalParcels, Rejected = _counters.Rejected, NoReads = _counters.NoReads,
-                Code98 = _counters.Code98, Code68 = _counters.Code68, Code97 = _counters.Code97,
-                DimensionErrors = _counters.DimensionErrors, ScaleErrors = _counters.ScaleErrors, ScaleFaults = _counters.ScaleFaults,
-                SortedByWaybill = _counters.SortedByWaybill, SortedByPostalCode = _counters.SortedByPostalCode,
-                DatabaseInserts = _counters.DatabaseInserts
-            };
+            var counters = _counters.Copy();
             var connections = _simulation
                 ? new ConnectionState(false, false, false, _databaseConnected, false, true, _repository.IsSimulation)
                 : new ConnectionState(_cameraReceiver?.Connected == true || _cameraClient?.Connected == true,
@@ -552,7 +577,7 @@ internal sealed class LineController
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
-                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch);
+                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy());
         }
     }
 }

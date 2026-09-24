@@ -17,21 +17,41 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly IConveyorRepository _repository;
     private readonly ILogger _logger;
     private readonly ISmsAlerts? _sms;
+    private readonly CounterStatisticsService? _statistics;
+    private readonly bool _coordinateStatistics;
     private readonly string _closeChute39Tag;
     private readonly string _motionTag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
+    public bool Maintenance => _configuration.General?.Maintenance == true;
+    public bool CanChangeOperatingMode => ConveyorRunning == false && _plc.IsConnected
+        && (_plc is not IPlcReadback readback || readback.ReadsHealthy);
 
-    public async Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause)
+    public async Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause, bool maintenance = false)
     {
         if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande convoyeur est déjà en cours.");
         try
         {
+            if (start && (maintenance || Maintenance) && !CanChangeOperatingMode)
+                throw new InvalidOperationException("Arrêter le convoyeur et attendre la confirmation d’arrêt de l’automate avant de démarrer en maintenance ou de revenir en production.");
+            var modeSaved = true;
             var result = await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
-                _configuration.Simulation, start, cause, _logger, _motionTag);
+                _configuration.Simulation, start, cause, _logger, _motionTag, async () =>
+                {
+                    if (!start) return;
+                    _configuration.General!.Maintenance = maintenance;
+                    foreach (var line in _lines.Values) line.SetMaintenance(maintenance);
+                    try { await _editor.SaveMaintenanceAsync(maintenance); }
+                    catch (Exception exception)
+                    {
+                        modeSaved = false;
+                        _logger.LogError(exception, "Mode {Mode} actif mais non enregistré pour le prochain redémarrage", maintenance ? "maintenance" : "production");
+                    }
+                });
             var action = start ? "Commande démarrer convoyeur envoyée" : $"Commande arrêter convoyeur envoyée ({cause switch { 0 => "PAUSE", 1 => "JAM", _ => "DOWN" }})";
-            _sms?.Notify(action + (result.Recorded ? "" : " ; échec enregistrement MySQL"));
-            return result;
+            _sms?.Notify(action + (Maintenance ? " — maintenance" : " — production") + (result.Recorded ? "" : " ; échec enregistrement MySQL"));
+            return result with { Message = result.Message + (start ? (maintenance ? " Mode maintenance actif." : " Mode production actif.") : "")
+                + (modeSaved ? "" : " Attention : mode non mémorisé pour le prochain redémarrage.") };
         }
         finally { _motionGate.Release(); Changed?.Invoke(); }
     }
@@ -56,12 +76,17 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public event Action? Changed;
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
-        SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null)
+        SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null,
+        CounterStatisticsService? statistics = null)
     {
         var configuration = options.Value;
         _configuration = configuration;
         _editor = editor;
         _sms = sms;
+        _statistics = statistics;
+        _coordinateStatistics = configuration.Statistics.Enabled && !configuration.Simulation;
+        if (_coordinateStatistics && statistics is null)
+            throw new InvalidOperationException("Service de sauvegarde des statistiques manquant.");
         _repository = repository;
         _logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         var activeLines = configuration.GetConfiguredLines().ToArray();
@@ -84,9 +109,12 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _autoStartIds = activeLines.Where(line => line.Enabled).Select(line => line.Id).ToHashSet();
         _lines = activeLines.ToDictionary(line => line.Id, line =>
         {
-            return new LineController(line, configuration.Simulation, repository, _plc,
+            var controller = new LineController(line, configuration.Simulation, repository, _plc,
                 line.Id == primaryLine.Id, sortEngine,
-                loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke(), sms);
+                loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke(), sms,
+                automaticCounterReset: !_coordinateStatistics);
+            controller.SetMaintenance(Maintenance);
+            return controller;
         });
         if (_plc is IPlcReadback readback) readback.TagChanged += RecordPlcTagChange;
     }
@@ -118,7 +146,26 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
             await line.StartAsync();
-        try { await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken); }
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            do
+            {
+                if (!_coordinateStatistics) continue;
+                var now = DateTime.Now;
+                try
+                {
+                    await _statistics!.TickAsync(now, GetSnapshots, stoppingToken, () =>
+                    {
+                        foreach (var line in _lines.Values) line.ResetCountersIfDue(now);
+                    });
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logger.LogError(exception, "Capture des statistiques impossible ; remise à zéro quotidienne différée");
+                }
+            } while (await timer.WaitForNextTickAsync(stoppingToken));
+        }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
 

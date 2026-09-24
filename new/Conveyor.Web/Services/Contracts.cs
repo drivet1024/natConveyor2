@@ -47,8 +47,10 @@ public interface IConveyorSupervisor
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }
     bool? ConveyorRunning { get; }
+    bool Maintenance { get; }
+    bool CanChangeOperatingMode { get; }
     Task SetShiftAsync(int shiftId);
-    Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause);
+    Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause, bool maintenance = false);
     Task StartLineAsync(int lineId);
     Task RestartLineAsync(int lineId);
     Task StopLineAsync(int lineId);

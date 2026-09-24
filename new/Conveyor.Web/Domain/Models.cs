@@ -35,6 +35,7 @@ public sealed record SortDecision(
 
 public sealed class LineCounters
 {
+    public LineCounters Copy() => (LineCounters)MemberwiseClone();
     public long CameraReads { get; set; }
     public long DimensionReads { get; set; }
     public long ScaleReads { get; set; }
@@ -79,4 +80,7 @@ public sealed record LineSnapshot(
     DeviceReception? PlcTransferInput = null,
     string PlcTransferTag = "",
     bool PlcTransferTagSupported = false,
-    PlcDispatch? LastPlcDispatch = null);
+    PlcDispatch? LastPlcDispatch = null,
+    bool Maintenance = false,
+    LineCounters? ProductionCounters = null,
+    LineCounters? MaintenanceCounters = null);

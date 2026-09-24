@@ -13,7 +13,7 @@ public sealed class SmsAlertsTests
     private static ConveyorOptions Configuration() => new()
     {
         Simulation = false,
-        General = new() { Name = "Québec", DepotId = 2, ConveyorId = 7 },
+        General = new() { Name = "Convoyeur principal", DepotId = 2, ConveyorId = 7 },
         Sms = new()
         {
             Enabled = true, AccountSid = "AC" + new string('a', 32), AuthToken = "test-token",
@@ -46,7 +46,9 @@ public sealed class SmsAlertsTests
             Assert.Equal(config.Sms.FromNumber, request.Fields["From"].ToString());
             var body = request.Fields["Body"].ToString();
             Assert.Contains("Reset compteurs effectué", body);
-            Assert.Contains("[Québec] dépôt [Québec] convoyeur [7] ligne [2]", body);
+            Assert.Contains("WARN: Reset compteurs effectué dépôt [Québec] ligne [2]", body);
+            Assert.DoesNotContain("Convoyeur principal", body);
+            Assert.DoesNotContain("convoyeur [", body);
             Assert.DoesNotContain("dépôt [2]", body);
             Assert.DoesNotContain(config.Sms.AuthToken, body);
         });

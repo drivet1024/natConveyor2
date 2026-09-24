@@ -107,6 +107,19 @@ else
     </section>
 
     <section class="config-section">
+        <div class="config-section-title"><div><span class="eyebrow">STATISTIQUES</span><h2>Sauvegarde des compteurs</h2></div></div>
+        <div class="config-grid">
+            <label class="toggle-field"><InputCheckbox @bind-Value="_model.Statistics.Enabled" /><span>Activer la sauvegarde quotidienne</span><small>Production : par ligne et total du convoyeur. Maintenance : compteurs séparés par ligne avec line_id. Les trois tables de statistiques sont utilisées sur la base MySQL configurée. Aucun enregistrement en simulation.</small></label>
+            <label><span>Heure de début du shift</span><input type="time" @bind="_model.Statistics.ShiftStartTime" /><small>Date et heure enregistrées dans INSERT_DATE, y compris la veille pour un shift de nuit.</small></label>
+            <label><span>Heure de sauvegarde en BD</span><input type="time" @bind="_model.Statistics.SaveTime" /><small>Heure locale du serveur, avant ou à la remise à zéro quotidienne. Enregistrer et redémarrer pour appliquer.</small></label>
+            @foreach (var statisticsLine in _model.GetConfiguredLines())
+            {
+                <label><span>Remise à zéro quotidienne — ligne @(statisticsLine.Id + 1)</span><input type="time" @bind="statisticsLine.EndOfDay" /><small>La sauvegarde prévue est capturée avant cette remise à zéro.</small></label>
+            }
+        </div>
+    </section>
+
+    <section class="config-section">
         <div class="config-section-title"><div><span class="eyebrow">ALERTES</span><h2>SMS Twilio</h2></div></div>
         <div class="config-grid">
             <label class="toggle-field"><InputCheckbox @bind-Value="_model.Sms.Enabled" /><span>Activer les alertes SMS</span><small>Reset Data, reset compteurs, commandes de marche et connexion/déconnexion des appareils. Aucun SMS envoyé en mode simulation.</small></label>
@@ -124,7 +137,7 @@ else
             <div class="config-block">
                 <h3>IDENTIFICATION</h3>
                 <div class="config-grid">
-                    <label><span>ID de ligne MySQL (lineId)</span><InputNumber @bind-Value="line.DatabaseLineId" min="1" /><small>Valeur enregistrée telle quelle dans lineId de scan_history et scan_noWB. Laisser vide pour enregistrer NULL.</small></label>
+                    <label><span>ID de ligne MySQL (lineId)</span><InputNumber @bind-Value="line.DatabaseLineId" min="1" /><small>Valeur enregistrée telle quelle dans lineId de scan_history et scan_noWB. Également utilisé dans line_id des statistiques ; obligatoire si leur sauvegarde est activée. Sinon, laisser vide pour enregistrer NULL.</small></label>
                 </div>
             </div>
             <div class="config-block">

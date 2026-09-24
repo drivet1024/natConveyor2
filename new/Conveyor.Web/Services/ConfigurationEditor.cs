@@ -10,6 +10,7 @@ public interface IConfigurationEditor
     ConveyorOptions GetEditableCopy();
     Task SaveAsync(ConveyorOptions options, string? newConnectionString, CancellationToken cancellationToken = default);
     Task SaveShiftAsync(int shiftId);
+    Task SaveMaintenanceAsync(bool maintenance) => Task.CompletedTask;
     string FilePath { get; }
 }
 
@@ -37,6 +38,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     {
         Validate(options);
         options.ApplyGlobalSorting();
+        // This operational state is changed by START commands, never by an older settings form.
+        options.General!.Maintenance = current.Value.General?.Maintenance == true;
         if (string.IsNullOrWhiteSpace(newConnectionString))
             options.Database.ConnectionString = current.Value.Database.ConnectionString;
         else
@@ -48,7 +51,10 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         finally { _writeGate.Release(); }
     }
 
-    public async Task SaveShiftAsync(int shiftId)
+    public Task SaveShiftAsync(int shiftId) => SaveGeneralValueAsync("ShiftId", JsonValue.Create(shiftId));
+    public Task SaveMaintenanceAsync(bool maintenance) => SaveGeneralValueAsync("Maintenance", JsonValue.Create(maintenance));
+
+    private async Task SaveGeneralValueAsync(string property, JsonNode value)
     {
         await _writeGate.WaitAsync();
         try
@@ -64,8 +70,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             if (general is null)
                 conveyor["General"] = general = JsonSerializer.SerializeToNode(current.Value.General, JsonOptions)!.AsObject();
             // Existing JSON may use camelCase; preserve the original key.
-            var key = general.Select(pair => pair.Key).FirstOrDefault(key => string.Equals(key, "ShiftId", StringComparison.OrdinalIgnoreCase)) ?? "shiftId";
-            general[key] = shiftId;
+            var key = general.Select(pair => pair.Key).FirstOrDefault(key => string.Equals(key, property, StringComparison.OrdinalIgnoreCase)) ?? property;
+            general[key] = value;
             await WriteDocumentAsync(document, CancellationToken.None);
         }
         finally { _writeGate.Release(); }
@@ -86,6 +92,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     private static void Validate(ConveyorOptions options)
     {
         if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
+        if (options.Statistics.ValidationError(options.GetConfiguredLines()) is { } statisticsError)
+            throw new InvalidOperationException(statisticsError);
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");
         if (options.LineCount is < 1 or > 2 || options.LineCount > options.Lines.Count)
             throw new InvalidOperationException("Choisir une ou deux lignes avec leurs paramètres de connexion.");

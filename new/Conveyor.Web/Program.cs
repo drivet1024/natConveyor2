@@ -36,6 +36,8 @@ builder.Services.AddOptions<ConveyorOptions>()
     .Bind(builder.Configuration.GetSection(ConveyorOptions.SectionName))
     .PostConfigure(options => options.ApplyGlobalSorting())
     .ValidateDataAnnotations()
+    .Validate(options => options.Statistics.ValidationError(options.GetConfiguredLines()) is null,
+        "Statistiques : vérifier les horaires du shift, de sauvegarde et de remise à zéro.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag), "Le tag de démarrage du convoyeur est obligatoire.")
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
     .Validate(options => options.GetConfiguredLines().All(line => line.DatabaseLineId is null or > 0), "Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.")
@@ -72,6 +74,8 @@ builder.Services.AddSingleton<DatabaseMetricsService>();
 builder.Services.AddSingleton<IDatabaseMetricsService>(services => services.GetRequiredService<DatabaseMetricsService>());
 builder.Services.AddHostedService(services => services.GetRequiredService<DatabaseMetricsService>());
 builder.Services.AddSingleton<ConveyorSupervisor>();
+builder.Services.AddSingleton<ICounterStatisticsStore, CounterStatisticsStore>();
+builder.Services.AddSingleton<CounterStatisticsService>();
 builder.Services.AddSingleton<IConveyorSupervisor>(services => services.GetRequiredService<ConveyorSupervisor>());
 builder.Services.AddHostedService(services => services.GetRequiredService<ConveyorSupervisor>());
 

@@ -7,4 +7,6 @@ logs/
 appsettings.Production.json
 conveyor.settings.json
 conveyor.settings.json.tmp
+data/counter-statistics.json
+data/counter-statistics.json.tmp
 test-diag.log

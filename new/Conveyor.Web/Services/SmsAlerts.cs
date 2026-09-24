@@ -31,7 +31,7 @@ public sealed class SmsAlerts(IOptions<ConveyorOptions> options, IHttpClientFact
         }
         var general = config.General;
         var line = lineId.HasValue ? $" ligne [{lineId.Value + 1}]" : " toutes lignes";
-        var message = $"WARN: {action} [{general?.Name}] dépôt [{general?.GetDepotDisplayName() ?? "Nom non configuré"}] convoyeur [{general?.ConveyorId}]{line} {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}";
+        var message = $"WARN: {action} dépôt [{general?.GetDepotDisplayName() ?? "Nom non configuré"}]{line} {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}";
         if (!_queue.Writer.TryWrite(message))
             logger.LogWarning("SMS non mis en file : file pleine ou service arrêté ({Action})", action);
     }

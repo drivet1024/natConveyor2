@@ -1,5 +1,109 @@
 # Conveyor Control
 
+## Sauvegarde quotidienne des compteurs
+
+Dans **Configuration → Sauvegarde des compteurs**, activer la sauvegarde, choisir
+l’heure fixe de début du shift et l’heure de sauvegarde dans MySQL. Les valeurs
+proposées sont 20 h 00 et 08 h 25 ; les horaires utilisent l’heure locale du serveur.
+**Enregistrer et redémarrer** applique les changements. La sauvegarde est désactivée
+par défaut et aucun enregistrement n’est effectué en simulation.
+
+L’application utilise la connexion MySQL déjà configurée et la table existante
+`conveyor_stats_dde`, avec la colonne `line_id`. Chaque ligne utilisée possède
+son propre enregistrement, même si elle est temporairement déconnectée. Renseigner
+un **ID de ligne MySQL (lineId)** positif et distinct pour chacune dans Configuration.
+Cet identifiant est transmis tel quel à `line_id`, sans conversion depuis le numéro
+visuel de la ligne. Une seule instance doit écrire les statistiques d’un dépôt
+et d’une ligne dans cette base. Une ligne déjà présente pour le même `DEPOT_ID`,
+`line_id` et `INSERT_DATE` est conservée, sans nouvelle insertion, lors d’un nouvel essai.
+
+Les statistiques de production sont également additionnées dans
+`conveyor_stats_dde_global`. Les compteurs de maintenance sont enregistrés
+séparément par ligne dans `conveyor_stats_dde_maintenance`, avec le même `line_id`
+MySQL configuré que pour la production. Les doublons de maintenance sont vérifiés
+par `DEPOT_ID`, `line_id` et `INSERT_DATE`. Si la colonne manque encore, exécuter
+une seule fois `scripts/sql/Add-Maintenance-LineId.sql` depuis la racine du dépôt
+sur la base locale ; les anciennes lignes restent à NULL, sans attribution inventée.
+La table globale n’a ni `line_id` ni `conveyor_id` : elle représente le convoyeur
+de cette instance et nécessite une base locale distincte par convoyeur. Ses doublons
+sont vérifiés par `DEPOT_ID` et `INSERT_DATE`. Les
+pourcentages globaux sont recalculés à partir des sommes des compteurs, sans
+moyenne des pourcentages par ligne. Les trois tables doivent exister avant activation.
+
+Dans la fenêtre **DÉMARRER**, le NIP permet de choisir **DÉMARRER** pour la
+production ou **MAINTENANCE**. Le démarrage en maintenance et le retour en
+production depuis la maintenance exigent un convoyeur arrêté, confirmé par le
+tag de marche à 0 avec connexion automate disponible et lectures saines. Un
+état inconnu ou en marche bloque le bouton et la commande côté serveur. L’envoi
+d’une commande d’arrêt seul ne suffit pas : attendre son retour automate.
+Le choix s’applique aux deux lignes après réussite
+de l’envoi de la commande automate. **ARRÊTER** conserve le mode ; un démarrage
+normal revient en production. Le mode actif est affiché au-dessus de la supervision
+et mémorisé dans `conveyor.settings.json` pour le prochain redémarrage. Un échec
+de mémorisation est signalé dans le résultat et les journaux.
+
+Chaque ligne possède deux jeux de compteurs indépendants. L’écran montre le mode
+actif ; changer de mode retrouve ses compteurs précédents. Un colis déjà en cours
+de traitement conserve son jeu de compteurs même si le mode change avant la fin
+de son traitement. Le reset manuel remet à zéro uniquement le mode affiché ;
+le reset quotidien remet à zéro les deux modes après capture programmée.
+
+À l’heure de sauvegarde, la production effectuée pendant le shift est enregistrée
+dans les tables normale et globale, et la maintenance dans sa propre table, même
+si le mode actif a changé entre-temps. Un shift exclusivement en maintenance ne
+crée aucune statistique de production tant que le mode maintenance reste actif.
+La maintenance n’alimente jamais les compteurs sauvegardés en production.
+Les commandes de marche et les scans opérationnels conservent leurs écritures
+habituelles ; cette séparation concerne les trois tables de statistiques.
+
+| Colonne | Valeur sauvegardée |
+| --- | --- |
+| `ID` | Auto-incrément de la table |
+| `DEPOT_ID` | Identifiant du dépôt configuré |
+| `line_id` | ID de ligne MySQL configuré |
+| `INSERT_DATE` | Date et heure du début du shift associé à l’heure de sauvegarde |
+| `NB_SCANNED` | `TotalParcels` de la ligne |
+| `NB_REJECTED` | `Rejected` de la ligne |
+| `NB_RECYCLED` | `Code97` de la ligne |
+| `NB_SORTED` | `SortedByWaybill + SortedByPostalCode` de la ligne |
+| `PC_REJECTED`, `PC_RECYCLED` | Compteur correspondant / `NB_SCANNED` × 100 |
+| `PC_CODE98`, `PC_CODE68` | Compteur de la ligne correspondant / `NB_SCANNED` × 100 |
+| `PC_FULLCHUTE`, `PC_CODE42` | `NULL` : aucune mesure correspondante disponible |
+
+Les pourcentages sont arrondis à deux décimales et valent zéro sans scans.
+`NB_SORTED` représente les tris logiciels par route d’expédition ou code postal,
+pas une confirmation du passage physique ; un tri détourné vers 97 peut aussi
+être compté parmi ces tris. Les rejets suivent le compteur affiché, qui exclut
+les no-reads. Les codes 98 sont comptés après insertion du scan et les codes 68
+suivent la dernière valeur de transfert, comme à l’écran. Aucun total automate
+historique n’est inventé pour remplacer ces compteurs logiciels.
+
+Exemple : début à 20 h 00 et sauvegarde le 24 septembre à 08 h 25 donnent
+`INSERT_DATE = 2026-09-23 20:00:00`. Le choix du shift de tri dans la supervision
+ne modifie pas cet horaire fixe. Il s’agit d’une photo des compteurs au moment
+de la sauvegarde, depuis leur dernière remise à zéro ; une remise à zéro manuelle
+en cours de shift réduit donc les valeurs qui seront sauvegardées.
+
+Le contrôle de l’échéance s’effectue toutes les cinq secondes. La sauvegarde
+doit précéder ou coïncider avec la remise à zéro quotidienne de chaque ligne,
+également réglable dans cette section. Quand les heures coïncident, la capture
+est écrite sur disque avant le reset, puis envoyée en base. L’écriture SQL ne
+bloque pas le traitement des colis. Une erreur de capture sur disque diffère
+le reset quotidien et apparaît dans les journaux.
+
+Le fichier `data/counter-statistics.json`, dans le dossier de l’application,
+conserve les captures en attente et la dernière échéance capturée. Il est exclu
+de Git et des publications. Le compte du service doit pouvoir écrire dans ce
+dossier ; le conserver lors des mises à jour. En cas d’échec MySQL, la capture
+est réessayée toutes les minutes, y compris après redémarrage, sans relire les
+compteurs déjà remis à zéro. Les réussites et erreurs sont visibles dans les logs.
+
+Les compteurs en cours restent en mémoire : cette fonction ne les restaure pas
+après un arrêt avant la capture. Si l’application démarre après une échéance
+manquée, elle n’invente pas de statistiques pour ce shift ; seules les captures
+déjà présentes sur disque sont reprises. L’application doit rester active
+pendant le shift et à l’heure prévue pour une sauvegarde complète.
+
 ## Alertes SMS Twilio
 
 Dans **Configuration → SMS Twilio**, activer les alertes et saisir AccountSid,
@@ -17,8 +121,8 @@ démarrage/arrêt envoyées à l’automate (avec cause d’arrêt), et l’acti
 l’arrêt des connexions appareils par ligne, y compris au démarrage/arrêt de
 l’application. Une activation des connexions ne confirme pas la connexion
 physique de chaque appareil : les voyants restent la référence. Les coupures
-TCP spontanées ne déclenchent pas de SMS. Les messages identifient le site,
-le dépôt par son nom, le convoyeur, la ligne ou toutes les lignes, et l’heure locale.
+TCP spontanées ne déclenchent pas de SMS. Les messages identifient
+le dépôt par son nom, la ligne ou toutes les lignes, et l’heure locale.
 Le champ **Configuration → Général → Nom du dépôt** personnalise le nom envoyé.
 Sans valeur, le dépôt 1 utilise Saint-Hubert, 28 Gilmore, 2 Québec et 12 Toronto ;
 les autres affichent « Nom non configuré » jusqu’à la saisie du nom. Enregistrer

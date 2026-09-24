@@ -9,7 +9,7 @@ label { display: grid; gap: .4rem; }
 .start-pin input:focus { outline: 1px solid var(--orange); border-color: var(--orange); }
 .start-pin small { color: var(--muted); }
 select { padding: .6rem; background: #0e1215; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
-.action-buttons { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+.action-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 
 .stop-reasons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; margin: 1.2rem 0; }
 .reason-button { min-height: 86px; padding: 1rem .4rem; border: 2px solid transparent; border-radius: 8px; font-size: 1.2rem; font-weight: 800; cursor: pointer; }

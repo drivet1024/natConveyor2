@@ -6,13 +6,17 @@
     @if (Start)
     {
         <p>Voulez-vous vraiment démarrer le convoyeur ?</p>
+        @if (!CanChangeOperatingMode)
+        {
+            <p role="status">Le convoyeur doit être arrêté, avec confirmation de l’automate, pour démarrer en maintenance ou revenir de maintenance en production.</p>
+        }
         @if (!Completed)
         {
             <div class="start-pin">
                 <label for="start-pin">NIP de démarrage</label>
                 <input id="start-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
                        @bind="_pin" @bind:event="oninput" disabled="@Busy" aria-describedby="start-pin-help" />
-                <small id="start-pin-help">Saisissez le NIP pour activer le bouton DÉMARRER.</small>
+                <small id="start-pin-help">Saisissez le NIP puis choisissez DÉMARRER (production) ou MAINTENANCE.</small>
             </div>
         }
     }
@@ -30,7 +34,8 @@
         <button type="button" class="btn @(Start && !Completed ? "cancel-start" : "")" autofocus="@(Start && !Completed)" disabled="@Busy" @onclick="OnClose">@(Completed ? "Fermer" : "ANNULER")</button>
         @if (Start && !Completed)
         {
-        <button type="button" class="btn btn-start" disabled="@(Busy || !ValidStartPin)" @onclick="() => Confirm(null)">DÉMARRER</button>
+        <button type="button" class="btn btn-start" disabled="@(Busy || !ValidStartPin || (MaintenanceActive && !CanChangeOperatingMode))" @onclick="() => Confirm(null)">DÉMARRER</button>
+        <button type="button" class="btn btn-test" disabled="@(Busy || !ValidStartPin || !CanChangeOperatingMode)" @onclick="ConfirmMaintenance">MAINTENANCE</button>
         }
     </div>
 </dialog>
@@ -39,15 +44,19 @@
     [Parameter] public bool Start { get; set; }
     [Parameter] public bool Completed { get; set; }
     [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool CanChangeOperatingMode { get; set; }
+    [Parameter] public bool MaintenanceActive { get; set; }
     [Parameter] public string? Message { get; set; }
     [Parameter] public EventCallback<int?> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnMaintenance { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     private ElementReference _dialog;
     private IJSObjectReference? _module;
     private bool _disposed;
     private string _pin = "";
     private bool ValidStartPin => _pin == "1980";
-    private Task Confirm(int? cause) => Busy || Completed || (Start && !ValidStartPin) ? Task.CompletedTask : OnConfirm.InvokeAsync(cause);
+    private Task Confirm(int? cause) => Busy || Completed || (Start && (!ValidStartPin || (MaintenanceActive && !CanChangeOperatingMode))) ? Task.CompletedTask : OnConfirm.InvokeAsync(cause);
+    private Task ConfirmMaintenance() => Busy || Completed || !Start || !ValidStartPin || !CanChangeOperatingMode ? Task.CompletedTask : OnMaintenance.InvokeAsync();
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

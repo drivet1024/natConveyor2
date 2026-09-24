@@ -9,6 +9,8 @@
 
 <PageTitle>Contrôle des convoyeurs</PageTitle>
 
+<div class="config-notice" role="status">Mode <strong>@(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</strong> — les compteurs affichés correspondent à ce mode.</div>
+
 @if (_database.Parcels == 0 || _database.PostalCodes == 0)
 {
     <DataWaitModal Parcels="_database.Parcels" PostalCodes="_database.PostalCodes" />
@@ -21,7 +23,7 @@
 
 @if (_motionStart is { } startMotion)
 {
-    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="@_motionMessage" OnConfirm="ConfirmMotion" OnClose="() => _motionStart = null" />
+    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="@_motionMessage" CanChangeOperatingMode="Supervisor.CanChangeOperatingMode" MaintenanceActive="Supervisor.Maintenance" OnConfirm="ConfirmMotion" OnMaintenance="() => ConfirmMotionCore(null, true)" OnClose="() => _motionStart = null" />
 }
 
 <header class="dashboard-header">
@@ -111,14 +113,15 @@
         _motionCompleted = false;
         _motionMessage = null;
     }
-    private async Task ConfirmMotion(int? cause)
+    private Task ConfirmMotion(int? cause) => ConfirmMotionCore(cause, false);
+    private async Task ConfirmMotionCore(int? cause, bool maintenance)
     {
         if (_motionBusy || _motionCompleted || _motionStart is not { } start) return;
         _motionBusy = true;
         _motionMessage = "Envoi de la commande…";
         try
         {
-            var result = await Supervisor.SetConveyorMotionAsync(start, cause);
+            var result = await Supervisor.SetConveyorMotionAsync(start, cause, maintenance);
             _motionCompleted = true;
             _motionMessage = result.Message;
         }

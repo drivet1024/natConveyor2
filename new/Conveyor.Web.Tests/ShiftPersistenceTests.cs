@@ -8,6 +8,29 @@ namespace Conveyor.Web.Tests;
 
 public sealed class ShiftPersistenceTests
 {
+    [Fact]
+    public async Task MaintenanceModeSurvivesRestartAndShiftChanges()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "conveyor-mode-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var options = new ConveyorOptions { General = new() { Name = "Gilmore", DepotId = 28, ShiftId = 1 } };
+            var editor = new ConfigurationEditor(Microsoft.Extensions.Options.Options.Create(options), new TestEnvironment { ContentRootPath = directory });
+            await editor.SaveMaintenanceAsync(true);
+            await editor.SaveShiftAsync(2);
+            var configuration = new ConfigurationBuilder().AddJsonFile(editor.FilePath).Build();
+            var restored = configuration.GetSection("Conveyor").Get<ConveyorOptions>()!;
+            Assert.True(restored.General!.Maintenance);
+            Assert.Equal(2, restored.General.ShiftId);
+            Assert.Equal(28, restored.General.DepotId);
+            await editor.SaveMaintenanceAsync(false);
+            configuration.Reload();
+            Assert.False(configuration.GetValue<bool>("Conveyor:General:Maintenance"));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
