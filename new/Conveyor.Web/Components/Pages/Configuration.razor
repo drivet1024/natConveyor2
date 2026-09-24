@@ -51,7 +51,7 @@ else
         <div class="config-grid">
             @TextField("Nom", _general.Name, value => _general.Name = value)
             @NumberField("Dépôt", _general.DepotId, value => _general.DepotId = value)
-            <label><span>Nom du dépôt</span><InputText @bind-Value="_general.DepotName" placeholder="@_general.GetDepotDisplayName()" /><small>Nom utilisé dans les SMS. Vide : Saint-Hubert pour 1/28, Québec pour 2, Toronto pour 12.</small></label>
+            <label><span>Nom du dépôt</span><InputText @bind-Value="_general.DepotName" placeholder="@_general.GetDepotDisplayName()" /><small>Nom utilisé dans les SMS. Vide : Saint-Hubert pour 1, Gilmore pour 28, Québec pour 2, Toronto pour 12.</small></label>
             <label><span>Conveyor ID</span><InputNumber @bind-Value="_general.ConveyorId" min="0" /><small>Identifiant enregistré dans conveyor_action pour les deux lignes.</small></label>
             @NumberField("Shift de départ", _general.ShiftId, value => _general.ShiftId = value)
             <label><span>Nombre de lignes utilisées</span><InputSelect @bind-Value="_model.LineCount"><option value="1">1 ligne</option><option value="2">2 lignes</option></InputSelect><small>Appliqué après enregistrement et redémarrage. Les réglages de la deuxième ligne sont conservés.</small></label>

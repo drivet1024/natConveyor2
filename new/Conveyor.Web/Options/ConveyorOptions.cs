@@ -67,7 +67,8 @@ public sealed class GeneralOptions
     public string DepotName { get; set; } = "";
     public string GetDepotDisplayName() => !string.IsNullOrWhiteSpace(DepotName) ? DepotName.Trim() : DepotId switch
     {
-        1 or 28 => "Saint-Hubert",
+        1 => "Saint-Hubert",
+        28 => "Gilmore",
         2 => "Québec",
         12 => "Toronto",
         _ => "Nom non configuré"
