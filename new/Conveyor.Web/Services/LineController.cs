@@ -482,8 +482,10 @@ internal sealed class LineController
     internal static bool IsLightParcel(decimal weight, decimal maximumWeight) =>
         maximumWeight > 0 && weight > 0 && weight < maximumWeight;
 
+    internal const decimal InverseLengthMarginInches = 2m;
     internal static bool IsInverseLengthParcel(Dimension dimension) =>
-        dimension.Length > 0 && dimension.Width > 0 && dimension.Width > dimension.Length;
+        dimension.Length > 0 && dimension.Width > 0 &&
+        dimension.Width >= dimension.Length + InverseLengthMarginInches;
 
     internal void RecordScalePresenceForParcel(bool receivedWeight, LineCounters? parcelCounters = null)
     {

@@ -34,10 +34,12 @@ public sealed class SortEngineTests
 
     [Theory]
     [InlineData(4, 8, true)]
+    [InlineData(6, 8, true)]
+    [InlineData(6.01, 8, false)]
     [InlineData(8, 8, false)]
     [InlineData(9, 8, false)]
     [InlineData(-1, 8, false)]
-    public void InverseLengthParcelRequiresTheSecondPositiveMeasureToBeGreater(
+    public void InverseLengthParcelRequiresASecondMeasureAtLeastTwoInchesGreater(
         decimal firstMeasure, decimal secondMeasure, bool expected)
     {
         Assert.Equal(expected, LineController.IsInverseLengthParcel(new(firstMeasure, secondMeasure, 3)));
