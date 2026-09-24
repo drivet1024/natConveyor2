@@ -106,6 +106,8 @@ else
                 @NumberField("Fenêtre de corrélation (ms)", _sorting.CorrelationWindowMs, value => _sorting.CorrelationWindowMs = value)
                 @DecimalField("Poids maximal", _sorting.MaximumWeight, value => _sorting.MaximumWeight = value)
                 @DecimalField("Dimension maximale", _sorting.MaximumDimension, value => _sorting.MaximumDimension = value)
+                <label><span>Seuil petit colis (po)</span><input type="number" min="0" step="0.01" @bind="_sorting.SmallParcelMaximumSide" /><small>La plus petite mesure doit être inférieure ou égale au seuil. Exemple : 4 × 8 × 3 avec 6 po compte comme petit colis. 0 désactive le compteur.</small></label>
+                <label><span>Seuil colis léger (lb)</span><input type="number" min="0" step="0.01" @bind="_sorting.LightParcelMaximumWeight" /><small>Le poids doit être strictement inférieur au seuil. 0 désactive le compteur.</small></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.PostalCodeSort" /><span>Tri par code postal</span></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.ValidateDimensionsAndWeight" /><span>Mode 98 actif au démarrage</span><small>OFF par défaut. Cette valeur est réappliquée aux deux lignes après chaque redémarrage.</small></label>
                 <label class="toggle-field"><InputCheckbox @bind-Value="_sorting.EnableCode86" /><span>Activer le code 86</span></label>

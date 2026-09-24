@@ -108,6 +108,8 @@ cinq secondes en fonctionnement normal). Une erreur disque diffère le reset.
 
 | Colonne | Valeur sauvegardée |
 | --- | --- |
+| `NB_LIGHT_PARCEL` | Colis dont le poids positif est strictement inférieur au seuil global configuré |
+| `NB_SMALL_PARCEL` | Colis dont la plus petite dimension positive est inférieure ou égale au seuil global configuré |
 | `DEPOT_ID`, `line_id` | Identifiants configurés |
 | `INSERT_DATE` | Début du shift |
 | `NB_SCANNED` | Total des colis |

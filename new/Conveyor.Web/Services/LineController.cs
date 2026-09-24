@@ -344,6 +344,11 @@ internal sealed class LineController
             dimension?.Timestamp,
             hasCorrelatedWeight ? weight!.Value : -1,
             weight?.Timestamp);
+        lock (_gate)
+        {
+            if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide)) parcelCounters.SmallParcels++;
+            if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
+        }
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
         var rejectionCounted = false;
@@ -468,6 +473,13 @@ internal sealed class LineController
 
     private static bool IsCode68(string? value) =>
         value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal);
+
+    internal static bool IsSmallParcel(Dimension dimension, decimal maximumSide) =>
+        maximumSide > 0 && dimension.Length > 0 && dimension.Width > 0 && dimension.Height > 0 &&
+        Math.Min(dimension.Length, Math.Min(dimension.Width, dimension.Height)) <= maximumSide;
+
+    internal static bool IsLightParcel(decimal weight, decimal maximumWeight) =>
+        maximumWeight > 0 && weight > 0 && weight < maximumWeight;
 
     internal void RecordScalePresenceForParcel(bool receivedWeight, LineCounters? parcelCounters = null)
     {

@@ -32,6 +32,8 @@ public sealed class ConveyorOptions
             CorrelationWindowMs = primary.CorrelationWindowMs,
             MaximumWeight = primary.MaximumWeight,
             MaximumDimension = primary.MaximumDimension,
+            SmallParcelMaximumSide = primary.SmallParcelMaximumSide,
+            LightParcelMaximumWeight = primary.LightParcelMaximumWeight,
             PostalCodeSort = primary.PostalCodeSort,
             // Code 98 is opt-in. Legacy configurations without a global
             // sorting section restart with the safe global default: OFF.
@@ -53,6 +55,8 @@ public sealed class ConveyorOptions
             line.CorrelationWindowMs = Sorting.CorrelationWindowMs;
             line.MaximumWeight = Sorting.MaximumWeight;
             line.MaximumDimension = Sorting.MaximumDimension;
+            line.SmallParcelMaximumSide = Sorting.SmallParcelMaximumSide;
+            line.LightParcelMaximumWeight = Sorting.LightParcelMaximumWeight;
             line.PostalCodeSort = Sorting.PostalCodeSort;
             line.ValidateDimensionsAndWeight = Sorting.ValidateDimensionsAndWeight;
             line.EnableCode86 = Sorting.EnableCode86;
@@ -88,6 +92,8 @@ public sealed class SortingOptions
     public int CorrelationWindowMs { get; set; } = 1_500;
     public decimal MaximumWeight { get; set; } = 150;
     public decimal MaximumDimension { get; set; } = 100;
+    [Range(typeof(decimal), "0", "1000")] public decimal SmallParcelMaximumSide { get; set; }
+    [Range(typeof(decimal), "0", "1000")] public decimal LightParcelMaximumWeight { get; set; }
     public bool PostalCodeSort { get; set; } = true;
     public bool ValidateDimensionsAndWeight { get; set; }
     public bool EnableCode86 { get; set; }
@@ -129,6 +135,8 @@ public sealed class LineOptions
     public int CorrelationWindowMs { get; set; } = 1_500;
     public decimal MaximumWeight { get; set; } = 150;
     public decimal MaximumDimension { get; set; } = 100;
+    public decimal SmallParcelMaximumSide { get; set; }
+    public decimal LightParcelMaximumWeight { get; set; }
     public TimeOnly EndOfDay { get; set; } = new(8, 25);
     public PlcOptions Plc { get; set; } = new();
 }

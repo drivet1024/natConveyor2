@@ -39,6 +39,8 @@ builder.Services.AddOptions<ConveyorOptions>()
     .Validate(options => options.Statistics.ValidationError(options.GetConfiguredLines()) is null,
         "Statistiques : vérifier les horaires du shift, de sauvegarde et de remise à zéro.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag), "Le tag de démarrage du convoyeur est obligatoire.")
+    .Validate(options => options.Sorting is not null && options.Sorting.SmallParcelMaximumSide >= 0 && options.Sorting.LightParcelMaximumWeight >= 0,
+        "Les seuils petit colis et colis léger doivent être positifs ou nuls.")
     .Validate(options => options.Lines.Select(line => line.Id).Distinct().Count() == options.Lines.Count, "Les identifiants de ligne doivent être uniques.")
     .Validate(options => options.GetConfiguredLines().All(line => line.DatabaseLineId is null or > 0), "Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.")
     .Validate(options =>

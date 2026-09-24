@@ -102,6 +102,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
         options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
+        if (options.Sorting is null || options.Sorting.SmallParcelMaximumSide < 0 || options.Sorting.LightParcelMaximumWeight < 0)
+            throw new InvalidOperationException("Les seuils petit colis et colis léger doivent être positifs ou nuls.");
         if (options.Lines.Any(line => line.DatabaseLineId is <= 0)) throw new InvalidOperationException("Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.");
         var databaseLineIds = options.Lines.Where(line => line.DatabaseLineId.HasValue).Select(line => line.DatabaseLineId!.Value).ToArray();
         if (databaseLineIds.Distinct().Count() != databaseLineIds.Length) throw new InvalidOperationException("Les lineId MySQL renseignés doivent être uniques.");

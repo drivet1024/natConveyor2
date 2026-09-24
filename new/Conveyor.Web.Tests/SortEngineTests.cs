@@ -11,6 +11,50 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Theory]
+    [InlineData(4, 8, 3, 6, true)]
+    [InlineData(6, 8, 7, 6, true)]
+    [InlineData(7, 8, 9, 6, false)]
+    [InlineData(-1, 8, 3, 6, false)]
+    [InlineData(4, 8, 3, 0, false)]
+    public void SmallParcelUsesTheSmallestPositiveSide(decimal length, decimal width, decimal height,
+        decimal threshold, bool expected)
+    {
+        Assert.Equal(expected, LineController.IsSmallParcel(new(length, width, height), threshold));
+    }
+
+    [Theory]
+    [InlineData(4.99, 5, true)]
+    [InlineData(5, 5, false)]
+    [InlineData(-1, 5, false)]
+    [InlineData(4, 0, false)]
+    public void LightParcelMustBeStrictlyBelowThePositiveThreshold(decimal weight, decimal threshold, bool expected)
+    {
+        Assert.Equal(expected, LineController.IsLightParcel(weight, threshold));
+    }
+
+    [Fact]
+    public async Task ParcelProfilesAreCountedFromTheCorrelatedMeasurements()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.SmallParcelMaximumSide = 6;
+        line.LightParcelMaximumWeight = 5;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(4, 8, 3), 4.99m);
+            await controller.SimulateAsync("12345678902", new(7, 8, 9), 5m);
+
+            var counters = controller.Snapshot().Counters;
+            Assert.Equal(1, counters.SmallParcels);
+            Assert.Equal(1, counters.LightParcels);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Theory]
     [InlineData(true, 39, 97, 1)]
     [InlineData(false, 39, 39, 0)]
     [InlineData(true, 4, 4, 0)]

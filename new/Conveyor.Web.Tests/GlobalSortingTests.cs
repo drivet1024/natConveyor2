@@ -119,6 +119,8 @@ public sealed class GlobalSortingTests
         var options = new ConveyorOptions { Lines = [new() { Id = 0 }, new() { Id = 1 }] };
         options.ApplyGlobalSorting();
         options.Sorting!.MaximumWeight = 75;
+        options.Sorting.SmallParcelMaximumSide = 6;
+        options.Sorting.LightParcelMaximumWeight = 5;
         options.Sorting.EnableCode86 = true;
         options.Sorting.ValidateDimensionsAndWeight = false;
         var restored = JsonSerializer.Deserialize<ConveyorOptions>(JsonSerializer.Serialize(options))!;
@@ -126,6 +128,8 @@ public sealed class GlobalSortingTests
         Assert.All(restored.Lines, line =>
         {
             Assert.Equal(75, line.MaximumWeight);
+            Assert.Equal(6, line.SmallParcelMaximumSide);
+            Assert.Equal(5, line.LightParcelMaximumWeight);
             Assert.True(line.EnableCode86);
             Assert.False(line.ValidateDimensionsAndWeight);
         });

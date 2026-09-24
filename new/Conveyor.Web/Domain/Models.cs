@@ -48,6 +48,8 @@ public sealed class LineCounters
     public long DimensionErrors { get; set; }
     public long ScaleErrors { get; set; }
     public long ScaleFaults { get; set; }
+    public long LightParcels { get; set; }
+    public long SmallParcels { get; set; }
     public long SortedByWaybill { get; set; }
     public long SortedByPostalCode { get; set; }
     public long DatabaseInserts { get; set; }
