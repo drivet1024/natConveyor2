@@ -79,6 +79,7 @@ builder.Services.AddSingleton<ICounterStatisticsStore, CounterStatisticsStore>()
 builder.Services.AddSingleton<CounterStatisticsService>();
 builder.Services.AddSingleton<IConveyorSupervisor>(services => services.GetRequiredService<ConveyorSupervisor>());
 builder.Services.AddHostedService(services => services.GetRequiredService<ConveyorSupervisor>());
+builder.Services.AddHostedService<PlcRecoveryMonitor>();
 
 var app = builder.Build();
 

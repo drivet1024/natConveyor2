@@ -7,10 +7,10 @@
     <p>Le redémarrage interrompt les communications automate des deux lignes. Le convoyeur doit être arrêté.</p>
     @if (_message is not null) { <p role="status">@_message</p> }
     <div class="rslinx-actions">
-        <button type="button" class="btn" autofocus disabled="@_busy" @onclick="OnClose">@(_completed ? "Fermer" : "Annuler")</button>
+        <button type="button" class="btn" autofocus disabled="@(_busy && !_waitingForConnection)" @onclick="OnClose">@(_waitingForConnection ? "Fermer la fenêtre" : _completed ? "Fermer" : "Annuler")</button>
         @if (!_completed)
         {
-            <button type="button" class="btn btn-test" disabled="@_busy" @onclick="Restart">@(_busy ? "Redémarrage…" : "Redémarrer RSLinx")</button>
+            <button type="button" class="btn btn-test" disabled="@_busy" @onclick="Restart">@(_waitingForConnection ? "Reconnexion en cours…" : _busy ? "Redémarrage…" : "Redémarrer RSLinx")</button>
         }
     </div>
 </dialog>
@@ -22,7 +22,38 @@
     private bool _disposed;
     private bool _busy;
     private bool _completed;
+    private bool _waitingForConnection;
     private string? _message;
+
+    protected override void OnInitialized() => Supervisor.Changed += OnSupervisorChanged;
+
+    private void OnSupervisorChanged()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed || !_waitingForConnection) return;
+            RefreshConnection();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshConnection()
+    {
+        var running = Supervisor.GetSnapshots().Where(line => line.Running).ToArray();
+        if (running.Length > 0 && running.All(line => line.Connections.Plc))
+        {
+            _waitingForConnection = false;
+            _busy = false;
+            _completed = true;
+            _message = "RSLinx redémarré ; automate connecté.";
+            return;
+        }
+
+        _message = running.Length == 0
+            ? "RSLinx redémarré ; connexions appareils désactivées. Fermer la fenêtre et utiliser CONNECTER pour reconnecter l’automate."
+            : "RSLinx redémarré ; reconnexion à l’automate en cours. En attente de la connexion et des lectures automate…";
+    }
 
     private async Task Restart()
     {
@@ -31,11 +62,13 @@
         _message = "Redémarrage de RSLinx en cours…";
         try
         {
-            _message = await Supervisor.RestartRslinxAsync();
-            _completed = true;
+            await Supervisor.RestartRslinxAsync();
+            if (_disposed) return;
+            _waitingForConnection = true;
+            RefreshConnection();
         }
         catch (Exception exception) { _message = exception.Message; }
-        finally { _busy = false; }
+        finally { _busy = _waitingForConnection; }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -54,6 +87,7 @@
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        Supervisor.Changed -= OnSupervisorChanged;
         if (_module is null) return;
         try { await _module.DisposeAsync(); } catch (JSDisconnectedException) { }
     }

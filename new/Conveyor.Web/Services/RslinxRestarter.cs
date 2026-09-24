@@ -25,6 +25,7 @@ public sealed class RslinxRestarter(ILogger<RslinxRestarter> logger) : IRslinxRe
         catch (OperationCanceledException)
         {
             if (!process.HasExited) process.Kill(); // Stop only our helper, never its newly launched RSLinx child.
+            token.ThrowIfCancellationRequested();
             throw new InvalidOperationException("Délai de redémarrage RSLinx dépassé. Vérifier son état sur le serveur.");
         }
         var detail = (await errors).Trim();

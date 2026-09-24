@@ -58,7 +58,7 @@
     <div class="config-notice error" role="status">@_resetDataMessage</div>
 }
 
-<section class="line-grid">
+<section class="line-grid @(_lines.Count == 1 ? "single-line" : null)">
 @foreach (var line in _lines)
 {
     <article class="line-card">

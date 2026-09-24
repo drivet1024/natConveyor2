@@ -25,6 +25,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
     public bool Maintenance => _configuration.General?.Maintenance == true;
+    private volatile bool _rslinxRestartInProgress;
+    public bool RslinxRestartInProgress => _rslinxRestartInProgress;
     public bool CanChangeOperatingMode => ConveyorRunning == false && _plc.IsConnected
         && (_plc is not IPlcReadback readback || readback.ReadsHealthy);
 
@@ -185,11 +187,17 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     }
 
     public IReadOnlyList<LineSnapshot> GetSnapshots() => _lines.Values.Select(line => line.Snapshot()).OrderBy(x => x.LineId).ToArray();
-    public async Task<string> RestartRslinxAsync()
+    public Task<string> RestartRslinxAsync() => RestartRslinxCoreAsync(false);
+    public Task<string> RestartRslinxAutomaticallyAsync(CancellationToken token = default) => RestartRslinxCoreAsync(true, token);
+    private async Task<string> RestartRslinxCoreAsync(bool automatic, CancellationToken token = default)
     {
         if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande automate est déjà en cours.");
         try
         {
+            if (automatic && (!_configuration.RslinxRestart.AutoRestart ||
+                !_lines.OrderBy(pair => pair.Key).First().Value.Running ||
+                (_plc.IsConnected && (_plc is not IPlcReadback state || state.ReadsHealthy))))
+                return "Redémarrage automatique annulé : connexion rétablie ou surveillance désactivée.";
             var plcOptions = _configuration.GetConfiguredLines().First().Plc;
             if (_configuration.Simulation) throw new InvalidOperationException("Redémarrage RSLinx désactivé en simulation.");
             if (string.Equals(plcOptions.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase))
@@ -197,11 +205,16 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             if (string.Equals(plcOptions.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase) &&
                 !IsLocalHost(plcOptions.OpcHost))
                 throw new InvalidOperationException("RSLinx est configuré sur un serveur OPC distant. Le redémarrer sur ce serveur.");
-            if (ConveyorRunning == true) throw new InvalidOperationException("Arrêter le convoyeur avant de redémarrer RSLinx.");
+            // On a communication failure the last motion value may be stale.
+            // The automatic recovery requested by the operator never sends a motion command.
+            if (!automatic && ConveyorRunning == true) throw new InvalidOperationException("Arrêter le convoyeur avant de redémarrer RSLinx.");
             if (_configuration.RslinxRestart.ValidationError() is { } error) throw new InvalidOperationException(error);
             if (_rslinxRestarter is null) throw new InvalidOperationException("Service de redémarrage RSLinx indisponible.");
             var reconnect = _lines.OrderBy(pair => pair.Key).First().Value.Running;
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            token.ThrowIfCancellationRequested();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(120));
+            _rslinxRestartInProgress = true;
             _logger.LogWarning("Redémarrage RSLinx demandé ; interruption temporaire des échanges automate");
             await _plc.DisconnectAsync();
             ConveyorRunning = null;
@@ -210,7 +223,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             try { await _rslinxRestarter.RestartAsync(_configuration.RslinxRestart, timeout.Token); }
             finally
             {
-                if (reconnect)
+                if (reconnect && !token.IsCancellationRequested)
                 {
                     try { await _plc.ConnectAsync(timeout.Token); reconnected = _plc.IsConnected; }
                     catch (Exception exception) { _logger.LogWarning(exception, "Reconnexion automate différée après redémarrage RSLinx ; surveiller le voyant"); }
@@ -221,7 +234,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                     : "RSLinx redémarré ; reconnexion automate en attente. Consulter les journaux et le voyant."
                 : "RSLinx redémarré. Les connexions appareils restent désactivées ; utiliser CONNECTER pour les ouvrir.";
         }
-        finally { _motionGate.Release(); Changed?.Invoke(); }
+        finally { _rslinxRestartInProgress = false; _motionGate.Release(); Changed?.Invoke(); }
     }
 
     private static bool IsLocalHost(string host) => string.IsNullOrWhiteSpace(host) ||

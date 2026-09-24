@@ -3,6 +3,7 @@ namespace Conveyor.Web.Options;
 public sealed class RslinxRestartOptions
 {
     public string Mode { get; set; } = "Service";
+    public bool AutoRestart { get; set; } = true;
     public string ServiceName { get; set; } = "RSLinx";
     public string ExecutablePath { get; set; } = "";
 

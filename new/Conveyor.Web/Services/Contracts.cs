@@ -54,6 +54,8 @@ public interface IConveyorSupervisor
     Task StartLineAsync(int lineId);
     Task RestartLineAsync(int lineId);
     Task<string> RestartRslinxAsync();
+    bool RslinxRestartInProgress { get; }
+    Task<string> RestartRslinxAutomaticallyAsync(CancellationToken token = default);
     Task StopLineAsync(int lineId);
     void ResetCounters(int lineId);
     void SetCode98Enabled(int lineId, bool enabled);

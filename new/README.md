@@ -2,6 +2,30 @@
 
 ## Redémarrage RSLinx depuis AUTOMATE
 
+L’option **Redémarrer RSLinx automatiquement si l’automate se déconnecte** est
+activée par défaut dans Configuration → AUTOMATE. Tant que les connexions de la
+ligne principale sont demandées, une surveillance indépendante vérifie le même
+état que le voyant toutes les cinq secondes (transport et qualité des lectures).
+Après au moins 15 secondes d’indisponibilité continue, elle envoie un SMS d’alerte
+puis tente de redémarrer RSLinx, avec un SMS de résultat. La disparition de la panne
+pendant 30 secondes consécutives déclenche un SMS de rétablissement et réarme la
+surveillance. Les alertes utilisent les paramètres Twilio et les destinataires existants.
+
+Une seule tentative est effectuée par incident, avec au moins cinq minutes entre
+deux tentatives, même si la connexion oscille. Un échec exige une intervention
+ou une reconnexion stable avant réarmement. Les déconnexions volontaires de la
+ligne principale, la simulation et les redémarrages manuels en cours ne déclenchent
+pas cette reprise. Désactiver l’option conserve les alertes de déconnexion et de
+rétablissement sans redémarrage automatique. L’automatisme reste soumis aux limites
+du redémarrage local (protocole, serveur OPC et droits Windows).
+
+En reprise automatique, la dernière valeur de marche reçue avant la panne peut
+être périmée : elle ne bloque pas le redémarrage RSLinx demandé après la perte
+de communication. Aucune commande de marche ou d’arrêt du convoyeur n’est envoyée
+par cette reprise. La commande manuelle conserve son blocage lorsque la dernière
+valeur indique un convoyeur en marche. La temporisation et la limite par incident
+sont en mémoire et repartent à zéro au redémarrage de Conveyor.Web.
+
 La tuile **AUTOMATE** est cliquable et conserve son voyant et son état. Elle ouvre
 une fenêtre de confirmation **Redémarrer RSLinx**. Le convoyeur doit être arrêté :
 si l’automate le signale en marche, la commande est refusée. Si RSLinx ne répond
