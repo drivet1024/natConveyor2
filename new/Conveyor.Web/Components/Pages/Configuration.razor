@@ -13,7 +13,7 @@
         <h2 id="pin-gate-title">NIP requis</h2>
         <form @onsubmit="UnlockConfiguration" @onsubmit:preventDefault>
             <label for="configuration-pin">NIP</label>
-            <input id="configuration-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+            <input @ref="_pinInput" id="configuration-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4"
                    autocomplete="off" autofocus @bind="_submittedPin" @bind:event="oninput" />
             <button type="submit" class="btn">Déverrouiller</button>
         </form>
@@ -51,9 +51,9 @@ else
         <div class="config-grid">
             @TextField("Nom", _general.Name, value => _general.Name = value)
             @NumberField("Dépôt", _general.DepotId, value => _general.DepotId = value)
+            <label><span>Nom du dépôt</span><InputText @bind-Value="_general.DepotName" placeholder="@_general.GetDepotDisplayName()" /><small>Nom utilisé dans les SMS. Vide : Saint-Hubert pour 1/28, Québec pour 2, Toronto pour 12.</small></label>
             <label><span>Conveyor ID</span><InputNumber @bind-Value="_general.ConveyorId" min="0" /><small>Identifiant enregistré dans conveyor_action pour les deux lignes.</small></label>
             @NumberField("Shift de départ", _general.ShiftId, value => _general.ShiftId = value)
-            <label class="toggle-field"><InputCheckbox @bind-Value="_model.Simulation" /><span>Mode simulation</span><small>Désactiver pour communiquer avec les appareils réels.</small></label>
             <label><span>Nombre de lignes utilisées</span><InputSelect @bind-Value="_model.LineCount"><option value="1">1 ligne</option><option value="2">2 lignes</option></InputSelect><small>Appliqué après enregistrement et redémarrage. Les réglages de la deuxième ligne sont conservés.</small></label>
             <label class="wide-field"><span>Nouvelle chaîne de connexion MySQL</span><InputText type="password" autocomplete="new-password" @bind-Value="_newConnectionString" placeholder="Laisser vide pour conserver la valeur actuelle" /><small>La valeur actuelle n’est jamais affichée dans le navigateur.</small></label>
         </div>
@@ -178,6 +178,7 @@ else
 }
 
 @code {
+    private ElementReference _pinInput;
     private bool _configurationUnlocked;
     private string _submittedPin = "";
     private string? _pinError;
@@ -194,6 +195,12 @@ else
     private bool _restarting;
     private string? _error;
     protected override void OnInitialized() => _model = Editor.GetEditableCopy();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_configurationUnlocked)
+            await _pinInput.FocusAsync(preventScroll: true);
+    }
 
     private void UnlockConfiguration()
     {

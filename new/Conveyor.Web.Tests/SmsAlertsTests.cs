@@ -46,7 +46,8 @@ public sealed class SmsAlertsTests
             Assert.Equal(config.Sms.FromNumber, request.Fields["From"].ToString());
             var body = request.Fields["Body"].ToString();
             Assert.Contains("Reset compteurs effectué", body);
-            Assert.Contains("[Québec] dépôt [2] convoyeur [7] ligne [2]", body);
+            Assert.Contains("[Québec] dépôt [Québec] convoyeur [7] ligne [2]", body);
+            Assert.DoesNotContain("dépôt [2]", body);
             Assert.DoesNotContain(config.Sms.AuthToken, body);
         });
     }

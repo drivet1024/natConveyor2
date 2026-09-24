@@ -64,6 +64,14 @@ public sealed class GeneralOptions
     public int? ConveyorId { get; set; }
     public string Name { get; set; } = "Convoyeur";
     public int DepotId { get; set; }
+    public string DepotName { get; set; } = "";
+    public string GetDepotDisplayName() => !string.IsNullOrWhiteSpace(DepotName) ? DepotName.Trim() : DepotId switch
+    {
+        1 or 28 => "Saint-Hubert",
+        2 => "Québec",
+        12 => "Toronto",
+        _ => "Nom non configuré"
+    };
     public int ShiftId { get; set; }
     [Required] public string ConveyorStartTag { get; set; } = DefaultConveyorStartTag;
 }

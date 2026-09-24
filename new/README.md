@@ -18,7 +18,11 @@ l’arrêt des connexions appareils par ligne, y compris au démarrage/arrêt de
 l’application. Une activation des connexions ne confirme pas la connexion
 physique de chaque appareil : les voyants restent la référence. Les coupures
 TCP spontanées ne déclenchent pas de SMS. Les messages identifient le site,
-le dépôt, le convoyeur, la ligne ou toutes les lignes, et l’heure locale.
+le dépôt par son nom, le convoyeur, la ligne ou toutes les lignes, et l’heure locale.
+Le champ **Configuration → Général → Nom du dépôt** personnalise le nom envoyé.
+Sans valeur, les dépôts 1/28 utilisent Saint-Hubert, 2 Québec et 12 Toronto ;
+les autres affichent « Nom non configuré » jusqu’à la saisie du nom. Enregistrer
+et redémarrer pour appliquer.
 
 Les SMS sont désactivés par défaut et aucun appel Twilio n’est effectué en mode
 simulation. L’envoi utilise une file en mémoire de 200 alertes, avec un délai
