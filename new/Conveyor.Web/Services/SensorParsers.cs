@@ -40,6 +40,15 @@ public static class SensorParsers
         return decimal.TryParse(numeric, NumberStyles.Number, CultureInfo.InvariantCulture, out var weight) ? weight : null;
     }
 
+    public static string FormatWeightForDisplay(string frame)
+    {
+        var start = frame.LastIndexOf('\u0002');
+        start = start < 0 ? 0 : start + 1;
+        var end = frame.IndexOfAny(['\r', '\n'], start);
+        if (end < 0) end = frame.Length;
+        return new string(frame[start..end].Where(character => !char.IsControl(character)).ToArray()).Trim();
+    }
+
     private static string? ExtractBetweenLastStxAndCrLf(string frame)
     {
         var start = frame.LastIndexOf('\u0002');

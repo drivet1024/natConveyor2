@@ -50,4 +50,13 @@ public sealed class SensorParserTests
     {
         Assert.Null(SensorParsers.ParseWeight("001.65LB\r\n", "StxToCrLf"));
     }
+
+    [Theory]
+    [InlineData("\u0002022.30LB\r\n   ", "022.30LB")]
+    [InlineData("garbage\u0002001.65LB\r\n", "001.65LB")]
+    [InlineData("  4.75 lb  ", "4.75 lb")]
+    public void Weight_display_keeps_only_the_readable_payload(string frame, string expected)
+    {
+        Assert.Equal(expected, SensorParsers.FormatWeightForDisplay(frame));
+    }
 }

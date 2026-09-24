@@ -1,7 +1,7 @@
 <section class="device-feed" aria-label="Réception des appareils">
     <div class="feed-heading"><strong>RÉCEPTION EN DIRECT</strong><span>@(Line.Connections.Simulated ? "DONNÉES SIMULÉES" : "DERNIÈRES TRAMES REÇUES")</span></div>
     @DeviceRow("DIMENSIONNEUR", Line.DimensionInput, Line.Connections.Dimensioner)
-    @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale)
+    @DeviceRow("BALANCE", Line.ScaleInput, Line.Connections.Scale, null, true)
     <div class="camera-plc-row @(!string.IsNullOrWhiteSpace(Line.PlcTransferTag) ? "has-transfer" : null)">
         @DeviceRow("CAMÉRA", Line.CameraInput, Line.Connections.Camera, Line.LastPlcDispatch)
         @PlcReadout("AUTOMATE", Line.PlcTag, Line.PlcInput, Line.PlcTagSupported)
@@ -26,7 +26,7 @@
             @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
         </div>
     </div>;
-    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null) => @<div class="feed-row">
+    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null, bool weightDisplay = false) => @<div class="feed-row">
         <div class="feed-label">
             <strong>@name</strong>
             <small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small>
@@ -42,7 +42,7 @@
             @if (input is null) { <span class="feed-empty">Aucune trame reçue</span> }
             else
             {
-                <code>@Visible(input.Raw)@(input.Truncated ? " … [tronquée]" : "")</code>
+                <code>@(weightDisplay ? SensorParsers.FormatWeightForDisplay(input.Raw) : Visible(input.Raw))@(input.Truncated ? " … [tronquée]" : "")</code>
                 <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff") · trame @input.Sequence</span>
             }
         </div>
