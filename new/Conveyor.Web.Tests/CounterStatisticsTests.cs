@@ -10,6 +10,27 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void HistoryWindowIncludesTodayAndPreviousTwentyNineDays()
+    {
+        var (from, to) = StatisticsHistoryService.GetThirtyDayWindow(new DateTime(2026, 9, 24, 15, 30, 0));
+
+        Assert.Equal(new DateTime(2026, 8, 26), from);
+        Assert.Equal(new DateTime(2026, 9, 25), to);
+        Assert.Equal(30, (to - from).TotalDays);
+    }
+
+    [Fact]
+    public void DimensionHistoryUsesCombinedReadParcelsAsDenominator()
+    {
+        var rate = StatisticsHistoryService.CalculateDimensionErrorPercent([
+            new() { TotalParcels = 100, NoReads = 20, DimensionErrors = 8 },
+            new() { TotalParcels = 300, NoReads = 80, DimensionErrors = 22 }
+        ]);
+
+        Assert.Equal(10, rate);
+    }
+
+    [Fact]
     public void WeightAndScaleErrorsUseSeparateCountsAndDenominatorsForEveryDestination()
     {
         var counters = new LineCounters { TotalParcels = 100, NoReads = 20, ScaleErrors = 10, ScaleFaults = 3 };

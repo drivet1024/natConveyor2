@@ -105,6 +105,8 @@
 }
 .brand-short, .menu-collapse { display: none; }
 .bi-gear-fill-nav-menu { font-size: 1.4rem; line-height: 1.25rem; }
+.bi-chart-nav-menu { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M2 13.5h12M3 11l3-3 2 2 4-5 2 2'/%3E%3C/svg%3E"); }
+.bi-maintenance-nav-menu { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='white' d='M10.7 1.2a4 4 0 0 0-4.9 5.1L1.4 10.7a2.3 2.3 0 1 0 3.2 3.2L9 9.5a4 4 0 0 0 5.1-4.9l-2.4 2.4-2.1-.6-.6-2.1 2.4-2.4-.7-.7Z'/%3E%3C/svg%3E"); }
 .bi { flex-shrink: 0; }
 
 @media (min-width: 641px) {

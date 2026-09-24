@@ -1,0 +1,39 @@
+@page "/statistiques"
+@inject StatisticsHistoryService History
+
+<PageTitle>Historique des statistiques</PageTitle>
+
+<header class="dashboard-header">
+    <div><span class="eyebrow">PRODUCTION GLOBALE</span><h1>Historique des statistiques</h1><p>Total du convoyeur, du @FromLabel au @ToLabel.</p></div>
+    <button class="btn" disabled="@_loading" @onclick="LoadAsync">@(_loading ? "Chargement…" : "Actualiser")</button>
+</header>
+
+@if (_error is not null)
+{
+    <div class="config-notice error" role="alert">Impossible de charger l’historique : @_error</div>
+}
+else if (_loading)
+{
+    <div class="history-loading" role="status">Chargement de l’historique…</div>
+}
+else
+{
+    <StatisticsHistoryChart Points="_points" />
+}
+
+@code {
+    private IReadOnlyList<StatisticsHistoryPoint> _points = [];
+    private bool _loading = true;
+    private string? _error;
+    private static DateTime From => DateTime.Today.AddDays(-29);
+    private static string FromLabel => From.ToString("dd MMMM yyyy");
+    private static string ToLabel => DateTime.Today.ToString("dd MMMM yyyy");
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _points = await History.LoadGlobalAsync(); }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _loading = false; }
+    }
+}

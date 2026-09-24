@@ -1,0 +1,55 @@
+@page "/statistiques-maintenance"
+@inject StatisticsHistoryService History
+@inject IOptions<ConveyorOptions> Options
+
+<PageTitle>Historique maintenance</PageTitle>
+
+<header class="dashboard-header">
+    <div><span class="eyebrow">MAINTENANCE</span><h1>Historique maintenance</h1><p>Compteurs de maintenance des 30 derniers jours pour la ligne sélectionnée.</p></div>
+    <button class="btn" disabled="@_loading" @onclick="LoadAsync">@(_loading ? "Chargement…" : "Actualiser")</button>
+</header>
+
+<section class="history-toolbar">
+    <label for="maintenance-line">Ligne
+        <select id="maintenance-line" @bind="_selectedLineIndex" @bind:after="LoadAsync">
+            @for (var index = 0; index < _lines.Length; index++)
+            {
+                <option value="@index">Ligne @(_lines[index].Id + 1) — @LineIdLabel(_lines[index])</option>
+            }
+        </select>
+    </label>
+</section>
+
+@if (_error is not null)
+{
+    <div class="config-notice error" role="alert">Impossible de charger l’historique : @_error</div>
+}
+else if (_loading)
+{
+    <div class="history-loading" role="status">Chargement de l’historique…</div>
+}
+else
+{
+    <StatisticsHistoryChart Points="_points" />
+}
+
+@code {
+    private LineOptions[] _lines = [];
+    private int _selectedLineIndex;
+    private IReadOnlyList<StatisticsHistoryPoint> _points = [];
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnInitializedAsync()
+    {
+        _lines = Options.Value.GetConfiguredLines().ToArray();
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _points = _lines.Length == 0 ? [] : await History.LoadMaintenanceAsync(_lines[_selectedLineIndex].DatabaseLineId); }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _loading = false; }
+    }
+    private static string LineIdLabel(LineOptions line) => line.DatabaseLineId is { } id ? $"lineId {id}" : "lineId NULL";
+}

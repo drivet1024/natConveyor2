@@ -1,0 +1,106 @@
+@using System.Globalization
+
+<section class="history-panel" aria-labelledby="history-chart-title">
+    <div class="history-panel-heading">
+        <div><span class="eyebrow">30 DERNIERS JOURS</span><h2 id="history-chart-title">Évolution par shift</h2></div>
+        <div class="history-legend" aria-label="Légende">
+            <span class="parcels"><i></i>Total colis</span>
+            <span class="scale"><i></i>Erreurs balance</span>
+            <span class="dimension"><i></i>Erreurs dimensionneur</span>
+        </div>
+    </div>
+
+    @if (Points.Count == 0)
+    {
+        <div class="history-empty">Aucune statistique enregistrée pour cette période.</div>
+    }
+    else
+    {
+        <div class="history-kpis">
+            <div><strong>@Last.TotalParcels.ToString("N0")</strong><span>colis au dernier shift</span></div>
+            <div><strong>@FormatPercent(Last.BalanceErrorPercent)</strong><span>erreurs balance</span></div>
+            <div><strong>@FormatPercent(Last.DimensionErrorPercent)</strong><span>erreurs dimensionneur</span></div>
+        </div>
+        <div class="history-chart-scroll">
+            <svg class="history-chart" viewBox="0 0 1000 380" role="img" aria-labelledby="history-chart-title history-chart-description">
+                <desc id="history-chart-description">Graphique à lignes du total de colis et des pourcentages d’erreurs de balance et de dimensionneur sur les 30 derniers jours.</desc>
+                @for (var i = 0; i <= 4; i++)
+                {
+                    var y = Top + PlotHeight * i / 4d;
+                    <g>
+                        <line class="grid-line" x1="@Left" y1="@F(y)" x2="@(Width - Right)" y2="@F(y)" />
+                        <text class="axis-label left-axis" x="@(Left - 12)" y="@F(y + 4)">@FormatCountAxis(MaxParcels * (4 - i) / 4d)</text>
+                        <text class="axis-label right-axis" x="@(Width - Right + 12)" y="@F(y + 4)">@FormatAxisPercent(MaxPercent * (4 - i) / 4d)</text>
+                    </g>
+                }
+                @for (var i = 0; i < 5; i++)
+                {
+                    var date = PeriodStart.AddDays(i == 4 ? 29 : i * 7);
+                    var x = X(date);
+                    <g><text class="axis-label date-axis" x="@F(x)" y="@(Height - 13)">@date.ToString("dd MMM", CultureInfo.GetCultureInfo("fr-CA"))</text></g>
+                }
+                <text class="axis-title" x="12" y="18">COLIS</text>
+                <text class="axis-title percent-title" x="@(Width - 12)" y="18">TAUX</text>
+                <polyline class="series parcels" points="@Polyline(point => ParcelsY(point.TotalParcels))" />
+                <polyline class="series scale" points="@Polyline(point => PercentY(point.BalanceErrorPercent))" />
+                @foreach (var segment in DimensionSegments)
+                {
+                    <polyline class="series dimension" points="@Polyline(segment, point => PercentY(point.DimensionErrorPercent!.Value))" />
+                }
+                @foreach (var point in Points)
+                {
+                    <circle class="point parcels" cx="@F(X(point.ShiftStart))" cy="@F(ParcelsY(point.TotalParcels))" r="4"><title>@Tooltip(point, "Total colis", point.TotalParcels.ToString("N0"))</title></circle>
+                    <circle class="point scale" cx="@F(X(point.ShiftStart))" cy="@F(PercentY(point.BalanceErrorPercent))" r="4"><title>@Tooltip(point, "Erreurs balance", FormatPercent(point.BalanceErrorPercent))</title></circle>
+                    @if (point.DimensionErrorPercent is { } dimensionPercent)
+                    {
+                        <circle class="point dimension" cx="@F(X(point.ShiftStart))" cy="@F(PercentY(dimensionPercent))" r="4"><title>@Tooltip(point, "Erreurs dimensionneur", FormatPercent(dimensionPercent))</title></circle>
+                    }
+                }
+            </svg>
+        </div>
+        @if (Points.Any(point => point.DimensionErrorPercent is null))
+        {
+            <p class="history-note">La courbe du dimensionneur débute lorsque le détail des compteurs est disponible; les périodes antérieures ne sont pas remplacées par zéro.</p>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<StatisticsHistoryPoint> Points { get; set; } = [];
+    private const double Width = 1000, Height = 380, Left = 72, Right = 68, Top = 30, Bottom = 52;
+    private const double PlotHeight = Height - Top - Bottom;
+    private DateTime PeriodStart => DateTime.Today.AddDays(-29);
+    private StatisticsHistoryPoint Last => Points[^1];
+    private double MaxParcels => NiceMaximum(Points.Max(point => (double)point.TotalParcels), 100);
+    private double MaxPercent => Math.Min(100, NiceMaximum(Points.Max(point => Math.Max(point.BalanceErrorPercent, point.DimensionErrorPercent ?? 0)), 5));
+    private double X(DateTime date) => Left + Math.Clamp((date.Date - PeriodStart).TotalDays / 29d, 0, 1) * (Width - Left - Right);
+    private double ParcelsY(long value) => Top + PlotHeight * (1 - value / MaxParcels);
+    private double PercentY(double value) => Top + PlotHeight * (1 - value / MaxPercent);
+    private string Polyline(Func<StatisticsHistoryPoint, double> y) => string.Join(' ', Points.Select(point => $"{F(X(point.ShiftStart))},{F(y(point))}"));
+    private string Polyline(IEnumerable<StatisticsHistoryPoint> points, Func<StatisticsHistoryPoint, double> y) => string.Join(' ', points.Select(point => $"{F(X(point.ShiftStart))},{F(y(point))}"));
+    private IEnumerable<IReadOnlyList<StatisticsHistoryPoint>> DimensionSegments
+    {
+        get
+        {
+            List<StatisticsHistoryPoint> segment = [];
+            foreach (var point in Points)
+            {
+                if (point.DimensionErrorPercent.HasValue) segment.Add(point);
+                else if (segment.Count > 0) { yield return segment.ToArray(); segment.Clear(); }
+            }
+            if (segment.Count > 0) yield return segment;
+        }
+    }
+    private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    private static double NiceMaximum(double value, double minimum)
+    {
+        if (value <= minimum) return minimum;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(value)));
+        return Math.Ceiling(value / magnitude * 2) / 2 * magnitude;
+    }
+    private static string FormatPercent(double value) => $"{value:0.##} %";
+    private static string FormatPercent(double? value) => value.HasValue ? FormatPercent(value.Value) : "—";
+    private static string FormatAxisPercent(double value) => $"{value:0.#} %";
+    private static string FormatCountAxis(double value) => value >= 1000 ? $"{value / 1000:0.#} k" : $"{value:0}";
+    private static string Tooltip(StatisticsHistoryPoint point, string metric, string value) => $"{point.ShiftStart:yyyy-MM-dd HH:mm} — {metric} : {value}";
+}
