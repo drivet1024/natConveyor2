@@ -1,0 +1,56 @@
+@using System.Globalization
+
+<section class="realtime-panel" aria-labelledby="realtime-title">
+    <div class="realtime-heading">
+        <div><span class="eyebrow">AUJOURD’HUI · TEMPS RÉEL</span><h2 id="realtime-title">Vue d’ensemble de la production</h2></div>
+        <span class="updated">Actualisé à @UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+    </div>
+
+    <div class="headline-kpis">
+        @Headline("Total colis", Counters.TotalParcels, null, "Tous les colis reçus par les caméras")
+        @Headline("Rejets", Counters.Rejected, Percentage(Counters.Rejected, Counters.TotalParcels), "Rejets ÷ total des colis")
+        @Headline("Erreurs balance", Counters.ScaleErrors, Percentage(Counters.ScaleErrors, EligibleParcels), "Erreurs poids ÷ colis lus")
+        @Headline("Erreurs dimensionneur", Counters.DimensionErrors, Percentage(Counters.DimensionErrors, EligibleParcels), "Erreurs dimensions ÷ colis lus")
+    </div>
+
+    <div class="realtime-sections">
+        <section class="metric-section" aria-labelledby="flow-title">
+            <h3 id="flow-title">Traitement et qualité</h3>
+            <div class="metric-grid">
+                @Metric("Sans lecture", Counters.NoReads, Counters.TotalParcels)
+                @Metric("Code 98", Counters.Code98, Counters.TotalParcels)
+                @Metric("Code 68", Counters.Code68, Counters.TotalParcels)
+                @Metric("Code 97 · Recirculation", Counters.Code97, Counters.TotalParcels)
+                @Metric("Colis triés", Counters.SortedByWaybill + Counters.SortedByPostalCode, Counters.TotalParcels)
+                @Metric("Fautes balance", Counters.ScaleFaults, null, "Nombre d’impulsions de faute reçues")
+            </div>
+        </section>
+
+        <section class="metric-section" aria-labelledby="profile-title">
+            <h3 id="profile-title">Profil des colis</h3>
+            <div class="metric-grid profile-grid">
+                @Metric("Colis légers", Counters.LightParcels, Counters.TotalParcels)
+                @Metric("Petits colis", Counters.SmallParcels, Counters.TotalParcels)
+                @Metric("Dimensions inversées", Counters.InverseLengthParcels, Counters.TotalParcels, "2e mesure > 1re mesure")
+            </div>
+        </section>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
+    [Parameter] public DateTimeOffset UpdatedAt { get; set; }
+    private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
+    private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
+    private static string FormatPercent(decimal value) => value.ToString("0.#", CultureInfo.GetCultureInfo("fr-CA")) + " %";
+    private RenderFragment Headline(string label, long count, decimal? percent, string title) => @<div class="headline" title="@title">
+        <strong>@count.ToString("N0")</strong>
+        @if (percent.HasValue) { <span class="rate">@FormatPercent(percent.Value)</span> }
+        <span class="label">@label</span>
+    </div>;
+    private RenderFragment Metric(string label, long count, long? denominator, string? detail = null) => @<div class="realtime-metric">
+        <div><strong>@count.ToString("N0")</strong>@if (denominator.HasValue) { <span class="rate">@FormatPercent(Percentage(count, denominator.Value))</span> }</div>
+        <span class="label">@label</span>
+        @if (detail is not null) { <small>@detail</small> }
+    </div>;
+}

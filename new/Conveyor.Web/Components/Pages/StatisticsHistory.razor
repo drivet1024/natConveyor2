@@ -1,42 +1,98 @@
 @page "/statistiques"
+@implements IDisposable
 @inject StatisticsHistoryService History
+@inject IConveyorSupervisor Supervisor
 
-<PageTitle>Historique des statistiques</PageTitle>
+<PageTitle>Statistiques</PageTitle>
 
 <header class="dashboard-header">
-    <div><span class="eyebrow">PRODUCTION GLOBALE</span><h1>Historique des statistiques</h1><p>Total du convoyeur, du @FromLabel au @ToLabel.</p></div>
-    <button class="btn" disabled="@_loading" @onclick="LoadAsync">@(_loading ? "Chargement…" : "Actualiser")</button>
+    <div><span class="eyebrow">PRODUCTION GLOBALE</span><h1>Statistiques</h1><p>@HeaderDescription</p></div>
+    <button class="btn" disabled="@(_activeTab == "history" && _loading)" @onclick="RefreshActiveAsync">@(_activeTab == "history" && _loading ? "Chargement…" : "Actualiser")</button>
 </header>
 
-@if (_error is not null)
+<div class="statistics-tabs" role="tablist" aria-label="Période des statistiques">
+    <button id="realtime-tab" type="button" role="tab" aria-selected="@(_activeTab == "realtime" ? "true" : "false")" aria-controls="realtime-statistics"
+            class="@(_activeTab == "realtime" ? "active" : null)" @onclick='() => SelectTabAsync("realtime")'>Aujourd’hui · temps réel</button>
+    <button id="history-tab" type="button" role="tab" aria-selected="@(_activeTab == "history" ? "true" : "false")" aria-controls="history-statistics"
+            class="@(_activeTab == "history" ? "active" : null)" @onclick='() => SelectTabAsync("history")'>Historique · 30 jours</button>
+</div>
+
+@if (_activeTab == "realtime")
 {
-    <div class="config-notice error" role="alert">Impossible de charger l’historique : @_error</div>
-}
-else if (_loading)
-{
-    <div class="history-loading" role="status">Chargement de l’historique…</div>
+    <div id="realtime-statistics" role="tabpanel" aria-labelledby="realtime-tab">
+        <RealtimeStatistics Counters="_realtimeCounters" UpdatedAt="_realtimeUpdatedAt" />
+    </div>
 }
 else
 {
-    <div class="history-charts">
-        <StatisticsHistoryChart Points="_points" />
-        <ParcelCategoryChart Points="_points" />
+    <div id="history-statistics" role="tabpanel" aria-labelledby="history-tab">
+        @if (_error is not null)
+        {
+            <div class="config-notice error" role="alert">Impossible de charger l’historique : @_error</div>
+        }
+        else if (_loading)
+        {
+            <div class="history-loading" role="status">Chargement de l’historique…</div>
+        }
+        else
+        {
+            <div class="history-charts">
+                <StatisticsHistoryChart Points="_points" />
+                <ParcelCategoryChart Points="_points" />
+            </div>
+        }
     </div>
 }
 
 @code {
     private IReadOnlyList<StatisticsHistoryPoint> _points = [];
-    private bool _loading = true;
+    private LineCounters _realtimeCounters = new();
+    private DateTimeOffset _realtimeUpdatedAt;
+    private string _activeTab = "realtime";
+    private bool _historyLoaded;
+    private bool _loading;
     private string? _error;
     private static DateTime From => DateTime.Today.AddDays(-29);
     private static string FromLabel => From.ToString("dd MMMM yyyy");
     private static string ToLabel => DateTime.Today.ToString("dd MMMM yyyy");
-    protected override Task OnInitializedAsync() => LoadAsync();
+    private string HeaderDescription => _activeTab == "realtime"
+        ? $"Journée de production en cours · {DateTime.Today:dd MMMM yyyy}."
+        : $"Total du convoyeur, du {FromLabel} au {ToLabel}.";
+    protected override void OnInitialized()
+    {
+        Supervisor.Changed += OnSupervisorChanged;
+        RefreshRealtime();
+    }
+    private async Task SelectTabAsync(string tab)
+    {
+        _activeTab = tab;
+        if (tab == "realtime") RefreshRealtime();
+        else if (!_historyLoaded) await LoadAsync();
+    }
+    private Task RefreshActiveAsync()
+    {
+        if (_activeTab == "history") return LoadAsync();
+        RefreshRealtime();
+        return Task.CompletedTask;
+    }
+    private void RefreshRealtime()
+    {
+        var lines = Supervisor.GetSnapshots();
+        _realtimeCounters = CounterStatistics.CaptureCombined(0, DateTime.Today,
+            lines.Select(line => line.ProductionCounters ?? new LineCounters())).Counters ?? new();
+        _realtimeUpdatedAt = DateTimeOffset.Now;
+    }
+    private void OnSupervisorChanged()
+    {
+        if (_activeTab != "realtime") return;
+        _ = InvokeAsync(() => { RefreshRealtime(); StateHasChanged(); });
+    }
     private async Task LoadAsync()
     {
         _loading = true; _error = null;
-        try { _points = await History.LoadGlobalAsync(); }
+        try { _points = await History.LoadGlobalAsync(); _historyLoaded = true; }
         catch (Exception exception) { _error = exception.Message; }
         finally { _loading = false; }
     }
+    public void Dispose() => Supervisor.Changed -= OnSupervisorChanged;
 }
