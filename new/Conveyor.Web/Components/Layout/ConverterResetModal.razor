@@ -2,6 +2,7 @@
 @inject IJSRuntime JS
 @inject ConverterResetService ResetService
 @inject IConveyorSupervisor Supervisor
+@inject IOptions<ConveyorOptions> Options
 
 <dialog @ref="_dialog" class="converter-dialog" aria-labelledby="converter-title">
     <h2 id="converter-title">Commandes — ligne @(LineId + 1)</h2>
@@ -21,8 +22,14 @@
     <section class="command-group" aria-labelledby="restart-title">
         <h3 id="restart-title">REDÉMARRAGE</h3>
         <div class="reset-buttons">
-            <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(true)">Reset Balance</button>
-            <button type="button" class="btn" disabled="@_busy" @onclick="() => Reset(false)">Reset Dimensionneur</button>
+            <button type="button" class="btn reset-device" disabled="@_busy" @onclick="() => Reset(true)">
+                <span>Reset Balance</span>
+                @if (ConnectedConverterIp(true) is { } scaleIp) { <small>@scaleIp</small> }
+            </button>
+            <button type="button" class="btn reset-device" disabled="@_busy" @onclick="() => Reset(false)">
+                <span>Reset Dimensionneur</span>
+                @if (ConnectedConverterIp(false) is { } dimensionIp) { <small>@dimensionIp</small> }
+            </button>
         </div>
     </section>
     @if (_message is not null) { <p class="@(_error ? "error" : "message")" role="status">@_message</p> }
@@ -51,6 +58,15 @@
         catch (JSDisconnectedException) { }
     }
     private bool IsRunning => Supervisor.GetSnapshots().Any(line => line.LineId == LineId && line.Running);
+    private string? ConnectedConverterIp(bool scale)
+    {
+        var snapshot = Supervisor.GetSnapshots().FirstOrDefault(line => line.LineId == LineId);
+        var connected = scale ? snapshot?.Connections.Scale : snapshot?.Connections.Dimensioner;
+        if (connected is not true) return null;
+        var line = Options.Value.GetConfiguredLines().FirstOrDefault(line => line.Id == LineId);
+        var address = scale ? line?.ScaleConverter.IpAddress : line?.DimensionConverter.IpAddress;
+        return string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+    }
     private async Task SetConnections(bool connect)
     {
         if (_busy) return;
