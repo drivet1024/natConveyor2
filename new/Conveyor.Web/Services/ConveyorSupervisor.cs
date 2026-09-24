@@ -19,6 +19,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly ISmsAlerts? _sms;
     private readonly CounterStatisticsService? _statistics;
     private readonly bool _coordinateStatistics;
+    private readonly IRslinxRestarter? _rslinxRestarter;
     private readonly string _closeChute39Tag;
     private readonly string _motionTag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
@@ -77,13 +78,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
         SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null,
-        CounterStatisticsService? statistics = null)
+        CounterStatisticsService? statistics = null, IRslinxRestarter? rslinxRestarter = null)
     {
         var configuration = options.Value;
         _configuration = configuration;
         _editor = editor;
         _sms = sms;
         _statistics = statistics;
+        _rslinxRestarter = rslinxRestarter;
         _coordinateStatistics = configuration.Statistics.Enabled && !configuration.Simulation;
         if (_coordinateStatistics && statistics is null)
             throw new InvalidOperationException("Service de sauvegarde des statistiques manquant.");
@@ -183,14 +185,62 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     }
 
     public IReadOnlyList<LineSnapshot> GetSnapshots() => _lines.Values.Select(line => line.Snapshot()).OrderBy(x => x.LineId).ToArray();
-    public Task StartLineAsync(int lineId) => Get(lineId).StartAsync();
-    public async Task RestartLineAsync(int lineId)
+    public async Task<string> RestartRslinxAsync()
+    {
+        if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande automate est déjà en cours.");
+        try
+        {
+            var plcOptions = _configuration.GetConfiguredLines().First().Plc;
+            if (_configuration.Simulation) throw new InvalidOperationException("Redémarrage RSLinx désactivé en simulation.");
+            if (string.Equals(plcOptions.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Le protocole passerelle TCP ne permet pas de redémarrer RSLinx.");
+            if (string.Equals(plcOptions.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase) &&
+                !IsLocalHost(plcOptions.OpcHost))
+                throw new InvalidOperationException("RSLinx est configuré sur un serveur OPC distant. Le redémarrer sur ce serveur.");
+            if (ConveyorRunning == true) throw new InvalidOperationException("Arrêter le convoyeur avant de redémarrer RSLinx.");
+            if (_configuration.RslinxRestart.ValidationError() is { } error) throw new InvalidOperationException(error);
+            if (_rslinxRestarter is null) throw new InvalidOperationException("Service de redémarrage RSLinx indisponible.");
+            var reconnect = _lines.OrderBy(pair => pair.Key).First().Value.Running;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            _logger.LogWarning("Redémarrage RSLinx demandé ; interruption temporaire des échanges automate");
+            await _plc.DisconnectAsync();
+            ConveyorRunning = null;
+            Changed?.Invoke();
+            var reconnected = false;
+            try { await _rslinxRestarter.RestartAsync(_configuration.RslinxRestart, timeout.Token); }
+            finally
+            {
+                if (reconnect)
+                {
+                    try { await _plc.ConnectAsync(timeout.Token); reconnected = _plc.IsConnected; }
+                    catch (Exception exception) { _logger.LogWarning(exception, "Reconnexion automate différée après redémarrage RSLinx ; surveiller le voyant"); }
+                }
+            }
+            return reconnect
+                ? reconnected ? "RSLinx redémarré ; connexion automate réouverte. Vérifier le voyant et les lectures."
+                    : "RSLinx redémarré ; reconnexion automate en attente. Consulter les journaux et le voyant."
+                : "RSLinx redémarré. Les connexions appareils restent désactivées ; utiliser CONNECTER pour les ouvrir.";
+        }
+        finally { _motionGate.Release(); Changed?.Invoke(); }
+    }
+
+    private static bool IsLocalHost(string host) => string.IsNullOrWhiteSpace(host) ||
+        new[] { ".", "localhost", "127.0.0.1", "::1", Environment.MachineName }.Contains(host.Trim(), StringComparer.OrdinalIgnoreCase);
+
+    public Task StartLineAsync(int lineId) => WithConnectionGateAsync(() => Get(lineId).StartAsync());
+    public Task RestartLineAsync(int lineId) => WithConnectionGateAsync(async () =>
     {
         var line = Get(lineId);
         await line.StopAsync();
         await line.StartAsync();
+    });
+    public Task StopLineAsync(int lineId) => WithConnectionGateAsync(() => Get(lineId).StopAsync());
+    private async Task WithConnectionGateAsync(Func<Task> action)
+    {
+        if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande automate ou un redémarrage RSLinx est déjà en cours.");
+        try { await action(); }
+        finally { _motionGate.Release(); }
     }
-    public Task StopLineAsync(int lineId) => Get(lineId).StopAsync();
     public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();

@@ -53,6 +53,7 @@ public interface IConveyorSupervisor
     Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause, bool maintenance = false);
     Task StartLineAsync(int lineId);
     Task RestartLineAsync(int lineId);
+    Task<string> RestartRslinxAsync();
     Task StopLineAsync(int lineId);
     void ResetCounters(int lineId);
     void SetCode98Enabled(int lineId, bool enabled);

@@ -85,3 +85,6 @@
     .metrics .metric { padding-left: .55rem; padding-right: .55rem; }
     .metric-parcels { gap: .35rem; }
 }
+.plc-restart-button { color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.plc-restart-button:hover { border-color: var(--orange); }
+.plc-restart-button:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }

@@ -12,6 +12,7 @@ public sealed class ConveyorOptions
     public DatabaseOptions Database { get; set; } = new();
     public SmsOptions Sms { get; set; } = new();
     public StatisticsOptions Statistics { get; set; } = new();
+    public RslinxRestartOptions RslinxRestart { get; set; } = new();
     public GeneralOptions? General { get; set; }
     public SortingOptions? Sorting { get; set; }
     [MinLength(1), MaxLength(2)] public List<LineOptions> Lines { get; set; } = [];

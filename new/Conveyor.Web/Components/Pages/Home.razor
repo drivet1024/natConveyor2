@@ -21,6 +21,11 @@
     <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
 }
 
+@if (_rslinxDialog)
+{
+    <RslinxRestartModal OnClose="() => _rslinxDialog = false" />
+}
+
 @if (_motionStart is { } startMotion)
 {
     <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="@_motionMessage" CanChangeOperatingMode="Supervisor.CanChangeOperatingMode" MaintenanceActive="Supervisor.Maintenance" OnConfirm="ConfirmMotion" OnMaintenance="() => ConfirmMotionCore(null, true)" OnClose="() => _motionStart = null" />
@@ -37,7 +42,7 @@
                 <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>
             </div>
         </section>
-        <div class="shared-status" title="@PlcTitle()"><span class="connection-led @PlcCss()"></span><div><small>AUTOMATE</small><strong>@PlcLabel()</strong></div></div>
+        <button type="button" class="shared-status plc-restart-button" title="@(PlcTitle() + " — cliquer pour redémarrer RSLinx")" aria-label="Automate : ouvrir le redémarrage RSLinx" @onclick="() => _rslinxDialog = true"><span class="connection-led @PlcCss()"></span><span><small>AUTOMATE</small><strong>@PlcLabel()</strong></span></button>
         <div class="database-summary">
             <div class="database-summary-title" title="@DatabaseTitle()"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
             <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
@@ -102,6 +107,7 @@
 </section>
 
 @code {
+    private bool _rslinxDialog;
     private string MotionTag => Options.Value.General?.ConveyorStartTag ?? ConveyorMotion.DefaultMotionTag;
     private bool? _motionStart;
     private bool _motionBusy;

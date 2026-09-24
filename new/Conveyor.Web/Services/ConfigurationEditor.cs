@@ -92,6 +92,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     private static void Validate(ConveyorOptions options)
     {
         if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
+        if (options.RslinxRestart.ValidationError() is { } rslinxError) throw new InvalidOperationException(rslinxError);
         if (options.Statistics.ValidationError(options.GetConfiguredLines()) is { } statisticsError)
             throw new InvalidOperationException(statisticsError);
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");

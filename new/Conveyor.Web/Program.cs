@@ -69,6 +69,7 @@ builder.Services.AddSingleton<ISmsAlerts>(services => services.GetRequiredServic
 builder.Services.AddHostedService(services => services.GetRequiredService<SmsAlerts>());
 builder.Services.AddSingleton<IConfigurationEditor, ConfigurationEditor>();
 builder.Services.AddSingleton<ConverterResetService>();
+builder.Services.AddSingleton<IRslinxRestarter, RslinxRestarter>();
 builder.Services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
 builder.Services.AddSingleton<DatabaseMetricsService>();
 builder.Services.AddSingleton<IDatabaseMetricsService>(services => services.GetRequiredService<DatabaseMetricsService>());

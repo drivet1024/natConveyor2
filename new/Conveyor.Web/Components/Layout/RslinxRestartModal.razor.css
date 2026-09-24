@@ -1,0 +1,5 @@
+.rslinx-dialog { width: min(460px, calc(100vw - 2rem)); padding: 1.2rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.rslinx-dialog::backdrop { background: #0009; }
+h2 { font-size: 1.1rem; }
+p { font-size: .9rem; }
+.rslinx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }

@@ -1,5 +1,43 @@
 # Conveyor Control
 
+## Redémarrage RSLinx depuis AUTOMATE
+
+La tuile **AUTOMATE** est cliquable et conserve son voyant et son état. Elle ouvre
+une fenêtre de confirmation **Redémarrer RSLinx**. Le convoyeur doit être arrêté :
+si l’automate le signale en marche, la commande est refusée. Si RSLinx ne répond
+plus et que l’état est inconnu, vérifier l’arrêt physique avant de confirmer.
+Cette commande ne démarre pas le convoyeur et ne remet pas les compteurs à zéro.
+
+Dans **Configuration → AUTOMATE**, régler le mode de redémarrage :
+
+- **Service Windows** (par défaut) : nom exact du service, `RSLinx` par défaut.
+  L’application demande son arrêt, attend l’état arrêté, le démarre puis attend
+  l’état en cours d’exécution. Aucun service dépendant n’est arrêté de force.
+- **Application Windows** : chemin absolu de `RSLINX.exe`. Conveyor.Web doit tourner
+  dans la même session interactive que RSLinx. La commande refuse une instance
+  située dans une autre session ou un autre chemin, ainsi qu’un service RSLinx
+  actif. Elle tente une fermeture normale, puis termine l’instance ciblée si elle
+  ne se ferme pas sous dix secondes, et relance le même exécutable. Le démarrage
+  utilise les paramètres par défaut de cet exécutable, sans arguments additionnels.
+
+Enregistrer et redémarrer Conveyor.Web applique les réglages. Le compte exécutant
+Conveyor.Web doit avoir les droits Windows d’arrêt/démarrage du service ou de
+gestion du processus RSLinx ; aucune élévation automatique n’est effectuée.
+Voir [les modes RSLinx documentés par Rockwell](https://www.rockwellautomation.com/en-us/docs/rslinx-classic/4-60/rslinx-classic-help-ditamap/troubleshooting/frequently-asked-questions--faq-/miscellaneous/run-rslinx-classic-as-a-service.html)
+et [les droits de gestion des services Windows](https://learn.microsoft.com/en-us/troubleshoot/windows-server/windows-security/grant-users-rights-manage-services).
+
+Le redémarrage concerne seulement le serveur local hébergeant Conveyor.Web.
+Il est refusé en simulation, avec une passerelle TCP ou avec un serveur OPC
+distant. Pendant l’opération, les commandes de marche et de connexion concurrentes
+sont refusées. Les échanges automate sont temporairement fermés, puis réouverts
+si les connexions de la ligne principale étaient actives. Si la reconnexion échoue,
+les contrôles périodiques reprennent les tentatives. Les connexions volontairement
+désactivées restent désactivées. Vérifier le voyant et les lectures : un processus
+ou service relancé ne garantit pas encore le retour des communications automate.
+Le délai du redémarrage Windows est limité à 90 secondes ; les erreurs et refus
+d’accès sont consignés dans les journaux. Aucun redémarrage réel n’est effectué
+par les tests automatisés.
+
 ## Sauvegarde quotidienne des compteurs
 
 Dans **Configuration → Sauvegarde des compteurs**, activer la sauvegarde, choisir

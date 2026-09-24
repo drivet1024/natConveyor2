@@ -78,6 +78,12 @@ else
                     @TextField("Adresse passerelle automate", _plc.Host, value => _plc.Host = value)
                     @NumberField("Port automate", _plc.Port, value => _plc.Port = value)
                 }
+                <label><span>Redémarrage RSLinx — mode</span><InputSelect @bind-Value="_model.RslinxRestart.Mode"><option value="Service">Service Windows</option><option value="Application">Application Windows</option></InputSelect><small>Sur le serveur Conveyor.Web. La tuile AUTOMATE ouvre la commande de redémarrage.</small></label>
+                @TextField("Nom du service Windows RSLinx", _model.RslinxRestart.ServiceName, value => _model.RslinxRestart.ServiceName = value)
+                @if (_model.RslinxRestart.Mode == "Application")
+                {
+                    <label><span>Chemin complet de RSLINX.exe</span><InputText @bind-Value="_model.RslinxRestart.ExecutablePath" /><small>Conveyor.Web et RSLinx doivent fonctionner dans la même session Windows interactive.</small></label>
+                }
                 <label><span>Tag démarrage convoyeur</span><InputText @bind-Value="_general.ConveyorStartTag" /><small>Commun aux deux lignes : 1 démarre le convoyeur et 0 l’arrête.</small></label>
                 <label><span>Tag fermeture chute 39</span><InputText @bind-Value="_plc.CloseChute39Tag" /><small>Commun aux deux lignes : 1 détourne les colis de la chute 39 vers la recirculation 97 ; 0 rétablit la chute 39. Lu en DDE ou OPC DA.</small></label>
                 @foreach (var line in _model.GetConfiguredLines())

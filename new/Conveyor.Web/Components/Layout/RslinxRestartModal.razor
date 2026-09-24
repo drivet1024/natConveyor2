@@ -1,0 +1,60 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IConveyorSupervisor Supervisor
+
+<dialog @ref="_dialog" class="rslinx-dialog" aria-labelledby="rslinx-title">
+    <h2 id="rslinx-title">Redémarrer RSLinx</h2>
+    <p>Le redémarrage interrompt les communications automate des deux lignes. Le convoyeur doit être arrêté.</p>
+    @if (_message is not null) { <p role="status">@_message</p> }
+    <div class="rslinx-actions">
+        <button type="button" class="btn" autofocus disabled="@_busy" @onclick="OnClose">@(_completed ? "Fermer" : "Annuler")</button>
+        @if (!_completed)
+        {
+            <button type="button" class="btn btn-test" disabled="@_busy" @onclick="Restart">@(_busy ? "Redémarrage…" : "Redémarrer RSLinx")</button>
+        }
+    </div>
+</dialog>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private bool _disposed;
+    private bool _busy;
+    private bool _completed;
+    private string? _message;
+
+    private async Task Restart()
+    {
+        if (_busy) return;
+        _busy = true;
+        _message = "Redémarrage de RSLinx en cours…";
+        try
+        {
+            _message = await Supervisor.RestartRslinxAsync();
+            _completed = true;
+        }
+        catch (Exception exception) { _message = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var module = await JS.InvokeAsync<IJSObjectReference>("import", "./data-wait-modal.js");
+            if (_disposed) { await module.DisposeAsync(); return; }
+            _module = module;
+            await module.InvokeVoidAsync("show", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); } catch (JSDisconnectedException) { }
+    }
+}
