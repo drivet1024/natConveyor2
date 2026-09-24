@@ -56,11 +56,11 @@ internal sealed class PlcRecoveryIncident
         }
         _healthySince = null;
         _disconnectedSince ??= now;
-        if (now - _disconnectedSince < TimeSpan.FromSeconds(15)) return;
+        if (now - _disconnectedSince < TimeSpan.FromSeconds(45)) return;
         if (!_alerted)
         {
             _alerted = true;
-            notify("Automate déconnecté depuis au moins 15 secondes");
+            notify("Automate déconnecté depuis au moins 45 secondes");
         }
         if (!autoRestart || _attempted || now < _nextRestart) return;
         _attempted = true;

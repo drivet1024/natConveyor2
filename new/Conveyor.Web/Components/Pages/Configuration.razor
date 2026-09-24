@@ -80,7 +80,7 @@ else
                 }
                 <label><span>Redémarrage RSLinx — mode</span><InputSelect @bind-Value="_model.RslinxRestart.Mode"><option value="Service">Service Windows</option><option value="Application">Application Windows</option></InputSelect><small>Sur le serveur Conveyor.Web. La tuile AUTOMATE ouvre la commande de redémarrage.</small></label>
                 @TextField("Nom du service Windows RSLinx", _model.RslinxRestart.ServiceName, value => _model.RslinxRestart.ServiceName = value)
-                <label class="toggle-field"><InputCheckbox @bind-Value="_model.RslinxRestart.AutoRestart" /><span>Redémarrer RSLinx automatiquement si l’automate se déconnecte</span><small>Après 15 secondes de déconnexion : alerte SMS et une tentative par incident. Les SMS exigent l’activation de Twilio. Les déconnexions volontaires sont ignorées.</small></label>
+                <label class="toggle-field"><InputCheckbox @bind-Value="_model.RslinxRestart.AutoRestart" /><span>Redémarrer RSLinx automatiquement si l’automate se déconnecte</span><small>Après 45 secondes de déconnexion : alerte SMS et une tentative par incident. Les SMS exigent l’activation de Twilio. Les déconnexions volontaires sont ignorées.</small></label>
                 @if (_model.RslinxRestart.Mode == "Application")
                 {
                     <label><span>Chemin complet de RSLINX.exe</span><InputText @bind-Value="_model.RslinxRestart.ExecutablePath" /><small>Conveyor.Web et RSLinx doivent fonctionner dans la même session Windows interactive.</small></label>

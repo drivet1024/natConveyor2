@@ -9,9 +9,11 @@ public sealed class PlcRecoveryTests
     {
         var fixture = new Fixture();
         await fixture.Check(0, healthy: false);
-        await fixture.Check(14, healthy: false);
+        await fixture.Check(44, healthy: false);
         Assert.Empty(fixture.Messages);
-        await fixture.Check(15, healthy: false);
+        Assert.Equal(0, fixture.Restarts);
+        await fixture.Check(45, healthy: false);
+        Assert.Equal(1, fixture.Restarts);
         await fixture.Check(200, healthy: false);
         Assert.Equal(1, fixture.Restarts);
         Assert.Equal(3, fixture.Messages.Count);
@@ -21,9 +23,11 @@ public sealed class PlcRecoveryTests
         await fixture.Check(231, healthy: true);
         Assert.Contains("stable", fixture.Messages.Last());
         await fixture.Check(240, healthy: false);
-        await fixture.Check(255, healthy: false);
+        await fixture.Check(285, healthy: false);
         Assert.Equal(1, fixture.Restarts); // Five-minute cooldown survives a new incident.
-        await fixture.Check(315, healthy: false);
+        await fixture.Check(344, healthy: false);
+        Assert.Equal(1, fixture.Restarts);
+        await fixture.Check(345, healthy: false);
         Assert.Equal(2, fixture.Restarts);
     }
 
@@ -46,11 +50,11 @@ public sealed class PlcRecoveryTests
     {
         var fixture = new Fixture { Fail = true };
         await fixture.Check(0, healthy: false);
-        await fixture.Check(15, healthy: false);
+        await fixture.Check(45, healthy: false);
         await fixture.Check(600, healthy: false);
         await fixture.Check(900, healthy: true);
         await fixture.Check(910, healthy: false); // Brief reconnection must not rearm.
-        await fixture.Check(940, healthy: false);
+        await fixture.Check(955, healthy: false);
         Assert.Equal(1, fixture.Restarts);
         Assert.Equal(1, fixture.Errors);
         Assert.Contains("Échec", fixture.Messages.Last());
@@ -61,7 +65,7 @@ public sealed class PlcRecoveryTests
     {
         var fixture = new Fixture();
         await fixture.Check(0, healthy: false, autoRestart: false);
-        await fixture.Check(15, healthy: false, autoRestart: false);
+        await fixture.Check(45, healthy: false, autoRestart: false);
         Assert.Single(fixture.Messages);
         Assert.Equal(0, fixture.Restarts);
     }

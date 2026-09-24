@@ -6,7 +6,7 @@ L’option **Redémarrer RSLinx automatiquement si l’automate se déconnecte**
 activée par défaut dans Configuration → AUTOMATE. Tant que les connexions de la
 ligne principale sont demandées, une surveillance indépendante vérifie le même
 état que le voyant toutes les cinq secondes (transport et qualité des lectures).
-Après au moins 15 secondes d’indisponibilité continue, elle envoie un SMS d’alerte
+Après au moins 45 secondes d’indisponibilité continue, elle envoie un SMS d’alerte
 puis tente de redémarrer RSLinx, avec un SMS de résultat. La disparition de la panne
 pendant 30 secondes consécutives déclenche un SMS de rétablissement et réarme la
 surveillance. Les alertes utilisent les paramètres Twilio et les destinataires existants.
