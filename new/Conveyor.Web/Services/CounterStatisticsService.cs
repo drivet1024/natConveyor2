@@ -5,75 +5,105 @@ using Microsoft.Extensions.Options;
 
 namespace Conveyor.Web.Services;
 
-// Called by the supervisor before daily counter resets. Device processing stays independent.
+// Device processing remains independent from disk and SQL writes.
 public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, ICounterStatisticsStore store,
     IWebHostEnvironment environment, ILogger<CounterStatisticsService> logger)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private StatisticsState? _state;
-    private DateTime? _firstTick;
+    private DateTime? _activeShift;
     private DateTime _nextAttempt;
+    public bool Initialized => _activeShift.HasValue;
     private string FilePath => Path.Combine(environment.ContentRootPath, "data", "counter-statistics.json");
 
-    public async Task TickAsync(DateTime now, Func<IReadOnlyList<LineSnapshot>> snapshots, CancellationToken token,
-        Action? afterCapture = null)
+    private async Task LoadStateAsync(CancellationToken token)
     {
-        var configuration = options.Value;
-        if (!configuration.Statistics.Enabled || configuration.Simulation) return;
+        _state ??= File.Exists(FilePath)
+            ? JsonSerializer.Deserialize<StatisticsState>(await File.ReadAllTextAsync(FilePath, token))
+                ?? throw new InvalidOperationException("État des sauvegardes statistiques invalide.")
+            : new StatisticsState();
+    }
+
+    public async Task InitializeAsync(DateTime now, Action<int, LineCounters, LineCounters> restore, CancellationToken token)
+    {
+        if (Initialized) return;
         await _gate.WaitAsync(token);
         try
         {
-            _firstTick ??= now;
-            _state ??= File.Exists(FilePath)
-                ? JsonSerializer.Deserialize<StatisticsState>(await File.ReadAllTextAsync(FilePath, token))
-                    ?? throw new InvalidOperationException("État des sauvegardes statistiques invalide.")
-                : new StatisticsState();
-            var scheduledAt = now.Date + configuration.Statistics.SaveTime.ToTimeSpan();
-            if (scheduledAt > now) scheduledAt = scheduledAt.AddDays(-1);
-            // Do not attribute newly restarted, empty counters to an already missed shift.
-            if (now >= scheduledAt && _firstTick <= scheduledAt && _state.LastCapturedAt < scheduledAt)
+            if (Initialized) return;
+            await LoadStateAsync(token);
+            var configuration = options.Value;
+            var shift = configuration.Statistics.GetShiftStart(now);
+            var restored = new List<(int Id, LineCounters Production, LineCounters Maintenance)>();
+            foreach (var line in configuration.GetConfiguredLines())
             {
-                var current = snapshots().ToDictionary(line => line.LineId);
-                var statistics = Capture(configuration, current, configuration.Statistics.GetShiftStart(scheduledAt));
-                var next = new StatisticsState
+                async Task<LineCounters> Load(StatisticsDestination destination)
                 {
-                    LastCapturedAt = scheduledAt,
-                    Pending = [.. _state.Pending, .. statistics]
-                };
-                // Persist first: a failed disk write must prevent the daily reset.
-                await PersistAsync(next, token);
-                _state = next;
-                foreach (var captured in statistics)
-                    logger.LogInformation("Statistiques {Destination} capturées localement : dépôt {Depot}, ligne MySQL {Line}, début shift {Shift}, {Scanned} scans",
-                        captured.Destination, captured.DepotId, captured.LineId, captured.ShiftStartedAt, captured.Scanned);
+                    var pending = _state!.Pending.LastOrDefault(row => row.DepotId == configuration.General!.DepotId
+                        && row.LineId == line.DatabaseLineId && row.ShiftStartedAt == shift && row.Destination == destination);
+                    if (pending is not null) return pending.RestoreCounters();
+                    return await store.LoadAsync(configuration.General!.DepotId, line.DatabaseLineId!.Value, shift, destination, token);
+                }
+                restored.Add((line.Id, await Load(StatisticsDestination.ProductionLine), await Load(StatisticsDestination.Maintenance)));
             }
+            // Apply only after every read succeeds: retries cannot partially reset running counters.
+            foreach (var line in restored) restore(line.Id, line.Production, line.Maintenance);
+            _activeShift = shift;
+        }
+        finally { _gate.Release(); }
+    }
 
-            // The daily reset follows the durable capture, before potentially slow SQL calls.
-            afterCapture?.Invoke();
-            if (now < _nextAttempt || _state.Pending.Count == 0) return;
+    public async Task TickAsync(DateTime now, Func<IReadOnlyList<LineSnapshot>> snapshots, CancellationToken token,
+        Action? resetForNewShift = null)
+    {
+        var configuration = options.Value;
+        if (!configuration.Statistics.Enabled || configuration.Simulation) return;
+        if (!Initialized) throw new InvalidOperationException("Restaurer les compteurs avant leur sauvegarde.");
+        await _gate.WaitAsync(token);
+        try
+        {
+            var shift = configuration.Statistics.GetShiftStart(now);
+            // Preserve the previous shift before resetting either mode, even if MySQL is offline.
+            await CapturePendingAsync(_activeShift!.Value, snapshots(), token);
+            if (shift > _activeShift.Value)
+            {
+                if (resetForNewShift is null) throw new InvalidOperationException("Remise à zéro du shift non configurée.");
+                resetForNewShift();
+                _activeShift = shift;
+                await CapturePendingAsync(shift, snapshots(), token);
+            }
+            if (now < _nextAttempt) return;
             try
             {
-                foreach (var statistics in _state.Pending.ToArray())
+                foreach (var statistics in _state!.Pending.ToArray())
                 {
                     await store.SaveAsync(statistics, token);
-                    var next = new StatisticsState
-                    {
-                        LastCapturedAt = _state.LastCapturedAt,
-                        Pending = _state.Pending.Skip(1).ToList()
-                    };
+                    var next = new StatisticsState { Pending = _state.Pending.Skip(1).ToList() };
                     await PersistAsync(next, token);
                     _state = next;
-                    logger.LogInformation("Statistiques {Destination} enregistrées : dépôt {Depot}, ligne MySQL {Line}, début shift {Shift}",
-                        statistics.Destination, statistics.DepotId, statistics.LineId, statistics.ShiftStartedAt);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _nextAttempt = now.AddMinutes(1);
-                logger.LogError(exception, "Sauvegarde statistiques MySQL échouée ; copie locale conservée, nouvel essai dans une minute");
+                _nextAttempt = now.AddSeconds(5);
+                logger.LogError(exception, "Sauvegarde statistiques MySQL échouée ; copie locale conservée, nouvel essai dans cinq secondes");
             }
         }
         finally { _gate.Release(); }
+    }
+
+    private async Task CapturePendingAsync(DateTime shift, IReadOnlyList<LineSnapshot> snapshots, CancellationToken token)
+    {
+        var captured = Capture(options.Value, snapshots.ToDictionary(line => line.LineId), shift);
+        var next = new StatisticsState { Pending = [.. _state!.Pending] };
+        foreach (var row in captured)
+        {
+            next.Pending.RemoveAll(old => old.DepotId == row.DepotId && old.LineId == row.LineId
+                && old.ShiftStartedAt == row.ShiftStartedAt && old.Destination == row.Destination);
+            next.Pending.Add(row);
+        }
+        await PersistAsync(next, token);
+        _state = next;
     }
 
     internal static CounterStatistics[] Capture(ConveyorOptions configuration, IReadOnlyDictionary<int, LineSnapshot> snapshots, DateTime shiftStart)

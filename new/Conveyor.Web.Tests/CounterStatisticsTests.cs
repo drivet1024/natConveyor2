@@ -10,6 +10,47 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void WeightAndScaleErrorsUseSeparateCountsAndDenominatorsForEveryDestination()
+    {
+        var counters = new LineCounters { TotalParcels = 100, NoReads = 20, ScaleErrors = 10, ScaleFaults = 3 };
+        foreach (var destination in Enum.GetValues<StatisticsDestination>())
+        {
+            var row = CounterStatistics.Capture(28, 31, DateTime.Today, counters) with { Destination = destination };
+            Assert.Equal(10, row.WeightErrors);
+            Assert.Equal(12.5, row.WeightErrorPercent);
+            Assert.Equal(3, row.ScaleErrors);
+            Assert.Equal(3, row.ScaleErrorPercent);
+            var restored = row.RestoreCounters();
+            Assert.Equal(10, restored.ScaleErrors);
+            Assert.Equal(3, restored.ScaleFaults);
+        }
+    }
+
+    [Fact]
+    public void GlobalErrorPercentagesUseCombinedCountsInsteadOfAveragingLines()
+    {
+        var row = CounterStatistics.CaptureCombined(28, DateTime.Today,
+            [new() { TotalParcels = 100, NoReads = 20, ScaleErrors = 10, ScaleFaults = 3 },
+             new() { TotalParcels = 300, NoReads = 80, ScaleErrors = 20, ScaleFaults = 5 }]);
+        Assert.Equal(30, row.WeightErrors);
+        Assert.Equal(10, row.WeightErrorPercent);
+        Assert.Equal(8, row.ScaleErrors);
+        Assert.Equal(2, row.ScaleErrorPercent);
+    }
+
+    [Fact]
+    public void ErrorPercentagesHandleNoParcelsOrNoReadParcels()
+    {
+        var empty = CounterStatistics.Capture(28, 31, DateTime.Today, new());
+        Assert.Equal(0, empty.WeightErrorPercent);
+        Assert.Equal(0, empty.ScaleErrorPercent);
+        var unread = CounterStatistics.Capture(28, 31, DateTime.Today,
+            new() { TotalParcels = 3, NoReads = 3, ScaleFaults = 1 });
+        Assert.Equal(0, unread.WeightErrorPercent);
+        Assert.Equal(33.33, unread.ScaleErrorPercent);
+    }
+
+    [Fact]
     public void GlobalProductionAndMaintenanceUseIndependentCountsAndWeightedPercentages()
     {
         using var fixture = new Fixture();
@@ -89,125 +130,121 @@ public sealed class CounterStatisticsTests
     }
 
     [Fact]
-    public void RejectsSavingAfterDailyResetButAllowsTheSameTime()
+    public void ShiftBoundaryBelongsToNewShiftAndLegacySaveTimeIsIgnored()
     {
-        var options = new StatisticsOptions { Enabled = true };
-        var lines = new[] { new LineOptions { DatabaseLineId = 31, EndOfDay = new(8, 25) } };
-        Assert.Null(options.ValidationError(lines));
-        options.SaveTime = new(8, 25);
-        Assert.Null(options.ValidationError(lines));
-        options.SaveTime = new(8, 26);
-        Assert.NotNull(options.ValidationError(lines));
-        options.SaveTime = options.ShiftStartTime;
-        Assert.NotNull(options.ValidationError(lines));
+        var options = new StatisticsOptions { Enabled = true, SaveTime = new(20, 0) };
+        var boundary = new DateTime(2026, 9, 23, 20, 0, 0);
+        Assert.Equal(boundary, options.GetShiftStart(boundary));
+        Assert.Equal(boundary.AddDays(-1), options.GetShiftStart(boundary.AddTicks(-1)));
+        Assert.Null(options.ValidationError([new() { DatabaseLineId = 31 }]));
+        Assert.NotNull(options.ValidationError([new() { DatabaseLineId = 31 }, new() { DatabaseLineId = 31 }]));
     }
 
     [Fact]
-    public async Task CapturesOnceAtScheduleAndDoesNotDuplicateAfterRestart()
+    public async Task LiveUpdatesReplaceSameShiftAndRestoreExactIndependentModes()
     {
-        using var fixture = new Fixture();
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 8, 19, 0));
-        Assert.Empty(fixture.Store.Saved);
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 0));
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 5));
-        await fixture.Tick(fixture.Create(), new(2026, 9, 23, 8, 21, 0));
-        var statistics = Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine);
-        Assert.Equal(new DateTime(2026, 9, 22, 20, 0, 0), statistics.ShiftStartedAt);
-        Assert.Equal(100, statistics.Scanned); // The unconfigured second line is excluded.
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production = new() { TotalParcels = 100, Code98 = 7, NoReads = 11, ScaleFaults = 3, SortedByPostalCode = 57 };
+        f.Maintenance = new() { TotalParcels = 9, ScaleErrors = 2 };
+        await f.Tick(service);
+        f.Production.TotalParcels = 120;
+        await f.Tick(service, f.Now.AddSeconds(5));
+        Assert.Equal(3, f.Store.Rows.Count);
+        Assert.Equal(120, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
+        f.Production = new(); f.Maintenance = new();
+        await f.Start();
+        Assert.Equal(120, f.Production.TotalParcels);
+        Assert.Equal(7, f.Production.Code98);
+        Assert.Equal(11, f.Production.NoReads);
+        Assert.Equal(3, f.Production.ScaleFaults);
+        Assert.Equal(57, f.Production.SortedByPostalCode);
+        Assert.Equal(9, f.Maintenance.TotalParcels);
+        Assert.Equal(2, f.Maintenance.ScaleErrors);
     }
 
     [Fact]
-    public async Task TwoLinesAreSavedSeparatelyAndPartialFailureResumesOnlyPendingLine()
+    public async Task MidnightDoesNotResetButShiftStartResetsBothModesOnce()
     {
-        using var fixture = new Fixture();
-        fixture.Options.LineCount = 2;
-        fixture.Store.FailLineId = 30;
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 8, 19, 0));
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 0));
-        var first = Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine);
-        Assert.Equal(31, first.LineId);
-        Assert.Equal(100, first.Scanned);
-        fixture.Store.FailLineId = null;
-        fixture.Options.Lines[1].DatabaseLineId = 99;
-        await fixture.Tick(fixture.Create(), new(2026, 9, 23, 9, 0, 0));
-        Assert.Equal(3, fixture.Store.Saved.Count);
-        var second = fixture.Store.Saved[1];
-        Assert.Equal(30, second.LineId); // Keep the captured identity after a configuration change.
-        Assert.Equal(999, second.Scanned);
-        Assert.Equal(first.ShiftStartedAt, second.ShiftStartedAt);
-        Assert.Equal(first.DepotId, second.DepotId);
-    }
-
-    [Theory]
-    [InlineData(null, 30)]
-    [InlineData(0, 30)]
-    [InlineData(31, 31)]
-    public void StatisticsRequireDistinctPositiveDatabaseLineIds(int? first, int second)
-    {
-        var options = new StatisticsOptions { Enabled = true };
-        Assert.NotNull(options.ValidationError([new() { DatabaseLineId = first }, new() { DatabaseLineId = second }]));
-        options.Enabled = false;
-        Assert.Null(options.ValidationError([new() { DatabaseLineId = first }, new() { DatabaseLineId = second }]));
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production.TotalParcels = 100;
+        f.Maintenance.TotalParcels = 12;
+        await f.Tick(service);
+        await f.Tick(service, new(2026, 9, 23, 0, 0, 0));
+        Assert.Equal(0, f.Resets);
+        await f.Tick(service, new(2026, 9, 23, 20, 0, 0));
+        Assert.Equal(1, f.Resets);
+        Assert.Equal(0, f.Production.TotalParcels);
+        Assert.Equal(0, f.Maintenance.TotalParcels);
+        Assert.Equal(100, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine && row.ShiftStartedAt.Day == 22).Scanned);
+        f.Production.TotalParcels = 4;
+        await f.Tick(service, new(2026, 9, 23, 20, 0, 5));
+        Assert.Equal(1, f.Resets);
+        Assert.Equal(4, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine && row.ShiftStartedAt.Day == 23).Scanned);
     }
 
     [Fact]
-    public async Task ResetRunsAfterDurableCaptureButBeforeDatabaseWrite()
+    public async Task OfflineCapturesAreCoalescedAndTakePriorityAtRestart()
     {
-        using var fixture = new Fixture();
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 8, 19, 0));
-        var reset = false;
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 0), () =>
-        {
-            Assert.Empty(fixture.Store.Saved);
-            var state = System.Text.Json.JsonSerializer.Deserialize<CounterStatisticsService.StatisticsState>(
-                File.ReadAllText(Path.Combine(fixture.DirectoryPath, "data", "counter-statistics.json")))!;
-            Assert.Equal(100, Assert.Single(state.Pending, row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
-            fixture.Scanned = 0;
-            reset = true;
-        });
-        Assert.True(reset);
-        Assert.Equal(100, Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production.TotalParcels = 100;
+        await f.Tick(service);
+        f.Store.Fail = true;
+        f.Production.TotalParcels = 110;
+        await f.Tick(service, f.Now.AddSeconds(5));
+        f.Production.TotalParcels = 130;
+        await f.Tick(service, f.Now.AddSeconds(10));
+        f.Store.Fail = false;
+        f.Production = new();
+        var restarted = await f.Start();
+        Assert.Equal(130, f.Production.TotalParcels);
+        await f.Tick(restarted, f.Now.AddSeconds(15));
+        Assert.Equal(130, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
+        Assert.Equal(2, f.Store.Rows.Count);
     }
 
     [Fact]
-    public async Task DatabaseFailureKeepsOriginalSnapshotAcrossCounterResetAndRestart()
+    public async Task OfflineShiftRolloverKeepsPreviousShiftPending()
     {
-        using var fixture = new Fixture();
-        var service = fixture.Create();
-        fixture.Store.Fail = true;
-        await fixture.Tick(service, new(2026, 9, 23, 8, 19, 0));
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 0));
-        fixture.Scanned = 0;
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 5));
-        Assert.Equal(1, fixture.Store.Attempts);
-        fixture.Store.Fail = false;
-        await fixture.Tick(fixture.Create(), new(2026, 9, 23, 9, 0, 0));
-        Assert.Equal(100, Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production.TotalParcels = 91;
+        f.Store.Fail = true;
+        await f.Tick(service, new(2026, 9, 23, 20, 0, 0));
+        Assert.Equal(0, f.Production.TotalParcels);
+        f.Store.Fail = false;
+        await f.Tick(service, new(2026, 9, 23, 20, 0, 5));
+        Assert.Equal(91, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine && row.ShiftStartedAt.Day == 22).Scanned);
+        Assert.Equal(0, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine && row.ShiftStartedAt.Day == 23).Scanned);
     }
 
     [Fact]
-    public async Task LateStartupDoesNotInventMissedStatistics()
+    public async Task FailedRestoreDoesNotApplyPartialCountersAndCanRetry()
     {
-        using var fixture = new Fixture();
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 8, 21, 0));
-        Assert.Empty(fixture.Store.Saved);
-        await fixture.Tick(service, new(2026, 9, 24, 8, 20, 0));
-        Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine);
+        using var f = new Fixture();
+        var service = f.Create();
+        f.Store.Fail = true;
+        await Assert.ThrowsAsync<IOException>(() => f.Initialize(service));
+        Assert.False(service.Initialized);
+        Assert.Equal(0, f.Restores);
+        f.Store.Fail = false;
+        await f.Initialize(service);
+        Assert.True(service.Initialized);
+        Assert.Equal(1, f.Restores);
     }
 
     [Fact]
-    public async Task DelayedTickAcrossMidnightKeepsCorrectShiftDate()
+    public async Task NewShiftStartupDoesNotRestorePreviousShift()
     {
-        using var fixture = new Fixture();
-        fixture.Options.Statistics.SaveTime = new(23, 59);
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 23, 58, 0));
-        await fixture.Tick(service, new(2026, 9, 24, 0, 0, 5));
-        Assert.Equal(new DateTime(2026, 9, 23, 20, 0, 0), Assert.Single(fixture.Store.Saved, row => row.Destination == StatisticsDestination.ProductionLine).ShiftStartedAt);
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production.TotalParcels = 80;
+        await f.Tick(service);
+        f.Now = new(2026, 9, 23, 20, 0, 0);
+        await f.Start();
+        Assert.Equal(0, f.Production.TotalParcels);
     }
 
     [Theory]
@@ -215,26 +252,57 @@ public sealed class CounterStatisticsTests
     [InlineData(true, true)]
     public async Task DisabledOrSimulatedDoesNotWrite(bool enabled, bool simulation)
     {
-        using var fixture = new Fixture();
-        fixture.Options.Simulation = simulation;
-        fixture.Options.Statistics.Enabled = enabled;
-        var service = fixture.Create();
-        await fixture.Tick(service, new(2026, 9, 23, 8, 19, 0));
-        await fixture.Tick(service, new(2026, 9, 23, 8, 20, 0));
-        Assert.Empty(fixture.Store.Saved);
-        Assert.False(Directory.Exists(Path.Combine(fixture.DirectoryPath, "data")));
+        using var f = new Fixture();
+        f.Options.Statistics.Enabled = enabled;
+        f.Options.Simulation = simulation;
+        await f.Tick(f.Create());
+        Assert.Empty(f.Store.Rows);
+        Assert.False(Directory.Exists(Path.Combine(f.DirectoryPath, "data")));
     }
 
     [Fact]
-    public async Task CorruptStateIsNotOverwrittenAndPreventsResetByFailingTheTick()
+    public async Task CorruptLocalStateBlocksRestoreWithoutOverwritingFile()
     {
-        using var fixture = new Fixture();
-        Directory.CreateDirectory(Path.Combine(fixture.DirectoryPath, "data"));
-        var path = Path.Combine(fixture.DirectoryPath, "data", "counter-statistics.json");
+        using var f = new Fixture();
+        Directory.CreateDirectory(Path.Combine(f.DirectoryPath, "data"));
+        var path = Path.Combine(f.DirectoryPath, "data", "counter-statistics.json");
         await File.WriteAllTextAsync(path, "invalid json");
-        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => fixture.Tick(fixture.Create(), new(2026, 9, 23, 8, 20, 0)));
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => f.Start());
         Assert.Equal("invalid json", await File.ReadAllTextAsync(path));
-        Assert.Empty(fixture.Store.Saved);
+        Assert.Equal(0, f.Restores);
+    }
+
+    [Fact]
+    public async Task LegacyPendingCaptureIsRestoredBeforeFirstLiveUpdate()
+    {
+        using var f = new Fixture();
+        Directory.CreateDirectory(Path.Combine(f.DirectoryPath, "data"));
+        var legacy = new CounterStatistics(28, 31, new(2026, 9, 22, 20, 0, 0), 100, 7, 4, 80, 7, 4, 8, 2);
+        await File.WriteAllTextAsync(Path.Combine(f.DirectoryPath, "data", "counter-statistics.json"),
+            System.Text.Json.JsonSerializer.Serialize(new CounterStatisticsService.StatisticsState { Pending = [legacy] }));
+        var service = await f.Start();
+        Assert.Equal(100, f.Production.TotalParcels);
+        Assert.Equal(8, f.Production.Code98);
+        Assert.Equal(4, f.Production.Code97);
+        await f.Tick(service);
+        Assert.Equal(100, f.Store.Rows.Single(row => row.Destination == StatisticsDestination.ProductionLine).Scanned);
+    }
+
+    [Fact]
+    public async Task FailedDiskCapturePreventsShiftReset()
+    {
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Production.TotalParcels = 37;
+        Directory.CreateDirectory(Path.Combine(f.DirectoryPath, "data", "counter-statistics.json.tmp"));
+        await Assert.ThrowsAnyAsync<IOException>(async () =>
+        {
+            try { await f.Tick(service, new(2026, 9, 23, 20, 0, 0)); }
+            catch (UnauthorizedAccessException exception) { throw new IOException("Disk unavailable", exception); }
+        });
+        Assert.Equal(0, f.Resets);
+        Assert.Equal(37, f.Production.TotalParcels);
+        Assert.Empty(f.Store.Rows);
     }
 
     private sealed class Fixture : IDisposable
@@ -242,31 +310,46 @@ public sealed class CounterStatisticsTests
         public string DirectoryPath { get; } = Path.Combine(Path.GetTempPath(), "conveyor-statistics-" + Guid.NewGuid());
         public ConveyorOptions Options { get; } = new()
         {
-            Simulation = false, General = new() { DepotId = 28 }, Statistics = new() { Enabled = true, SaveTime = new(8, 20) },
+            Simulation = false, General = new() { DepotId = 28 }, Statistics = new() { Enabled = true },
             LineCount = 1, Lines = [new() { Id = 0, DatabaseLineId = 31 }, new() { Id = 1, DatabaseLineId = 30 }]
         };
         public FakeStore Store { get; } = new();
-        public long Scanned { get; set; } = 100;
+        public DateTime Now { get; set; } = new(2026, 9, 22, 23, 0, 0);
+        public LineCounters Production { get; set; } = new();
+        public LineCounters Maintenance { get; set; } = new();
+        public int Resets { get; private set; }
+        public int Restores { get; private set; }
         public CounterStatisticsService Create() => new(Microsoft.Extensions.Options.Options.Create(Options), Store,
             new TestEnvironment { ContentRootPath = DirectoryPath }, NullLogger<CounterStatisticsService>.Instance);
-        public Task Tick(CounterStatisticsService service, DateTime now, Action? afterCapture = null) => service.TickAsync(now,
-            () => [Snapshot(0, Scanned), Snapshot(1, 999)], CancellationToken.None, afterCapture);
-        private static LineSnapshot Snapshot(int id, long scanned) => new(id, "Test", true,
-            new(false, false, false, false, false), new() { TotalParcels = scanned }, null, null, DateTimeOffset.Now);
+        public Task Initialize(CounterStatisticsService service) => service.InitializeAsync(Now,
+            (_, production, maintenance) => { Production = production; Maintenance = maintenance; Restores++; }, CancellationToken.None);
+        public async Task<CounterStatisticsService> Start()
+        {
+            var service = Create(); await Initialize(service); return service;
+        }
+        public Task Tick(CounterStatisticsService service, DateTime? now = null) => service.TickAsync(now ?? Now,
+            () => [new(0, "Test", false, new(false, false, false, false, false), Production, null, null, DateTimeOffset.Now,
+                ProductionCounters: Production.Copy(), MaintenanceCounters: Maintenance.Copy())], CancellationToken.None,
+            () => { Production = new(); Maintenance = new(); Resets++; });
         public void Dispose() { if (Directory.Exists(DirectoryPath)) Directory.Delete(DirectoryPath, true); }
     }
 
     private sealed class FakeStore : ICounterStatisticsStore
     {
         public bool Fail { get; set; }
-        public int? FailLineId { get; set; }
-        public int Attempts { get; private set; }
-        public List<CounterStatistics> Saved { get; } = [];
+        public List<CounterStatistics> Rows { get; } = [];
+        public Task<LineCounters> LoadAsync(int depotId, int lineId, DateTime shift, StatisticsDestination destination, CancellationToken token)
+        {
+            if (Fail) throw new IOException("Database unavailable");
+            return Task.FromResult(Rows.SingleOrDefault(row => row.DepotId == depotId && row.LineId == lineId
+                && row.ShiftStartedAt == shift && row.Destination == destination)?.Counters?.Copy() ?? new());
+        }
         public Task SaveAsync(CounterStatistics statistics, CancellationToken token)
         {
-            Attempts++;
-            if (Fail || statistics.LineId == FailLineId) throw new IOException("Database unavailable");
-            Saved.Add(statistics);
+            if (Fail) throw new IOException("Database unavailable");
+            Rows.RemoveAll(row => row.DepotId == statistics.DepotId && row.LineId == statistics.LineId
+                && row.ShiftStartedAt == statistics.ShiftStartedAt && row.Destination == statistics.Destination);
+            Rows.Add(statistics);
             return Task.CompletedTask;
         }
     }

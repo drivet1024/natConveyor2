@@ -32,6 +32,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public async Task<ConveyorActionResult> SetConveyorMotionAsync(bool start, int? cause, bool maintenance = false)
     {
+        if (start) EnsureCountersReady();
         if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande convoyeur est déjà en cours.");
         try
         {
@@ -148,6 +149,15 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        while (_coordinateStatistics && !_statistics!.Initialized && !stoppingToken.IsCancellationRequested)
+        {
+            try { await _statistics.InitializeAsync(DateTime.Now, (id, production, maintenance) => Get(id).RestoreCounters(production, maintenance), stoppingToken); }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogError(exception, "Restauration des compteurs impossible ; démarrage des appareils différé, nouvel essai dans cinq secondes");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
             await line.StartAsync();
         try
@@ -161,7 +171,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 {
                     await _statistics!.TickAsync(now, GetSnapshots, stoppingToken, () =>
                     {
-                        foreach (var line in _lines.Values) line.ResetCountersIfDue(now);
+                        foreach (var line in _lines.Values) line.RestoreCounters(new(), new());
                     });
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
@@ -177,6 +187,18 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         await Task.WhenAll(_lines.Values.Select(line => line.StopAsync()));
         await base.StopAsync(cancellationToken);
+        if (_coordinateStatistics && _statistics!.Initialized)
+        {
+            try
+            {
+                await _statistics.TickAsync(DateTime.Now, GetSnapshots, cancellationToken,
+                    () => { foreach (var line in _lines.Values) line.RestoreCounters(new(), new()); });
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogError(exception, "Dernière sauvegarde des compteurs à l’arrêt impossible");
+            }
+        }
     }
 
     public override void Dispose()
@@ -250,9 +272,15 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public Task StopLineAsync(int lineId) => WithConnectionGateAsync(() => Get(lineId).StopAsync());
     private async Task WithConnectionGateAsync(Func<Task> action)
     {
+        EnsureCountersReady();
         if (!await _motionGate.WaitAsync(0)) throw new InvalidOperationException("Une commande automate ou un redémarrage RSLinx est déjà en cours.");
         try { await action(); }
         finally { _motionGate.Release(); }
+    }
+    private void EnsureCountersReady()
+    {
+        if (_coordinateStatistics && !_statistics!.Initialized)
+            throw new InvalidOperationException("Restauration des compteurs en cours. Vérifier la connexion MySQL avant de connecter les appareils.");
     }
     public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);

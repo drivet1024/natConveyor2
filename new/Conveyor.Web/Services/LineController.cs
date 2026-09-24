@@ -224,6 +224,17 @@ internal sealed class LineController
         _changed();
     }
 
+    public void RestoreCounters(LineCounters production, LineCounters maintenance)
+    {
+        lock (_gate)
+        {
+            _productionCounters = production.Copy();
+            _maintenanceCounters = maintenance.Copy();
+            _consecutiveParcelsWithoutScale = 0;
+        }
+        _changed();
+    }
+
     public void ResetCounters()
     {
         lock (_gate)
