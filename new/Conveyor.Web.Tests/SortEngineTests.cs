@@ -33,6 +33,35 @@ public sealed class SortEngineTests
     }
 
     [Theory]
+    [InlineData(-99.01, -1)]
+    [InlineData(-0.01, -1)]
+    [InlineData(0, 0)]
+    [InlineData(12.6, 12.6)]
+    public void NegativeWeightsAreNormalizedToMissing(decimal weight, decimal expected)
+    {
+        Assert.Equal(expected, LineController.NormalizeWeight(weight));
+    }
+
+    [Fact]
+    public async Task NegativeScaleValueIsTransferredAsMinusOne()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12.6m, 7.8m, 2.8m), -99.01m);
+
+            Assert.Equal(-1, Assert.Single(repository.SavedDecisions).Weight);
+            Assert.Equal(-1, Assert.Single(repository.SavedParcelWeights));
+            Assert.Equal(-1, controller.Snapshot().LastDecision!.Weight);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Theory]
     [InlineData(4, 8, true)]
     [InlineData(6, 8, true)]
     [InlineData(6.01, 8, false)]
@@ -848,6 +877,7 @@ public sealed class SortEngineTests
     private sealed class FakeRepository : IConveyorRepository
     {
         public List<SortDecision> SavedDecisions { get; } = [];
+        public List<decimal> SavedParcelWeights { get; } = [];
         public List<int?> SavedDatabaseLineIds { get; } = [];
         public List<(int Id, bool Start, int? Cause)> Actions { get; } = [];
         public bool FailActionSave { get; set; }
@@ -884,6 +914,7 @@ public sealed class SortEngineTests
         {
             if (FailSave) return Task.FromException(new IOException("Insert failed"));
             SavedDecisions.Add(decision);
+            SavedParcelWeights.Add(parcel.Weight);
             SavedDatabaseLineIds.Add(databaseLineId);
             return Task.CompletedTask;
         }

@@ -342,7 +342,7 @@ internal sealed class LineController
         var parcel = new ParcelContext(frame, timestamp,
             dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
             dimension?.Timestamp,
-            hasCorrelatedWeight ? weight!.Value : -1,
+            hasCorrelatedWeight ? NormalizeWeight(weight!.Value) : -1,
             weight?.Timestamp);
         lock (_gate)
         {
@@ -481,6 +481,8 @@ internal sealed class LineController
 
     internal static bool IsLightParcel(decimal weight, decimal maximumWeight) =>
         maximumWeight > 0 && weight > 0 && weight < maximumWeight;
+
+    internal static decimal NormalizeWeight(decimal weight) => weight < 0 ? -1 : weight;
 
     internal const decimal InverseLengthMarginInches = 2m;
     internal static bool IsInverseLengthParcel(Dimension dimension) =>

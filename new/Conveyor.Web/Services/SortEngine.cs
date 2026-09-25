@@ -11,6 +11,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
     public async Task<SortDecision> DecideAsync(LineOptions line, ParcelContext parcel, CancellationToken token)
     {
+        if (parcel.Weight < 0) parcel = parcel with { Weight = -1 };
         var shiftId = line.ShiftId;
         var code98Enabled = line.ValidateDimensionsAndWeight;
         var missingMeasurements = parcel.Weight <= 0 || parcel.Dimension.Length <= 0 ||
