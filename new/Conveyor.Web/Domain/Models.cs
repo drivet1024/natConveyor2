@@ -69,9 +69,9 @@ public sealed class LineCounters
 
     public IEnumerable<(string Label, long Count)> RejectionCauses()
     {
+        yield return ("Pas dans le système", RejectedShipmentNotFound);
         yield return ("Route non configurée", RejectedRouteNotConfigured);
         yield return ("Plusieurs code-barres", RejectedMultipleShipments);
-        yield return ("Pas dans le système", RejectedShipmentNotFound);
     }
     public long NoReads { get; set; }
     public long Code98 { get; set; }
