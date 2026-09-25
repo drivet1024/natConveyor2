@@ -83,7 +83,7 @@
             }
             <div class="line-tools">
                 <label class="shift-choice">Shift
-                    <select value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shifts.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
+                    <select @key="Supervisor.CurrentShiftId" value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shifts.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
                         @if (!_shifts.Any(shift => shift.Id == Supervisor.CurrentShiftId))
                         {
                             <option value="@Supervisor.CurrentShiftId">Shift @Supervisor.CurrentShiftId — non défini</option>
