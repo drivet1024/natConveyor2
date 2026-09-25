@@ -19,7 +19,6 @@
 .supervision-metric strong{display:block;color:#fff;font-size:1.75rem;line-height:1;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count::after{content:" colis"}
-.supervision-metric .metric-percentage{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-label{display:block;margin-top:.15rem;color:#9eb8d7;font-size:.72rem}
 .supervision-metric.success-metric strong{color:var(--ok)}
 .supervision-metric.metric-warning{background:rgba(255,154,31,.055)}
