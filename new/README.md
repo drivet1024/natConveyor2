@@ -2,6 +2,12 @@
 
 ## Redémarrage RSLinx depuis AUTOMATE
 
+Le déploiement GitHub propose l'architecture `win-x86` par défaut pour utiliser
+le serveur COM 32 bits **RSLinx OPC Server**. L'option `win-x64` reste disponible
+dans le lancement manuel du workflow pour revenir à une livraison 64 bits, par
+exemple lorsqu'un **RSLinx Local OPC Server** 64 bits est installé et enregistré.
+Changer l'architecture ne modifie ni la configuration locale ni les données.
+
 L’option **Redémarrer RSLinx automatiquement si l’automate se déconnecte** est
 activée par défaut dans Configuration → AUTOMATE. Tant que les connexions de la
 ligne principale sont demandées, une surveillance indépendante vérifie le même

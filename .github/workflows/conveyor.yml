@@ -13,6 +13,14 @@ on:
           - STH-CONV-H-11
           - CONV-STH-BAS
           - Tous
+      architecture:
+        description: Architecture Windows de Conveyor (x86 pour RSLinx OPC Classic)
+        required: true
+        type: choice
+        default: win-x86
+        options:
+          - win-x86
+          - win-x64
 
 permissions:
   contents: read
@@ -70,7 +78,7 @@ jobs:
         run: |
           dotnet publish new/Conveyor.Web/Conveyor.Web.csproj `
             --configuration Release `
-            --runtime win-x64 `
+            --runtime "${{ inputs.architecture }}" `
             --self-contained true `
             --output "$env:RUNNER_TEMP/conveyor-package/app"
 
@@ -92,7 +100,7 @@ jobs:
       - name: Transmettre la publication
         uses: actions/upload-artifact@v7
         with:
-          name: conveyor-windows-x64
+          name: conveyor-windows-${{ inputs.architecture }}
           retention-days: 7
           if-no-files-found: error
           path: |
@@ -132,7 +140,7 @@ jobs:
       - name: Telecharger la publication
         uses: actions/download-artifact@v8
         with:
-          name: conveyor-windows-x64
+          name: conveyor-windows-${{ inputs.architecture }}
           path: ${{ runner.temp }}/conveyor-package/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Deployer et redemarrer
@@ -184,7 +192,7 @@ jobs:
       - name: Telecharger la publication
         uses: actions/download-artifact@v8
         with:
-          name: conveyor-windows-x64
+          name: conveyor-windows-${{ inputs.architecture }}
           path: ${{ runner.temp }}/conveyor-package/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Deployer et redemarrer
@@ -235,7 +243,7 @@ jobs:
       - name: Telecharger la publication
         uses: actions/download-artifact@v8
         with:
-          name: conveyor-windows-x64
+          name: conveyor-windows-${{ inputs.architecture }}
           path: ${{ runner.temp }}/conveyor-package/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Deployer et redemarrer
