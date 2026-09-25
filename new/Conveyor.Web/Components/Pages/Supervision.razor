@@ -1,8 +1,14 @@
 @page "/supervision"
 @implements IDisposable
+@inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
 
 <PageTitle>Supervision des convoyeurs</PageTitle>
+
+@if (_converterLineId is { } converterLineId)
+{
+    <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
+}
 
 <header class="supervision-header">
     <div>
@@ -51,18 +57,74 @@
         {
             <div class="line-error">@line.LastError</div>
         }
+
+        <div class="supervision-actions">
+            <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
+                    aria-pressed="@(line.Code98Enabled ? "true" : "false")"
+                    aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
+                    title="@(line.Code98Enabled ? "Code 98 actif — cliquer pour désactiver sur cette ligne" : "Code 98 désactivé — cliquer pour activer sur cette ligne")"
+                    @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+            @if (!string.IsNullOrEmpty(_shiftError))
+            {
+                <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span>
+            }
+            <div class="line-tools">
+                <label class="shift-choice">Shift
+                    <select value="@Supervisor.CurrentShiftId" disabled="@(_changingShift || _shifts.Count == 0)" @onchange="ChangeShift" title="Shift commun aux deux lignes — appliqué aux prochains colis">
+                        @if (!_shifts.Any(shift => shift.Id == Supervisor.CurrentShiftId))
+                        {
+                            <option value="@Supervisor.CurrentShiftId">Shift @Supervisor.CurrentShiftId — non défini</option>
+                        }
+                        @foreach (var shift in _shifts)
+                        {
+                            <option value="@shift.Id">@shift.Name</option>
+                        }
+                    </select>
+                </label>
+                <button type="button" class="btn gear-button" title="Ouvrir les commandes de la ligne" aria-label="Ouvrir les commandes de la ligne" @onclick="() => _converterLineId = line.LineId">⚙</button>
+            </div>
+        </div>
     </article>
 }
 </section>
 
 @code {
     private IReadOnlyList<LineSnapshot> _lines = [];
+    private IReadOnlyList<ConveyorShift> _shifts = [];
+    private bool _changingShift;
+    private string? _shiftError;
+    private int? _converterLineId;
     private DateTimeOffset UpdatedAt => _lines.Count == 0 ? DateTimeOffset.Now : _lines.Max(line => line.UpdatedAt);
 
     protected override void OnInitialized()
     {
         Supervisor.Changed += OnChanged;
         Refresh();
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadShifts();
+
+    private async Task LoadShifts()
+    {
+        try
+        {
+            _shifts = await Repository.GetShiftsAsync(CancellationToken.None);
+            _shiftError = _shifts.Count == 0 ? "Aucun shift dans la table conveyor_shift." : null;
+        }
+        catch
+        {
+            _shiftError = "Impossible de charger les shifts depuis MySQL.";
+        }
+    }
+
+    private async Task ChangeShift(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var shift)) return;
+        _changingShift = true;
+        _shiftError = null;
+        try { await Supervisor.SetShiftAsync(shift); }
+        catch (Exception exception) { _shiftError = exception.Message; }
+        finally { _changingShift = false; }
     }
 
     private void OnChanged() => _ = InvokeAsync(() =>
