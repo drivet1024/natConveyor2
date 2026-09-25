@@ -26,10 +26,6 @@
 .supervision-metric.metric-warning strong{color:#ff9a1f;font-size:2rem}
 .supervision-metric.metric-critical{background:rgba(255,78,91,.07)}
 .supervision-metric.metric-critical strong{color:#ff4e5b;font-size:2.25rem}
-.weight-balance-metric{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;padding:0;border-right:0}
-.weight-errors,.balance-faults{min-width:0;padding:1rem 1.15rem}
-.balance-faults{border-left:1px solid var(--line)}
-.weight-balance-metric .balance-faults strong{color:#fff;font-size:1.75rem}
 .supervision-actions{display:flex;align-items:center;gap:.65rem;min-height:68px;margin-top:auto;padding:.8rem 1.2rem}
 .supervision-actions .btn-code98{margin-left:0}
 .line-tools{display:flex;align-items:center;gap:.5rem;margin-left:auto}
@@ -38,4 +34,4 @@
 .shift-error{color:#ff6677;font-size:.75rem}
 .supervision-grid.single-line{grid-template-columns:minmax(0,calc((100% - 1.2rem)/2));justify-content:center}
 @media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-grid.single-line{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:700px){.supervision-header{align-items:flex-start;flex-direction:column}.supervision-header-actions{align-items:flex-start;flex-direction:column}.supervision-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.supervision-metric:nth-child(3n){border-right:1px solid var(--line)}.supervision-metric:nth-child(2n){border-right:0}.supervision-metric:nth-last-child(2){grid-column:span 2;border-right:0}.supervision-actions{padding:.65rem .85rem}.shift-choice select{min-width:6.5rem}}
+@media(max-width:700px){.supervision-header{align-items:flex-start;flex-direction:column}.supervision-header-actions{align-items:flex-start;flex-direction:column}.supervision-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.supervision-metric:nth-child(3n){border-right:1px solid var(--line)}.supervision-metric:nth-child(2n){border-right:0}.supervision-actions{padding:.65rem .85rem}.shift-choice select{min-width:6.5rem}}

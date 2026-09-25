@@ -61,7 +61,7 @@
             @Metric("Code 68", counters.Code68, counters.TotalParcels, "Code 68 ÷ total des colis")
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
             @Metric("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "Erreurs dimensions ÷ colis lus")
-            @WeightAndScaleFaultMetric(counters.ScaleErrors, counters.ScaleFaults, eligibleParcels)
+            @Metric("Erreurs poids", counters.ScaleErrors, eligibleParcels, "Erreurs poids ÷ colis lus")
         </div>
 
         <LastDecision Decision="line.LastDecision" />
@@ -189,18 +189,6 @@
         <strong>@count.ToString("N0")</strong>
         <span class="metric-percentage">@FormatPercentage(count, denominator) %</span>
         <span class="metric-label">@label</span>
-    </div>;
-
-    private RenderFragment WeightAndScaleFaultMetric(long weightErrors, long scaleFaults, long eligibleParcels) => @<div class="supervision-metric weight-balance-metric @SeverityCss(weightErrors, eligibleParcels, true)" title="Erreurs poids ÷ colis lus; fautes balance en nombre seulement">
-        <div class="weight-errors">
-            <strong>@FormatPercentage(weightErrors, eligibleParcels) %</strong>
-            <span class="metric-count">@weightErrors.ToString("N0")</span>
-            <span class="metric-label">Erreurs poids</span>
-        </div>
-        <div class="balance-faults">
-            <strong>@scaleFaults.ToString("N0")</strong>
-            <span class="metric-label">Fautes balance</span>
-        </div>
     </div>;
 
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
