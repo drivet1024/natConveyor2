@@ -615,6 +615,7 @@ public sealed class SortEngineTests
         var result = await engine.DecideAsync(Line(), Parcel("12345678901,H2X1Y4"), CancellationToken.None);
         Assert.Equal(4, result.Chute);
         Assert.Equal("Route de l'expédition", result.Reason);
+        Assert.False(result.ShipmentNotFound);
     }
 
     [Fact]
@@ -624,6 +625,7 @@ public sealed class SortEngineTests
         var result = await engine.DecideAsync(Line(), Parcel("12345678901"), CancellationToken.None);
         Assert.Equal(16, result.Chute);
         Assert.Equal("Route de l'expédition non configurée", result.Reason);
+        Assert.False(result.ShipmentNotFound);
     }
 
     [Fact]
@@ -633,6 +635,7 @@ public sealed class SortEngineTests
         var result = await engine.DecideAsync(Line(), Parcel("99999999999,H2X1Y4"), CancellationToken.None);
         Assert.Equal(7, result.Chute);
         Assert.Equal("Route du code postal", result.Reason);
+        Assert.True(result.ShipmentNotFound);
     }
 
     [Fact]
@@ -642,6 +645,7 @@ public sealed class SortEngineTests
         var result = await engine.DecideAsync(Line(), Parcel("12345678901,12345678902"), CancellationToken.None);
         Assert.Equal(99, result.Chute);
         Assert.Equal(16, result.PlcChute);
+        Assert.False(result.ShipmentNotFound);
     }
 
     [Fact]
@@ -748,6 +752,7 @@ public sealed class SortEngineTests
             Assert.Equal(1, counters.TotalParcels);
             Assert.Equal(expected, counters.Rejected);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
+            Assert.Equal(!failSave && barcode.StartsWith("987", StringComparison.Ordinal) ? 1 : 0, counters.NotInSystem);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
@@ -769,6 +774,7 @@ public sealed class SortEngineTests
             Assert.Equal(1, counters.TotalParcels);
             Assert.Equal(1, counters.NoReads);
             Assert.Equal(0, counters.Rejected);
+            Assert.Equal(0, counters.NotInSystem);
         }
         finally { await supervisor.StopLineAsync(0); }
     }

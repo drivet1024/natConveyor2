@@ -104,12 +104,14 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         }
 
         var plcChute = chute == 99 ? line.RejectedChute : chute;
+        var shipmentNotFound = !parcel.CameraData.Contains('?') && goodBarcodes.Count == 0;
         logger.LogInformation("Ligne {Line}: {Barcode} -> chute {Chute} ({Reason})", line.Id, barcode, chute, reason);
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
             parcel.Dimension, parcel.Weight, parcel.CameraTimestamp,
             goodBarcodes.Count == 1 ? matchedShipment?.DestinationPostalCode : null,
             goodBarcodes.Count == 1 ? matchedShipment?.RouteId : null,
-            goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null);
+            goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null,
+            shipmentNotFound);
     }
 
     private static string RenameBentley(string value) =>

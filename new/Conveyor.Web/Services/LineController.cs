@@ -390,6 +390,7 @@ internal sealed class LineController
                 if (isNoRead) parcelCounters.NoReads++;
                 else
                 {
+                    if (decision.ShipmentNotFound) parcelCounters.NotInSystem++;
                     // Measurement error rates use read parcels only, excluding no-reads.
                     if (!parcel.Dimension.IsValid(_options.MaximumDimension)) parcelCounters.DimensionErrors++;
                     if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) parcelCounters.ScaleErrors++;

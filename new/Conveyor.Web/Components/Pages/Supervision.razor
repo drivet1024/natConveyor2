@@ -33,6 +33,7 @@
         <div class="supervision-metrics">
             @Metric("Colis", counters.TotalParcels, counters.TotalParcels, "Total des colis reçus par la caméra")
             @Metric("Rejets", counters.Rejected, counters.TotalParcels, "Rejets ÷ total des colis")
+            @Metric("Pas dans le système", counters.NotInSystem, counters.TotalParcels, "Colis valides sans expédition correspondante ÷ total des colis")
             @Metric("Code 98", counters.Code98, counters.TotalParcels, "Code 98 ÷ total des colis")
             @Metric("Code 68", counters.Code68, counters.TotalParcels, "Code 68 ÷ total des colis")
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
