@@ -850,16 +850,17 @@ public sealed class SortEngineTests
     }
 
     [Theory]
-    [InlineData(false, false, 1, 0)]
-    [InlineData(true, false, 0, 1)]
+    [InlineData(false, false, null, 1, 0)]
+    [InlineData(false, false, 0, 1, 0)]
+    [InlineData(true, false, null, 0, 1)]
     public async Task MissingRouteAndCode86LimitHaveIndependentCounters(
-        bool enableCode86, bool code86Allowed, long missingRoute, long code86Limit)
+        bool enableCode86, bool code86Allowed, int? routeChute, long missingRoute, long code86Limit)
     {
         var config = new ConveyorOptions { Simulation = true,
             Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 16,
                 EnableCode86 = enableCode86 }] };
         config.ApplyGlobalSorting();
-        var repo = new FakeRepository { RouteChute = null, Code86Allowed = code86Allowed };
+        var repo = new FakeRepository { RouteChute = routeChute, Code86Allowed = code86Allowed };
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
             new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
         try
