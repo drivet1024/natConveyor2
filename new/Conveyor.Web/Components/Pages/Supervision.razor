@@ -58,8 +58,11 @@
             @Metric("Pas dans le système", counters.NotInSystem, counters.TotalParcels, "Colis valides sans expédition correspondante ÷ total des colis")
             @Metric("Code 98", counters.Code98, counters.TotalParcels, "Code 98 ÷ total des colis")
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
-            @Metric("Erreurs poids", counters.ScaleErrors, eligibleParcels, "Erreurs poids ÷ colis lus")
-            @Metric("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "Erreurs dimensions ÷ colis lus")
+            @if (line.Code98Enabled)
+            {
+                @Metric("Erreurs poids", counters.ScaleErrors, eligibleParcels, "Erreurs poids ÷ colis lus")
+                @Metric("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "Erreurs dimensions ÷ colis lus")
+            }
             @Metric("Plus de 2 passages 98", counters.Code98RecirculatedOverTwice, counters.TotalParcels, "Colis distincts ayant atteint un troisième passage au code 98 ÷ total des colis")
         </div>
 
