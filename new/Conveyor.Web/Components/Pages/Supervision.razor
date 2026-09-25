@@ -1,0 +1,88 @@
+@page "/supervision"
+@implements IDisposable
+@inject IConveyorSupervisor Supervisor
+
+<PageTitle>Supervision des convoyeurs</PageTitle>
+
+<header class="supervision-header">
+    <div>
+        <span class="eyebrow">TEMPS RÉEL</span>
+        <h1>Supervision</h1>
+        <p>Vue synthétique de la production et de la qualité par ligne.</p>
+    </div>
+    <span class="supervision-updated">Actualisé à @UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+</header>
+
+<section class="supervision-grid @(_lines.Count == 1 ? "single-line" : null)" aria-label="Supervision des lignes">
+@foreach (var line in _lines)
+{
+    var counters = line.Counters;
+    var eligibleParcels = Math.Max(0, counters.TotalParcels - counters.NoReads);
+    <article class="line-card supervision-line">
+        <div class="line-title compact-line-title">
+            <h2 class="line-number">LIGNE @(line.LineId + 1)</h2>
+            <span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span>
+        </div>
+
+        <div class="connections">
+            @Connection("Caméra", line.Connections.Camera, line.Connections.Simulated)
+            @Connection("Dimensionneur", line.Connections.Dimensioner, line.Connections.Simulated)
+            @Connection("Balance", line.Connections.Scale, line.Connections.Simulated)
+        </div>
+
+        <div class="supervision-metrics">
+            @Metric("Colis", counters.TotalParcels, counters.TotalParcels, "Total des colis reçus par la caméra")
+            @Metric("Rejets", counters.Rejected, counters.TotalParcels, "Rejets ÷ total des colis")
+            @Metric("Code 98", counters.Code98, counters.TotalParcels, "Code 98 ÷ total des colis")
+            @Metric("Code 68", counters.Code68, counters.TotalParcels, "Code 68 ÷ total des colis")
+            @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
+            @Metric("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "Erreurs dimensions ÷ colis lus")
+            @Metric("Erreurs poids", counters.ScaleErrors, eligibleParcels, "Erreurs poids ÷ colis lus")
+            @Metric("Fautes balance", counters.ScaleFaults, counters.TotalParcels, "Fautes balance ÷ total des colis")
+        </div>
+
+        <LastDecision Decision="line.LastDecision" />
+        @if (!string.IsNullOrWhiteSpace(line.LastError))
+        {
+            <div class="line-error">@line.LastError</div>
+        }
+    </article>
+}
+</section>
+
+@code {
+    private IReadOnlyList<LineSnapshot> _lines = [];
+    private DateTimeOffset UpdatedAt => _lines.Count == 0 ? DateTimeOffset.Now : _lines.Max(line => line.UpdatedAt);
+
+    protected override void OnInitialized()
+    {
+        Supervisor.Changed += OnChanged;
+        Refresh();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        Refresh();
+        StateHasChanged();
+    });
+
+    private void Refresh() => _lines = Supervisor.GetSnapshots();
+
+    private RenderFragment Connection(string label, bool connected, bool simulated) => @<div class="connection-item" title="@(simulated ? "Simulation — aucune connexion physique" : connected ? "Connexion établie" : "Déconnecté")">
+        <span class="connection-led @(simulated ? "sim" : connected ? "ok" : "ko")"></span><span>@label</span>
+    </div>;
+
+    private RenderFragment Metric(string label, long count, long denominator, string title) => @<div class="supervision-metric" title="@title">
+        <strong>@Percentage(count, denominator).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</strong>
+        <span class="metric-count">@count.ToString("N0")</span>
+        <span class="metric-label">@label</span>
+    </div>;
+
+    private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
+    private static bool LineAvailable(LineSnapshot line) => line.Connections.Simulated ||
+        (line.Connections.Camera && line.Connections.Dimensioner && line.Connections.Scale && line.Connections.Database && line.Connections.Plc);
+    private static string LineStateLabel(LineSnapshot line) => !line.Running ? "EN ARRÊT" : LineAvailable(line) ? "EN MARCHE" : "NON DISPONIBLE";
+    private static string LineStateCss(LineSnapshot line) => !line.Running ? "off" : LineAvailable(line) ? "on" : "unavailable";
+
+    public void Dispose() => Supervisor.Changed -= OnChanged;
+}
