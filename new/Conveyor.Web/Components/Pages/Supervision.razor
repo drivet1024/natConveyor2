@@ -10,13 +10,25 @@
     <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
 }
 
+@if (_motionStart is { } startMotion)
+{
+    <ConveyorActionModal Start="startMotion" Busy="_motionBusy" Completed="_motionCompleted" Message="@_motionMessage" CanChangeOperatingMode="Supervisor.CanChangeOperatingMode" MaintenanceActive="Supervisor.Maintenance" OnConfirm="ConfirmMotion" OnMaintenance="() => ConfirmMotionCore(null, true)" OnClose="() => _motionStart = null" />
+}
+
 <header class="supervision-header">
     <div>
         <span class="eyebrow">TEMPS RÉEL</span>
         <h1>Supervision</h1>
         <p>Vue synthétique de la production et de la qualité par ligne.</p>
     </div>
-    <span class="supervision-updated">Actualisé à @UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+    <div class="supervision-header-actions">
+        <section class="supervision-conveyor-controls" aria-label="Commandes du convoyeur">
+            <span class="@(Supervisor.ConveyorRunning == true ? "running" : null)">CONVOYEUR</span>
+            <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
+            <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>
+        </section>
+        <span class="supervision-updated">Actualisé à @UpdatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+    </div>
 </header>
 
 <section class="supervision-grid @(_lines.Count == 1 ? "single-line" : null)" aria-label="Supervision des lignes">
@@ -94,7 +106,35 @@
     private bool _changingShift;
     private string? _shiftError;
     private int? _converterLineId;
+    private bool? _motionStart;
+    private bool _motionBusy;
+    private bool _motionCompleted;
+    private string? _motionMessage;
     private DateTimeOffset UpdatedAt => _lines.Count == 0 ? DateTimeOffset.Now : _lines.Max(line => line.UpdatedAt);
+
+    private void OpenMotion(bool start)
+    {
+        _motionStart = start;
+        _motionCompleted = false;
+        _motionMessage = null;
+    }
+
+    private Task ConfirmMotion(int? cause) => ConfirmMotionCore(cause, false);
+
+    private async Task ConfirmMotionCore(int? cause, bool maintenance)
+    {
+        if (_motionBusy || _motionCompleted || _motionStart is not { } start) return;
+        _motionBusy = true;
+        _motionMessage = "Envoi de la commande…";
+        try
+        {
+            var result = await Supervisor.SetConveyorMotionAsync(start, cause, maintenance);
+            _motionCompleted = true;
+            _motionMessage = result.Message;
+        }
+        catch (Exception exception) { _motionMessage = exception.Message; }
+        finally { _motionBusy = false; }
+    }
 
     protected override void OnInitialized()
     {
