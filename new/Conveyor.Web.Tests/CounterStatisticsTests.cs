@@ -65,6 +65,25 @@ public sealed class CounterStatisticsTests
     }
 
     [Fact]
+    public void RejectionCausesSurviveCaptureAndCombineWithoutLosingLegacyCounts()
+    {
+        var first = new LineCounters { TotalParcels = 100, Rejected = 2,
+            RejectedShipmentNotFound = 3, RejectedRouteNotConfigured = 4 };
+        var second = new LineCounters { TotalParcels = 100, RejectedCode86RetryLimit = 5,
+            RejectedProcessingError = 1 };
+
+        var row = CounterStatistics.CaptureCombined(28, DateTime.Today, [first, second]);
+
+        Assert.Equal(15, row.Rejected);
+        Assert.Equal(7.5, row.RejectedPercent);
+        Assert.Equal(3, row.RestoreCounters().RejectedShipmentNotFound);
+        Assert.Equal(4, row.RestoreCounters().RejectedRouteNotConfigured);
+        Assert.Equal(5, row.RestoreCounters().RejectedCode86RetryLimit);
+        Assert.Equal(1, row.RestoreCounters().RejectedProcessingError);
+        Assert.Equal(2, row.RestoreCounters().Rejected);
+    }
+
+    [Fact]
     public void ErrorPercentagesHandleNoParcelsOrNoReadParcels()
     {
         var empty = CounterStatistics.Capture(28, 31, DateTime.Today, new());
@@ -347,9 +366,34 @@ public sealed class CounterStatisticsTests
         Assert.Empty(f.Store.Rows);
     }
 
+    [Fact]
+    public async Task ReadOnlyApplicationStateFallsBackAndRestoresPendingCounters()
+    {
+        using var f = new Fixture();
+        var service = await f.Start();
+        f.Store.Fail = true;
+        f.Production.TotalParcels = 5;
+        await f.Tick(service);
+        var applicationState = Path.Combine(f.DirectoryPath, "data", "counter-statistics.json");
+        File.SetAttributes(applicationState, FileAttributes.ReadOnly);
+        try
+        {
+            f.Production.TotalParcels = 7;
+            await f.Tick(service, f.Now.AddSeconds(5));
+            Assert.True(Directory.Exists(f.FallbackDirectory));
+            f.Store.Fail = false;
+            f.Production = new();
+            var restarted = f.Create();
+            await f.Initialize(restarted);
+            Assert.Equal(7, f.Production.TotalParcels);
+        }
+        finally { File.SetAttributes(applicationState, FileAttributes.Normal); }
+    }
+
     private sealed class Fixture : IDisposable
     {
         public string DirectoryPath { get; } = Path.Combine(Path.GetTempPath(), "conveyor-statistics-" + Guid.NewGuid());
+        public string FallbackDirectory => Path.Combine(DirectoryPath, "fallback");
         public ConveyorOptions Options { get; } = new()
         {
             Simulation = false, General = new() { DepotId = 28 }, Statistics = new() { Enabled = true },
@@ -362,7 +406,8 @@ public sealed class CounterStatisticsTests
         public int Resets { get; private set; }
         public int Restores { get; private set; }
         public CounterStatisticsService Create() => new(Microsoft.Extensions.Options.Options.Create(Options), Store,
-            new TestEnvironment { ContentRootPath = DirectoryPath }, NullLogger<CounterStatisticsService>.Instance);
+            new TestEnvironment { ContentRootPath = DirectoryPath }, NullLogger<CounterStatisticsService>.Instance)
+            { FallbackDirectoryOverride = FallbackDirectory };
         public Task Initialize(CounterStatisticsService service) => service.InitializeAsync(Now,
             (_, production, maintenance) => { Production = production; Maintenance = maintenance; Restores++; }, CancellationToken.None);
         public async Task<CounterStatisticsService> Start()

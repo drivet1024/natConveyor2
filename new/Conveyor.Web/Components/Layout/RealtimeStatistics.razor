@@ -10,10 +10,18 @@
     <div class="headline-kpis">
         @Headline("Total colis", Counters.TotalParcels, null, "Tous les colis reçus par les caméras")
         @Headline("Colis triés", SortedParcels, Percentage(SortedParcels, Counters.TotalParcels), "Tris par expédition et par code postal ÷ total des colis")
-        @Headline("Rejets", Counters.Rejected, Percentage(Counters.Rejected, Counters.TotalParcels), "Rejets ÷ total des colis")
     </div>
 
     <div class="realtime-sections">
+        <section class="metric-section" aria-labelledby="rejection-causes-title">
+            <h3 id="rejection-causes-title">Causes de rejet</h3>
+            <div class="metric-grid">
+                @foreach (var cause in Counters.RejectionCauses())
+                {
+                    @Metric(cause.Label, cause.Count, Counters.TotalParcels)
+                }
+            </div>
+        </section>
         <section class="metric-section" aria-labelledby="production-title">
             <h3 id="production-title">Production</h3>
             <div class="metric-grid production-grid">

@@ -53,7 +53,10 @@
         </div>
 
         <div class="supervision-metrics @(line.Code98Enabled ? "quality-enabled" : null)">
-            @Metric("Rejets", counters.Rejected, counters.TotalParcels, "Rejets ÷ total des colis")
+            @foreach (var cause in counters.RejectionCauses())
+            {
+                @Metric(cause.Label, cause.Count, counters.TotalParcels, $"{cause.Label} ÷ total des colis")
+            }
             @Metric("Pas dans le système", counters.NotInSystem, counters.TotalParcels, "Colis valides sans expédition correspondante ÷ total des colis")
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
             @if (line.Code98Enabled)

@@ -814,12 +814,42 @@ public sealed class SortEngineTests
             await supervisor.SimulateParcelAsync(0, barcode, new Dimension(12, 8, 5), 4.75m);
             var counters = supervisor.GetSnapshots()[0].Counters;
             Assert.Equal(1, counters.TotalParcels);
-            Assert.Equal(expected, counters.Rejected);
+            Assert.Equal(expected, counters.TotalRejected);
+            Assert.Equal(barcode.StartsWith("987", StringComparison.Ordinal) ? 1 : 0,
+                counters.RejectedShipmentNotFound);
+            Assert.Equal(barcode.Contains(',') ? 1 : 0, counters.RejectedMultipleShipments);
+            Assert.Equal(rejectedChute == 4 && !failSave ? 1 : 0, counters.RejectedConfiguredRoute);
+            Assert.Equal(failSave && barcode.StartsWith("123", StringComparison.Ordinal) &&
+                         !barcode.Contains(',') ? 1 : 0, counters.RejectedProcessingError);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
             Assert.Equal(!failSave && barcode.StartsWith("987", StringComparison.Ordinal) ? 1 : 0, counters.NotInSystem);
             var sortedWithoutIssue = !failSave && barcode.StartsWith("12345678901", StringComparison.Ordinal) &&
                                      !barcode.Contains(',') && rejectedChute != 4 ? 1 : 0;
             Assert.Equal(sortedWithoutIssue, counters.SortedWithoutIssue);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Theory]
+    [InlineData(false, false, 1, 0)]
+    [InlineData(true, false, 0, 1)]
+    public async Task MissingRouteAndCode86LimitHaveIndependentCounters(
+        bool enableCode86, bool code86Allowed, long missingRoute, long code86Limit)
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 16,
+                EnableCode86 = enableCode86 }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository { RouteChute = null, Code86Allowed = code86Allowed };
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
+            var counters = supervisor.GetSnapshots()[0].Counters;
+            Assert.Equal(missingRoute, counters.RejectedRouteNotConfigured);
+            Assert.Equal(code86Limit, counters.RejectedCode86RetryLimit);
+            Assert.Equal(1, counters.TotalRejected);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
@@ -840,7 +870,7 @@ public sealed class SortEngineTests
             var counters = supervisor.GetSnapshots()[0].Counters;
             Assert.Equal(1, counters.TotalParcels);
             Assert.Equal(1, counters.NoReads);
-            Assert.Equal(0, counters.Rejected);
+            Assert.Equal(0, counters.TotalRejected);
             Assert.Equal(0, counters.Code98);
             Assert.Equal(0, counters.NotInSystem);
             Assert.Equal(0, counters.SortedWithoutIssue);
@@ -979,13 +1009,14 @@ public sealed class SortEngineTests
         public bool FailCounts { get; set; }
         public bool FailSave { get; set; }
         public bool Disable98 { get; set; }
+        public bool Code86Allowed { get; set; } = true;
         public int? RouteChute { get; set; } = 4;
         public bool IsSimulation { get; set; } = true;
         public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
             barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null);
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
-        public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
+        public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(Code86Allowed);
         public Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token)
         {
             var key = (codeType, barcode);

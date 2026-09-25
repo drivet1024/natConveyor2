@@ -42,7 +42,43 @@ public sealed class LineCounters
     public long DimensionReads { get; set; }
     public long ScaleReads { get; set; }
     public long TotalParcels { get; set; }
+    // Kept only for counter state written before rejection causes were tracked.
     public long Rejected { get; set; }
+    public long RejectedShipmentNotFound { get; set; }
+    public long RejectedRouteNotConfigured { get; set; }
+    public long RejectedCode86RetryLimit { get; set; }
+    public long RejectedMultipleShipments { get; set; }
+    public long RejectedConfiguredRoute { get; set; }
+    public long RejectedProcessingError { get; set; }
+    public long RejectedOther { get; set; }
+    public long TotalRejected => Rejected + RejectedShipmentNotFound + RejectedRouteNotConfigured +
+        RejectedCode86RetryLimit + RejectedMultipleShipments + RejectedConfiguredRoute +
+        RejectedProcessingError + RejectedOther;
+
+    public void CountRejection(string reason)
+    {
+        switch (reason)
+        {
+            case "Expédition introuvable": RejectedShipmentNotFound++; break;
+            case "Route de l'expédition non configurée": RejectedRouteNotConfigured++; break;
+            case "Limite de reprises code 86": RejectedCode86RetryLimit++; break;
+            case "Plusieurs expéditions détectées": RejectedMultipleShipments++; break;
+            case "Route de l'expédition":
+            case "Route du code postal": RejectedConfiguredRoute++; break;
+            default: RejectedOther++; break;
+        }
+    }
+
+    public IEnumerable<(string Label, long Count)> RejectionCauses()
+    {
+        yield return ("Expédition introuvable", RejectedShipmentNotFound);
+        yield return ("Route non configurée", RejectedRouteNotConfigured);
+        yield return ("Plusieurs expéditions", RejectedMultipleShipments);
+        yield return ("Route vers rejet", RejectedConfiguredRoute);
+        yield return ("Erreur de traitement", RejectedProcessingError);
+        yield return ("Autre cause de rejet", RejectedOther);
+        if (Rejected > 0) yield return ("Historique sans cause", Rejected);
+    }
     public long NoReads { get; set; }
     public long Code98 { get; set; }
     public long Code98RecirculatedOverTwice { get; set; }

@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Conveyor.Web.Domain;
 using Conveyor.Web.Options;
 using Microsoft.Extensions.Options;
@@ -13,8 +15,22 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
     private StatisticsState? _state;
     private DateTime? _activeShift;
     private DateTime _nextAttempt;
+    private string? _filePath;
+    internal string? FallbackDirectoryOverride { get; set; }
     public bool Initialized => _activeShift.HasValue;
-    private string FilePath => Path.Combine(environment.ContentRootPath, "data", "counter-statistics.json");
+    private string LegacyFilePath => Path.Combine(environment.ContentRootPath, "data", "counter-statistics.json");
+    private string FallbackFilePath
+    {
+        get
+        {
+            var root = FallbackDirectoryOverride ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Conveyor.Web");
+            var installation = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes(Path.GetFullPath(environment.ContentRootPath).ToUpperInvariant())))[..16];
+            return Path.Combine(root, installation, "counter-statistics.json");
+        }
+    }
+    private string FilePath => _filePath ??= File.Exists(FallbackFilePath) ? FallbackFilePath : LegacyFilePath;
 
     private async Task LoadStateAsync(CancellationToken token)
     {
@@ -86,7 +102,7 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 _nextAttempt = now.AddSeconds(5);
-                logger.LogError(exception, "Sauvegarde statistiques MySQL échouée ; copie locale conservée, nouvel essai dans cinq secondes");
+                logger.LogError(exception, "Synchronisation des statistiques échouée ; nouvel essai dans cinq secondes");
             }
         }
         finally { _gate.Release(); }
@@ -133,10 +149,32 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
 
     private async Task PersistAsync(StatisticsState state, CancellationToken token)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        var temporaryPath = FilePath + ".tmp";
-        await File.WriteAllTextAsync(temporaryPath, JsonSerializer.Serialize(state), token);
-        File.Move(temporaryPath, FilePath, overwrite: true);
+        var path = FilePath;
+        var json = JsonSerializer.Serialize(state);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporaryPath = path + ".tmp";
+        await File.WriteAllTextAsync(temporaryPath, json, token);
+        try
+        {
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        catch (UnauthorizedAccessException) when (path == LegacyFilePath)
+        {
+            // A deployed application directory may permit creating the temporary file
+            // but deny replacement of the existing state file.
+            var fallback = FallbackFilePath;
+            await WriteAtomicallyAsync(fallback, json, token);
+            _filePath = fallback;
+            logger.LogWarning("Sauvegarde locale des statistiques déplacée vers {Path} (dossier de l’application protégé)", fallback);
+        }
+    }
+
+    private static async Task WriteAtomicallyAsync(string path, string json, CancellationToken token)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporaryPath = path + ".tmp";
+        await File.WriteAllTextAsync(temporaryPath, json, token);
+        File.Move(temporaryPath, path, overwrite: true);
     }
 
     public sealed class StatisticsState

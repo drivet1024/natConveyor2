@@ -393,7 +393,7 @@ internal sealed class LineController
             }
             if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
-                lock (_gate) parcelCounters.Rejected++;
+                lock (_gate) parcelCounters.CountRejection(routingReason);
                 rejectionCounted = true;
             }
             stage = "insertion MySQL du scan";
@@ -442,7 +442,7 @@ internal sealed class LineController
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
                     if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
-                        lock (_gate) parcelCounters.Rejected++;
+                        lock (_gate) parcelCounters.RejectedProcessingError++;
                 }
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }

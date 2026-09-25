@@ -32,7 +32,15 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
         var total = new LineCounters
         {
             TotalParcels = counters.Sum(line => line.TotalParcels),
-            Rejected = counters.Sum(line => line.Rejected), Code97 = counters.Sum(line => line.Code97),
+            Rejected = counters.Sum(line => line.Rejected),
+            RejectedShipmentNotFound = counters.Sum(line => line.RejectedShipmentNotFound),
+            RejectedRouteNotConfigured = counters.Sum(line => line.RejectedRouteNotConfigured),
+            RejectedCode86RetryLimit = counters.Sum(line => line.RejectedCode86RetryLimit),
+            RejectedMultipleShipments = counters.Sum(line => line.RejectedMultipleShipments),
+            RejectedConfiguredRoute = counters.Sum(line => line.RejectedConfiguredRoute),
+            RejectedProcessingError = counters.Sum(line => line.RejectedProcessingError),
+            RejectedOther = counters.Sum(line => line.RejectedOther),
+            Code97 = counters.Sum(line => line.Code97),
             Code98 = counters.Sum(line => line.Code98), Code68 = counters.Sum(line => line.Code68),
             Code98RecirculatedOverTwice = counters.Sum(line => line.Code98RecirculatedOverTwice),
             NoReads = counters.Sum(line => line.NoReads),
@@ -53,8 +61,8 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
     {
         var scanned = counters.TotalParcels;
         double Percent(long count) => scanned == 0 ? 0 : Math.Round(100d * count / scanned, 2);
-        return new CounterStatistics(depotId, lineId, shiftStartedAt, scanned, counters.Rejected, counters.Code97,
+        return new CounterStatistics(depotId, lineId, shiftStartedAt, scanned, counters.TotalRejected, counters.Code97,
             counters.SortedByWaybill + counters.SortedByPostalCode,
-            Percent(counters.Rejected), Percent(counters.Code97), Percent(counters.Code98), Percent(counters.Code68)) { Counters = counters.Copy() };
+            Percent(counters.TotalRejected), Percent(counters.Code97), Percent(counters.Code98), Percent(counters.Code68)) { Counters = counters.Copy() };
     }
 }
