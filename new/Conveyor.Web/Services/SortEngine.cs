@@ -19,16 +19,19 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         var tokens = parcel.CameraData.ToUpperInvariant().Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var postalCodes = tokens.Where(x => PostalCodeRegex().IsMatch(x)).Select(x => x.Replace(" ", "")).Distinct().ToArray();
         var candidates = tokens.Where(x => x.Length > 8 && !PostalCodeRegex().IsMatch(x) && !x.Contains('?')).Distinct().ToArray();
+        var isNoRead = parcel.CameraData.Contains('?');
         var chute = line.RejectedChute;
         var reason = "Expédition introuvable";
         var barcode = "";
         var goodBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Shipment? matchedShipment = null;
 
-        if (parcel.CameraData.Contains('?'))
+        if (isNoRead)
         {
-            chute = line.NoReadChute;
-            reason = "Lecture caméra invalide";
+            reason = "Lecture caméra invalide — envoi au rejet";
+            logger.LogInformation("Ligne {Line}: sans lecture -> chute {Chute} ({Reason})", line.Id, line.RejectedChute, reason);
+            return new SortDecision("", "", line.RejectedChute, line.RejectedChute, reason,
+                parcel.Dimension, parcel.Weight, parcel.CameraTimestamp, ShipmentNotFound: false);
         }
 
         foreach (var raw in candidates)
@@ -103,7 +106,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         }
 
         var plcChute = chute == 99 ? line.RejectedChute : chute;
-        var shipmentNotFound = !parcel.CameraData.Contains('?') && goodBarcodes.Count == 0;
+        var shipmentNotFound = goodBarcodes.Count == 0;
         logger.LogInformation("Ligne {Line}: {Barcode} -> chute {Chute} ({Reason})", line.Id, barcode, chute, reason);
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
             parcel.Dimension, parcel.Weight, parcel.CameraTimestamp,

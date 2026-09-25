@@ -728,10 +728,10 @@ public sealed class SortEngineTests
     [InlineData(true, "12345678901", 0, 12, 98)]
     [InlineData(true, "12345678901", 5, 0, 98)]
     [InlineData(true, "99999999999,H2X1Y4", 0, 12, 98)]
-    [InlineData(true, "?", 0, 0, 98)]
+    [InlineData(true, "?", 0, 0, 16)]
     [InlineData(false, "12345678901", 0, 0, 4)]
     [InlineData(false, "99999999999,H2X1Y4", 0, 0, 7)]
-    [InlineData(false, "?", 0, 0, 1)]
+    [InlineData(false, "?", 0, 0, 16)]
     [InlineData(true, "12345678901", 5, 12, 4)]
     [InlineData(true, "12345678901,12345678902", 0, 0, 99)]
     public async Task Code98_switch_preserves_original_route_when_disabled(bool enabled, string camera, int weight, int length, int expected)
@@ -825,11 +825,11 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task NoReadIsNotAlsoCountedAsRejectedWhenBothUseTheSameChute()
+    public async Task NoReadIsSentToRejectedChuteWithoutCode98OrRejectedDoubleCount()
     {
         var config = new ConveyorOptions { Simulation = true,
-            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 1, NoReadChute = 1,
-                ValidateDimensionsAndWeight = false }] };
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 16, NoReadChute = 1,
+                ValidateDimensionsAndWeight = true }] };
         config.ApplyGlobalSorting();
         var repo = new FakeRepository();
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
@@ -841,8 +841,10 @@ public sealed class SortEngineTests
             Assert.Equal(1, counters.TotalParcels);
             Assert.Equal(1, counters.NoReads);
             Assert.Equal(0, counters.Rejected);
+            Assert.Equal(0, counters.Code98);
             Assert.Equal(0, counters.NotInSystem);
             Assert.Equal(0, counters.SortedWithoutIssue);
+            Assert.Equal(16, supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
