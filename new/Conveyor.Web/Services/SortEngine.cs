@@ -21,7 +21,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         var candidates = tokens.Where(x => x.Length > 8 && !PostalCodeRegex().IsMatch(x) && !x.Contains('?')).Distinct().ToArray();
         var isNoRead = parcel.CameraData.Contains('?');
         var chute = line.RejectedChute;
-        var reason = "Expédition introuvable";
+        var reason = "Pas dans le système";
         var barcode = "";
         var goodBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Shipment? matchedShipment = null;

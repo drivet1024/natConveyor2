@@ -49,17 +49,15 @@ public sealed class LineCounters
     public long RejectedCode86RetryLimit { get; set; }
     public long RejectedMultipleShipments { get; set; }
     public long RejectedConfiguredRoute { get; set; }
-    public long RejectedProcessingError { get; set; }
     public long RejectedOther { get; set; }
     public long TotalRejected => Rejected + RejectedShipmentNotFound + RejectedRouteNotConfigured +
-        RejectedCode86RetryLimit + RejectedMultipleShipments + RejectedConfiguredRoute +
-        RejectedProcessingError + RejectedOther;
+        RejectedCode86RetryLimit + RejectedMultipleShipments + RejectedConfiguredRoute + RejectedOther;
 
     public void CountRejection(string reason)
     {
         switch (reason)
         {
-            case "Expédition introuvable": RejectedShipmentNotFound++; break;
+            case "Pas dans le système": RejectedShipmentNotFound++; break;
             case "Route de l'expédition non configurée": RejectedRouteNotConfigured++; break;
             case "Limite de reprises code 86": RejectedCode86RetryLimit++; break;
             case "Plusieurs expéditions détectées": RejectedMultipleShipments++; break;
@@ -71,13 +69,10 @@ public sealed class LineCounters
 
     public IEnumerable<(string Label, long Count)> RejectionCauses()
     {
-        yield return ("Expédition introuvable", RejectedShipmentNotFound);
+        yield return ("Pas dans le système", RejectedShipmentNotFound);
         yield return ("Route non configurée", RejectedRouteNotConfigured);
         yield return ("Plusieurs expéditions", RejectedMultipleShipments);
         yield return ("Route vers rejet", RejectedConfiguredRoute);
-        yield return ("Erreur de traitement", RejectedProcessingError);
-        yield return ("Autre cause de rejet", RejectedOther);
-        if (Rejected > 0) yield return ("Historique sans cause", Rejected);
     }
     public long NoReads { get; set; }
     public long Code98 { get; set; }
@@ -90,7 +85,6 @@ public sealed class LineCounters
     public long LightParcels { get; set; }
     public long SmallParcels { get; set; }
     public long InverseLengthParcels { get; set; }
-    public long NotInSystem { get; set; }
     public long SortedWithoutIssue { get; set; }
     public long SortedByWaybill { get; set; }
     public long SortedByPostalCode { get; set; }

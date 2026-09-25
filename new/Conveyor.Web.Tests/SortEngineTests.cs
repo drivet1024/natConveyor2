@@ -798,10 +798,10 @@ public sealed class SortEngineTests
     [InlineData("98765432101", 1, false, 1)]
     [InlineData("98765432101", 1, true, 1)]
     [InlineData("12345678901", 1, false, 0)]
-    [InlineData("12345678901", 1, true, 1)]
+    [InlineData("12345678901", 1, true, 0)]
     [InlineData("12345678901", 4, false, 1)]
     [InlineData("12345678901,12345678902", 1, false, 1)]
-    public async Task RejectionsCountSentChuteEvenWhenDatabaseInsertFails(string barcode, int rejectedChute, bool failSave, long expected)
+    public async Task ConfiguredRejectionCausesCountEvenWhenDatabaseInsertFails(string barcode, int rejectedChute, bool failSave, long expected)
     {
         var config = new ConveyorOptions { Simulation = true,
             Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = rejectedChute }] };
@@ -819,13 +819,32 @@ public sealed class SortEngineTests
                 counters.RejectedShipmentNotFound);
             Assert.Equal(barcode.Contains(',') ? 1 : 0, counters.RejectedMultipleShipments);
             Assert.Equal(rejectedChute == 4 && !failSave ? 1 : 0, counters.RejectedConfiguredRoute);
-            Assert.Equal(failSave && barcode.StartsWith("123", StringComparison.Ordinal) &&
-                         !barcode.Contains(',') ? 1 : 0, counters.RejectedProcessingError);
+            if (failSave) Assert.Equal(rejectedChute, supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
-            Assert.Equal(!failSave && barcode.StartsWith("987", StringComparison.Ordinal) ? 1 : 0, counters.NotInSystem);
             var sortedWithoutIssue = !failSave && barcode.StartsWith("12345678901", StringComparison.Ordinal) &&
                                      !barcode.Contains(',') && rejectedChute != 4 ? 1 : 0;
             Assert.Equal(sortedWithoutIssue, counters.SortedWithoutIssue);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Theory]
+    [InlineData("98765432101", 1)]
+    [InlineData("98765432101,H2X1Y4", 0)]
+    public async Task PasDansLeSystemeCountsOnlyUnknownParcelsSentToReject(string cameraData, long expected)
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 16 }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, cameraData, new Dimension(12, 8, 5), 4.75m);
+            var counters = supervisor.GetSnapshots()[0].Counters;
+            Assert.Equal(expected, counters.RejectedShipmentNotFound);
+            Assert.Equal(expected, counters.RejectionCauses().Single(cause => cause.Label == "Pas dans le système").Count);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
@@ -872,7 +891,6 @@ public sealed class SortEngineTests
             Assert.Equal(1, counters.NoReads);
             Assert.Equal(0, counters.TotalRejected);
             Assert.Equal(0, counters.Code98);
-            Assert.Equal(0, counters.NotInSystem);
             Assert.Equal(0, counters.SortedWithoutIssue);
             Assert.Equal(16, supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute);
         }

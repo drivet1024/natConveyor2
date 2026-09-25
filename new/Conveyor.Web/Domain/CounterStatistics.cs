@@ -38,7 +38,6 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             RejectedCode86RetryLimit = counters.Sum(line => line.RejectedCode86RetryLimit),
             RejectedMultipleShipments = counters.Sum(line => line.RejectedMultipleShipments),
             RejectedConfiguredRoute = counters.Sum(line => line.RejectedConfiguredRoute),
-            RejectedProcessingError = counters.Sum(line => line.RejectedProcessingError),
             RejectedOther = counters.Sum(line => line.RejectedOther),
             Code97 = counters.Sum(line => line.Code97),
             Code98 = counters.Sum(line => line.Code98), Code68 = counters.Sum(line => line.Code68),
@@ -49,7 +48,6 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             LightParcels = counters.Sum(line => line.LightParcels),
             SmallParcels = counters.Sum(line => line.SmallParcels),
             InverseLengthParcels = counters.Sum(line => line.InverseLengthParcels),
-            NotInSystem = counters.Sum(line => line.NotInSystem),
             SortedWithoutIssue = counters.Sum(line => line.SortedWithoutIssue),
             SortedByWaybill = counters.Sum(line => line.SortedByWaybill),
             SortedByPostalCode = counters.Sum(line => line.SortedByPostalCode)

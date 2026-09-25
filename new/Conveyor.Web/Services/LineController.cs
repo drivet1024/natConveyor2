@@ -352,7 +352,6 @@ internal sealed class LineController
         }
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
-        var rejectionCounted = false;
         var recirculationCounted = false;
         var code98Sent = false;
         try
@@ -394,7 +393,6 @@ internal sealed class LineController
             if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
                 lock (_gate) parcelCounters.CountRejection(routingReason);
-                rejectionCounted = true;
             }
             stage = "insertion MySQL du scan";
             await _repository.SaveScanAsync(_options.Id, _options.DatabaseLineId, parcel, decision, token);
@@ -407,7 +405,6 @@ internal sealed class LineController
                 if (isNoRead) parcelCounters.NoReads++;
                 else
                 {
-                    if (decision.ShipmentNotFound) parcelCounters.NotInSystem++;
                     // Measurement error rates use read parcels only, excluding no-reads.
                     if (!parcel.Dimension.IsValid(_options.MaximumDimension)) parcelCounters.DimensionErrors++;
                     if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) parcelCounters.ScaleErrors++;
@@ -441,8 +438,6 @@ internal sealed class LineController
                     await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
-                    if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
-                        lock (_gate) parcelCounters.RejectedProcessingError++;
                 }
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }

@@ -69,17 +69,15 @@ public sealed class CounterStatisticsTests
     {
         var first = new LineCounters { TotalParcels = 100, Rejected = 2,
             RejectedShipmentNotFound = 3, RejectedRouteNotConfigured = 4 };
-        var second = new LineCounters { TotalParcels = 100, RejectedCode86RetryLimit = 5,
-            RejectedProcessingError = 1 };
+        var second = new LineCounters { TotalParcels = 100, RejectedCode86RetryLimit = 5 };
 
         var row = CounterStatistics.CaptureCombined(28, DateTime.Today, [first, second]);
 
-        Assert.Equal(15, row.Rejected);
-        Assert.Equal(7.5, row.RejectedPercent);
+        Assert.Equal(14, row.Rejected);
+        Assert.Equal(7, row.RejectedPercent);
         Assert.Equal(3, row.RestoreCounters().RejectedShipmentNotFound);
         Assert.Equal(4, row.RestoreCounters().RejectedRouteNotConfigured);
         Assert.Equal(5, row.RestoreCounters().RejectedCode86RetryLimit);
-        Assert.Equal(1, row.RestoreCounters().RejectedProcessingError);
         Assert.Equal(2, row.RestoreCounters().Rejected);
     }
 
