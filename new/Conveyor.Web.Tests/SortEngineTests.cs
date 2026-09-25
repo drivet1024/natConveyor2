@@ -753,6 +753,9 @@ public sealed class SortEngineTests
             Assert.Equal(expected, counters.Rejected);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
             Assert.Equal(!failSave && barcode.StartsWith("987", StringComparison.Ordinal) ? 1 : 0, counters.NotInSystem);
+            var sortedWithoutIssue = !failSave && barcode.StartsWith("12345678901", StringComparison.Ordinal) &&
+                                     !barcode.Contains(',') && rejectedChute != 4 ? 1 : 0;
+            Assert.Equal(sortedWithoutIssue, counters.SortedWithoutIssue);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
@@ -775,6 +778,7 @@ public sealed class SortEngineTests
             Assert.Equal(1, counters.NoReads);
             Assert.Equal(0, counters.Rejected);
             Assert.Equal(0, counters.NotInSystem);
+            Assert.Equal(0, counters.SortedWithoutIssue);
         }
         finally { await supervisor.StopLineAsync(0); }
     }

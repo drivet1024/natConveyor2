@@ -5,13 +5,22 @@
 .supervision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .supervision-line{min-width:0}
 .supervision-line .connections{grid-template-columns:repeat(3,1fr);padding:.7rem 1.2rem}
-.supervision-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.supervision-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-bottom:1px solid var(--line)}
+.supervision-summary .supervision-metric{border-bottom:0}
+.supervision-summary .supervision-metric:nth-child(2){border-right:0}
+.supervision-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 .supervision-metric{min-width:0;min-height:98px;padding:1rem 1.15rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
-.supervision-metric:nth-child(3n){border-right:0}
+.supervision-metric:nth-child(4n){border-right:0}
 .supervision-metric strong{display:block;color:#fff;font-size:1.75rem;line-height:1;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count::after{content:" colis"}
+.supervision-metric .metric-percentage{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-label{display:block;margin-top:.15rem;color:#9eb8d7;font-size:.72rem}
+.supervision-metric.success-metric strong{color:var(--ok)}
+.supervision-metric.metric-warning{background:rgba(255,154,31,.055)}
+.supervision-metric.metric-warning strong{color:#ff9a1f;font-size:2rem}
+.supervision-metric.metric-critical{background:rgba(255,78,91,.07)}
+.supervision-metric.metric-critical strong{color:#ff4e5b;font-size:2.25rem}
 .supervision-grid.single-line{grid-template-columns:minmax(0,calc((100% - 1.2rem)/2));justify-content:center}
-@media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-grid.single-line{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:700px){.supervision-header{align-items:flex-start;flex-direction:column}.supervision-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.supervision-metric:nth-child(3n){border-right:1px solid var(--line)}.supervision-metric:nth-child(2n){border-right:0}}
+@media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-grid.single-line{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:700px){.supervision-header{align-items:flex-start;flex-direction:column}.supervision-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.supervision-metric:nth-child(4n){border-right:1px solid var(--line)}.supervision-metric:nth-child(2n){border-right:0}}

@@ -53,6 +53,7 @@ public sealed class LineCounters
     public long SmallParcels { get; set; }
     public long InverseLengthParcels { get; set; }
     public long NotInSystem { get; set; }
+    public long SortedWithoutIssue { get; set; }
     public long SortedByWaybill { get; set; }
     public long SortedByPostalCode { get; set; }
     public long DatabaseInserts { get; set; }

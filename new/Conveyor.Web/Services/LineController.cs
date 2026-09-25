@@ -397,6 +397,12 @@ internal sealed class LineController
                 }
                 if (routingReason == "Route de l'expédition") parcelCounters.SortedByWaybill++;
                 if (routingReason == "Route du code postal") parcelCounters.SortedByPostalCode++;
+                var routed = routingReason is "Route de l'expédition" or "Route du code postal";
+                var measurementsValid = parcel.Dimension.IsValid(_options.MaximumDimension) &&
+                                        parcel.Weight > 0 && parcel.Weight <= _options.MaximumWeight;
+                if (routed && measurementsValid && !decision.ShipmentNotFound &&
+                    effectiveChute == decision.PlcChute && decision.PlcChute != _options.RejectedChute)
+                    parcelCounters.SortedWithoutIssue++;
                 _lastDimension = null;
                 _lastWeight = null;
             }

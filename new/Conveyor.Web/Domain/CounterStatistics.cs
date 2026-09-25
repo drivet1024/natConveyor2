@@ -41,6 +41,7 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             SmallParcels = counters.Sum(line => line.SmallParcels),
             InverseLengthParcels = counters.Sum(line => line.InverseLengthParcels),
             NotInSystem = counters.Sum(line => line.NotInSystem),
+            SortedWithoutIssue = counters.Sum(line => line.SortedWithoutIssue),
             SortedByWaybill = counters.Sum(line => line.SortedByWaybill),
             SortedByPostalCode = counters.Sum(line => line.SortedByPostalCode)
         };
