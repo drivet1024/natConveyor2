@@ -24,7 +24,7 @@
     {
         <p>Pourquoi arrêtez-vous le convoyeur ?</p>
         <div class="stop-reasons">
-            <button type="button" class="reason-button pause" disabled="@(Busy || Completed)" @onclick="() => Confirm(0)">PAUSE</button>
+            <button type="button" class="reason-button pause" disabled="@(Busy || Completed)" @onclick="() => Confirm(0)"><span>PAUSE</span><small>FIN DE SHIFT</small></button>
             <button type="button" class="reason-button jam" disabled="@(Busy || Completed)" @onclick="() => Confirm(1)">JAM</button>
             <button type="button" class="reason-button down" disabled="@(Busy || Completed)" @onclick="() => Confirm(2)">DOWN</button>
         </div>

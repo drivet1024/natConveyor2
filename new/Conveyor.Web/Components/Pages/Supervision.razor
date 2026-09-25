@@ -130,8 +130,16 @@
         try
         {
             var result = await Supervisor.SetConveyorMotionAsync(start, cause, maintenance);
-            _motionCompleted = true;
-            _motionMessage = result.Message;
+            if (start)
+            {
+                _motionCompleted = true;
+                _motionMessage = result.Message;
+            }
+            else
+            {
+                _motionStart = null;
+                _motionMessage = null;
+            }
         }
         catch (Exception exception) { _motionMessage = exception.Message; }
         finally { _motionBusy = false; }
