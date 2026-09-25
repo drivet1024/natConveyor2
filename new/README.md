@@ -7,6 +7,11 @@ le serveur COM 32 bits **RSLinx OPC Server**. L'option `win-x64` reste disponibl
 dans le lancement manuel du workflow pour revenir à une livraison 64 bits, par
 exemple lorsqu'un **RSLinx Local OPC Server** 64 bits est installé et enregistré.
 Changer l'architecture ne modifie ni la configuration locale ni les données.
+Avec un serveur OPC local (champ ordinateur vide, `localhost`, adresse de boucle
+locale ou nom de cet ordinateur), Conveyor active directement la classe COM
+enregistrée sur Windows. Cette activation locale évite que RSLinx Classic Single
+Node interprète la connexion comme un accès DCOM distant. Un nom d'ordinateur
+distant conserve le chemin OPC DA/DCOM de TitaniumAS.
 
 L’option **Redémarrer RSLinx automatiquement si l’automate se déconnecte** est
 activée par défaut dans Configuration → AUTOMATE. Tant que les connexions de la

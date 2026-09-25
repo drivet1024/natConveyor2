@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Conveyor.Web.Options;
 using TitaniumAS.Opc.Client.Common;
@@ -20,6 +21,9 @@ internal interface IOpcDaConnection : IDisposable
 
 internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags) : IOpcDaConnection
 {
+    private static readonly MethodInfo SetComObject = typeof(OpcDaServer)
+        .GetProperty(nameof(OpcDaServer.ComObject), BindingFlags.Instance | BindingFlags.Public)!
+        .GetSetMethod(nonPublic: true)!;
     private static readonly Lazy<bool> Initialized = new(() =>
     {
         // The library's legacy Bootstrap requests anonymous COM security. Use
@@ -58,14 +62,25 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
     internal static string ItemId(string topic, string tag) =>
         tag.StartsWith('[') || string.IsNullOrWhiteSpace(topic) ? tag : $"[{topic.Trim()}]{tag}";
 
+    internal static bool IsLocalHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return true;
+        var value = host.Trim();
+        return value is "." or "127.0.0.1" or "::1" ||
+               value.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Connect()
     {
         Initialize();
-        var host = string.IsNullOrWhiteSpace(options.OpcHost) ? "localhost" : options.OpcHost.Trim();
-        _server = new OpcDaServer(UrlBuilder.Build(options.OpcProgId.Trim(), host));
+        var serverId = options.OpcProgId.Trim();
+        _server = IsLocalHost(options.OpcHost)
+            ? CreateLocalServer(serverId)
+            : new OpcDaServer(UrlBuilder.Build(serverId, options.OpcHost.Trim()));
         try
         {
-            _server.Connect();
+            if (!_server.IsConnected) _server.Connect();
             _group = _server.AddGroup("Conveyor-" + Guid.NewGuid().ToString("N"));
             _group.UpdateRate = TimeSpan.FromMilliseconds(options.OpcUpdateRateMs);
             _group.ValuesChanged += OnValuesChanged;
@@ -75,6 +90,32 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
             if (!_group.IsSubscribed) throw new IOException("Le serveur OPC DA n’a pas activé les notifications de lecture.");
         }
         catch { Dispose(); throw; }
+    }
+
+    private static OpcDaServer CreateLocalServer(string serverId)
+    {
+        // TitaniumAS always supplies a COSERVERINFO structure to CoCreateInstanceEx,
+        // including for localhost. RSLinx Classic Single Node can reject that path as
+        // a remote activation. Resolve and activate the registered COM class locally,
+        // then let TitaniumAS manage the OPC groups, items, reads and writes.
+        var serverType = Guid.TryParse(serverId, out var clsid)
+            ? Type.GetTypeFromCLSID(clsid, throwOnError: true)!
+            : Type.GetTypeFromProgID(serverId, throwOnError: true)!;
+        clsid = serverType.GUID;
+        var server = new OpcDaServer(clsid);
+        var comObject = Activator.CreateInstance(serverType)
+            ?? throw new COMException($"Le serveur OPC DA local {serverId} n’a retourné aucun objet COM.");
+        try
+        {
+            SetComObject.Invoke(server, [comObject]);
+            return server;
+        }
+        catch
+        {
+            if (Marshal.IsComObject(comObject)) Marshal.FinalReleaseComObject(comObject);
+            server.Dispose();
+            throw;
+        }
     }
 
     private OpcDaItem AddItem(string itemId, bool active)

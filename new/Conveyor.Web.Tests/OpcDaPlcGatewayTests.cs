@@ -14,6 +14,16 @@ public sealed class OpcDaPlcGatewayTests
     public void ItemIdsPreserveExplicitTopics(string topic, string tag, string expected) =>
         Assert.Equal(expected, OpcDaConnection.ItemId(topic, tag));
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData(" localhost ", true)]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("::1", true)]
+    [InlineData("REMOTE-OPC", false)]
+    public void OpcHostDistinguishesLocalActivationFromDcom(string? host, bool expected) =>
+        Assert.Equal(expected, OpcDaConnection.IsLocalHost(host));
+
     [Fact]
     public async Task InitialReadAndSubscriptionNormalizeBooleansAndRejectBadQuality()
     {
