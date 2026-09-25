@@ -13,6 +13,7 @@ public interface IConveyorRepository
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
     Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken cancellationToken);
+    Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken cancellationToken);
     Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken cancellationToken);
     Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken cancellationToken);
     Task<bool> PingAsync(CancellationToken cancellationToken);

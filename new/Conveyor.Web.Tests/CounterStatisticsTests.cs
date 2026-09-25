@@ -51,8 +51,8 @@ public sealed class CounterStatisticsTests
     public void GlobalErrorPercentagesUseCombinedCountsInsteadOfAveragingLines()
     {
         var row = CounterStatistics.CaptureCombined(28, DateTime.Today,
-            [new() { TotalParcels = 100, NoReads = 20, ScaleErrors = 10, ScaleFaults = 3, LightParcels = 9, SmallParcels = 7, InverseLengthParcels = 4, SortedWithoutIssue = 70 },
-             new() { TotalParcels = 300, NoReads = 80, ScaleErrors = 20, ScaleFaults = 5, LightParcels = 11, SmallParcels = 13, InverseLengthParcels = 6, SortedWithoutIssue = 210 }]);
+            [new() { TotalParcels = 100, NoReads = 20, ScaleErrors = 10, ScaleFaults = 3, LightParcels = 9, SmallParcels = 7, InverseLengthParcels = 4, SortedWithoutIssue = 70, Code98RecirculatedOverTwice = 2 },
+             new() { TotalParcels = 300, NoReads = 80, ScaleErrors = 20, ScaleFaults = 5, LightParcels = 11, SmallParcels = 13, InverseLengthParcels = 6, SortedWithoutIssue = 210, Code98RecirculatedOverTwice = 3 }]);
         Assert.Equal(30, row.WeightErrors);
         Assert.Equal(10, row.WeightErrorPercent);
         Assert.Equal(8, row.ScaleErrors);
@@ -61,6 +61,7 @@ public sealed class CounterStatisticsTests
         Assert.Equal(20, row.SmallParcels);
         Assert.Equal(10, row.InverseLengthParcels);
         Assert.Equal(280, row.Counters!.SortedWithoutIssue);
+        Assert.Equal(5, row.Counters.Code98RecirculatedOverTwice);
     }
 
     [Fact]

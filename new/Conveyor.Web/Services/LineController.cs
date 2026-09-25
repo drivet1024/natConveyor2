@@ -354,6 +354,7 @@ internal sealed class LineController
         var stage = "calcul de la chute";
         var rejectionCounted = false;
         var recirculationCounted = false;
+        var code98Sent = false;
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
@@ -369,6 +370,22 @@ internal sealed class LineController
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, timestamp, token);
             _plcConnected = true;
+            code98Sent = decision.PlcChute == 98;
+            if (code98Sent && !string.IsNullOrWhiteSpace(decision.Barcode))
+            {
+                try
+                {
+                    var passCount = await _repository.RecordExceptionPassAsync("98", decision.Barcode, token);
+                    decision = decision with { Code98PassCount = passCount };
+                    if (passCount == 3)
+                        lock (_gate) parcelCounters.Code98RecirculatedOverTwice++;
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // A statistics failure must never redirect a code 98 parcel to the reject chute.
+                    _logger.LogWarning(exception, "Impossible de compter le passage code 98 du colis {Barcode}", decision.Barcode);
+                }
+            }
             if (decision.PlcChute == 97)
             {
                 lock (_gate) parcelCounters.Code97++;
@@ -411,15 +428,22 @@ internal sealed class LineController
         {
             _databaseConnected = false;
             lock (_gate) _lastError = $"{stage} : {exception.Message}";
-            _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}, étape : {Stage}; envoi vers le rejet", _options.Id + 1, stage);
+            _logger.LogError(exception, "Erreur de traitement sur la ligne {Line}, étape : {Stage}", _options.Id + 1, stage);
             try
             {
-                var fallbackChute = ResolveClosedChute(_options.RejectedChute);
-                await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
-                if (fallbackChute == 97 && !recirculationCounted)
-                    lock (_gate) parcelCounters.Code97++;
-                if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
-                    lock (_gate) parcelCounters.Rejected++;
+                if (code98Sent)
+                {
+                    _logger.LogWarning("Ligne {Line} : aucun rejet de secours après l'envoi du colis au code 98", _options.Id + 1);
+                }
+                else
+                {
+                    var fallbackChute = ResolveClosedChute(_options.RejectedChute);
+                    await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
+                    if (fallbackChute == 97 && !recirculationCounted)
+                        lock (_gate) parcelCounters.Code97++;
+                    if (fallbackChute == _options.RejectedChute && !isNoRead && !rejectionCounted)
+                        lock (_gate) parcelCounters.Rejected++;
+                }
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }

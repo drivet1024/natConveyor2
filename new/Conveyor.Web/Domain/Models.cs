@@ -32,7 +32,8 @@ public sealed record SortDecision(
     string? DestinationPostalCode = null,
     int? RouteId = null,
     bool? DisableCode98 = null,
-    bool ShipmentNotFound = false);
+    bool ShipmentNotFound = false,
+    int? Code98PassCount = null);
 
 public sealed class LineCounters
 {
@@ -44,6 +45,7 @@ public sealed class LineCounters
     public long Rejected { get; set; }
     public long NoReads { get; set; }
     public long Code98 { get; set; }
+    public long Code98RecirculatedOverTwice { get; set; }
     public long Code68 { get; set; }
     public long Code97 { get; set; }
     public long DimensionErrors { get; set; }

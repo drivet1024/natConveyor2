@@ -34,6 +34,7 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             TotalParcels = counters.Sum(line => line.TotalParcels),
             Rejected = counters.Sum(line => line.Rejected), Code97 = counters.Sum(line => line.Code97),
             Code98 = counters.Sum(line => line.Code98), Code68 = counters.Sum(line => line.Code68),
+            Code98RecirculatedOverTwice = counters.Sum(line => line.Code98RecirculatedOverTwice),
             NoReads = counters.Sum(line => line.NoReads),
             ScaleErrors = counters.Sum(line => line.ScaleErrors),
             ScaleFaults = counters.Sum(line => line.ScaleFaults),

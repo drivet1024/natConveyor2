@@ -659,6 +659,70 @@ public sealed class SortEngineTests
         Assert.Equal(98, result.Chute);
     }
 
+    [Fact]
+    public async Task Code98NeverFallsBackToRejectedChuteAfterRetryLimit()
+    {
+        var repository = new FakeRepository();
+        var engine = new SortEngine(repository, NullLogger<SortEngine>.Instance);
+        var line = Line();
+        line.ValidateDimensionsAndWeight = true;
+        line.Code86Retry = 2;
+        var parcel = Parcel("12345678901") with { Weight = -1, Dimension = Dimension.Missing };
+
+        for (var pass = 1; pass <= 5; pass++)
+        {
+            var result = await engine.DecideAsync(line, parcel, CancellationToken.None);
+            Assert.Equal(98, result.Chute);
+            Assert.Equal(98, result.PlcChute);
+        }
+    }
+
+    [Fact]
+    public async Task ThirdCode98PassCountsParcelOnlyOnce()
+    {
+        var config = new ConveyorOptions
+        {
+            Simulation = true,
+            Sorting = new() { ValidateDimensionsAndWeight = true },
+            Lines = [new() { Id = 0, CorrelationDelayMs = 0 }]
+        };
+        config.ApplyGlobalSorting();
+        var repository = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repository,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            for (var pass = 1; pass <= 5; pass++)
+                await supervisor.SimulateParcelAsync(0, "12345678901", Dimension.Missing, -1);
+
+            var snapshot = Assert.Single(supervisor.GetSnapshots());
+            Assert.Equal(98, snapshot.LastDecision!.PlcChute);
+            Assert.Equal(5, snapshot.LastDecision.Code98PassCount);
+            Assert.Equal(1, snapshot.Counters.Code98RecirculatedOverTwice);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Fact]
+    public async Task DatabaseFailureAfterCode98DoesNotSendParcelToRejectedChute()
+    {
+        var repository = new FakeRepository { FailSave = true };
+        var plc = new MotionPlc();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.ValidateDimensionsAndWeight = true;
+        var controller = new LineController(line, true, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", Dimension.Missing, -1);
+
+            Assert.Equal(98, Assert.Single(plc.Commands).Value);
+            Assert.Equal(98, controller.Snapshot().LastPlcDispatch!.Chute);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
     private static LineOptions Line() => new() { Id = 0, DatabaseLineId = 1, ShiftId = 1, RejectedChute = 16, NoReadChute = 1 };
     [Theory]
     [InlineData(true, "12345678901", 0, 12, 98)]
@@ -886,6 +950,7 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        private readonly Dictionary<(string Type, string Barcode), int> _exceptionPasses = [];
         public List<SortDecision> SavedDecisions { get; } = [];
         public List<decimal> SavedParcelWeights { get; } = [];
         public List<int?> SavedDatabaseLineIds { get; } = [];
@@ -919,6 +984,13 @@ public sealed class SortEngineTests
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
+        public Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token)
+        {
+            var key = (codeType, barcode);
+            var count = _exceptionPasses.GetValueOrDefault(key) + 1;
+            _exceptionPasses[key] = count;
+            return Task.FromResult(count);
+        }
         public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
         public Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken token)
         {

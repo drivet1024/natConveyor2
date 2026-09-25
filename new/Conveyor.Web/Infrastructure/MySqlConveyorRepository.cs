@@ -149,6 +149,31 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         return true;
     }
 
+    public async Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token)
+    {
+        var table = codeType switch { "86" => "code86", "98" => "code98", _ => throw new ArgumentOutOfRangeException(nameof(codeType)) };
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var count = 0;
+        await using (var select = new MySqlCommand($"select cnt from {table} where camera_data=@id for update", connection, transaction))
+        {
+            select.Parameters.AddWithValue("@id", barcode);
+            var value = await select.ExecuteScalarAsync(token);
+            count = value is null or DBNull ? 0 : Convert.ToInt32(value);
+        }
+        await using (var upsert = new MySqlCommand($"""
+            insert into {table}(camera_data,cnt) values(@id,1)
+            on duplicate key update cnt=cnt+1
+            """, connection, transaction))
+        {
+            upsert.Parameters.AddWithValue("@id", barcode);
+            await upsert.ExecuteNonQueryAsync(token);
+        }
+        await transaction.CommitAsync(token);
+        return count + 1;
+    }
+
     public async Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken)
     {
         if (start ? cause is not null : cause is not (0 or 1 or 2))
@@ -266,6 +291,7 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string Type, string Barcode), int> _exceptionPasses = new();
     public bool IsSimulation => true;
     public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken) => Task.FromResult<DateTimeOffset?>(null);
@@ -277,6 +303,8 @@ public sealed class SimulationConveyorRepository : IConveyorRepository
     public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult<int?>(routeId == 10 ? 4 : null);
     public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(postalCode.StartsWith('H') ? 7 : 8);
     public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(true);
+    public Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token) =>
+        Task.FromResult(_exceptionPasses.AddOrUpdate((codeType, barcode), 1, (_, count) => count + 1));
     public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
     public Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
     public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);

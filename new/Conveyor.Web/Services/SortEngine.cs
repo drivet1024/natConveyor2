@@ -59,9 +59,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
                                           parcel.Weight <= 0 || parcel.Weight > line.MaximumWeight;
                 if (invalidMeasurements && !shipment.DisableCode98)
                 {
-                    chute = await repository.ShouldUseExceptionChuteAsync("98", barcode, line.Code86Retry, token)
-                        ? 98 : line.RejectedChute;
-                    reason = chute == 98 ? "Dimensions ou poids invalides" : "Limite de reprises code 98";
+                    chute = 98;
+                    reason = "Dimensions ou poids invalides";
                 }
                 else if (!invalidMeasurements)
                 {
