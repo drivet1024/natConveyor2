@@ -2,6 +2,7 @@
 
 <PageTitle>St-Hubert — Convoyeur du haut</PageTitle>
 
+<div class="map-page">
 <header class="map-header">
     <div><span class="eyebrow">PLAN DU CONVOYEUR · ST-HUBERT</span><h1>Convoyeur du haut</h1></div>
     <span class="map-status">Plan statique · suivi des colis à venir</span>
@@ -10,19 +11,11 @@
 <section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
     <div class="map-toolbar">
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
-        <div class="map-zoom" aria-label="Zoom du plan">
-            <button type="button" class="btn" aria-label="Réduire le plan" disabled="@(_zoom <= 100)" @onclick="() => _zoom -= 25">−</button>
-            <span>@_zoom %</span>
-            <button type="button" class="btn" aria-label="Agrandir le plan" disabled="@(_zoom >= 250)" @onclick="() => _zoom += 25">+</button>
-            <button type="button" class="btn" @onclick="() => _zoom = 100">Vue complète</button>
-        </div>
     </div>
-    <div class="map-viewport" tabindex="0" aria-label="Plan du convoyeur, défilement horizontal au zoom">
-        <div class="map-canvas" style="@($"width: {_zoom}%")"><ConveyorDiagram /></div>
+    <div class="map-viewport" aria-label="Vue complète du convoyeur">
+        <div class="map-canvas"><ConveyorDiagram /></div>
     </div>
     <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 11, 13 et 21 à 41.</p>
 </section>
 
-@code {
-    private int _zoom = 100;
-}
+</div>
