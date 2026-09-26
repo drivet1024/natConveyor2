@@ -117,7 +117,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : string.Equals(primaryLine.Plc.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase)
-                    ? new OpcDaPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<OpcDaPlcGateway>(), monitoredTags)
+                    ? new OpcDaPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<OpcDaPlcGateway>(), monitoredTags, [_fullChutesTag, _code42Tag])
                     : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(), monitoredTags);
         var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         foreach (var line in activeLines.Where(line => !line.Enabled))

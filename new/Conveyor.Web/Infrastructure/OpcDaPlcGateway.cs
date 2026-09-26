@@ -23,18 +23,19 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
     public bool ReadsHealthy => IsConnected && _readsHealthy;
     public event Action<string, string>? TagChanged;
 
-    public OpcDaPlcGateway(PlcOptions options, ILogger<OpcDaPlcGateway> logger, IEnumerable<string> monitoredTags)
-        : this(options, logger, monitoredTags.ToArray(), null, TimeProvider.System) { }
+    public OpcDaPlcGateway(PlcOptions options, ILogger<OpcDaPlcGateway> logger, IEnumerable<string> monitoredTags,
+        IEnumerable<string>? subscriptionOnlyTags = null)
+        : this(options, logger, monitoredTags.ToArray(), null, TimeProvider.System, subscriptionOnlyTags?.ToArray()) { }
 
     internal OpcDaPlcGateway(PlcOptions options, ILogger<OpcDaPlcGateway> logger, string[] tags,
-        Func<IOpcDaConnection>? factory, TimeProvider time)
+        Func<IOpcDaConnection>? factory, TimeProvider time, string[]? subscriptionOnlyTags = null)
     {
         _options = options;
         _logger = logger;
         _time = time;
         var monitored = tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         _lastReceived = monitored.ToDictionary(tag => tag, _ => DateTimeOffset.MinValue, StringComparer.OrdinalIgnoreCase);
-        _factory = factory ?? (() => new OpcDaConnection(options, monitored));
+        _factory = factory ?? (() => new OpcDaConnection(options, monitored, subscriptionOnlyTags));
     }
 
     public async Task ConnectAsync(CancellationToken token)

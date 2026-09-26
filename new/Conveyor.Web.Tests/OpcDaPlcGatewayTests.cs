@@ -6,6 +6,18 @@ namespace Conveyor.Web.Tests;
 
 public sealed class OpcDaPlcGatewayTests
 {
+    [Fact]
+    public void SharedCountersAreExcludedFromControlReadsIncludingQualifiedAliases()
+    {
+        var monitored = new[] { "COLISDDE", "DEPART_SYSTEMES", "SHARE_NB_CHUTEPLEINE", "[NATIONEX]SHARE_NB_CODE42" };
+        var polled = OpcDaConnection.PolledItemIds("NATIONEX", monitored, ["SHARE_NB_CHUTEPLEINE", "SHARE_NB_CODE42"]);
+        Assert.Equal(2, polled.Count);
+        Assert.Contains("[NATIONEX]COLISDDE", polled);
+        Assert.Contains("[NATIONEX]DEPART_SYSTEMES", polled);
+        Assert.Equal(4, OpcDaConnection.PolledItemIds("NATIONEX", monitored, null).Count);
+        Assert.Empty(OpcDaConnection.PolledItemIds("NATIONEX", ["CUSTOM"], ["custom"]));
+    }
+
     [Theory]
     [InlineData("NATIONEX", "COLISDDE", "[NATIONEX]COLISDDE")]
     [InlineData(" NATIONEX ", "DEPART_SYSTEMES", "[NATIONEX]DEPART_SYSTEMES")]

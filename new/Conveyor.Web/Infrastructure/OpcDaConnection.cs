@@ -19,7 +19,7 @@ internal interface IOpcDaConnection : IDisposable
     Task WriteAsync(string tag, int value, CancellationToken token);
 }
 
-internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags) : IOpcDaConnection
+internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags, string[]? subscriptionOnlyTags = null) : IOpcDaConnection
 {
     private static readonly MethodInfo SetComObject = typeof(OpcDaServer)
         .GetProperty(nameof(OpcDaServer.ComObject), BindingFlags.Instance | BindingFlags.Public)!
@@ -62,6 +62,14 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
     internal static string ItemId(string topic, string tag) =>
         tag.StartsWith('[') || string.IsNullOrWhiteSpace(topic) ? tag : $"[{topic.Trim()}]{tag}";
 
+    internal static HashSet<string> PolledItemIds(string topic, IEnumerable<string> monitoredTags, IEnumerable<string>? subscriptionOnlyTags)
+    {
+        var excluded = (subscriptionOnlyTags ?? []).Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => ItemId(topic, tag)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return monitoredTags.Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(tag => ItemId(topic, tag))
+            .Where(itemId => !excluded.Contains(itemId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     internal static bool IsLocalHost(string? host)
     {
         if (string.IsNullOrWhiteSpace(host)) return true;
@@ -84,7 +92,11 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
             _group = _server.AddGroup("Conveyor-" + Guid.NewGuid().ToString("N"));
             _group.UpdateRate = TimeSpan.FromMilliseconds(options.OpcUpdateRateMs);
             _group.ValuesChanged += OnValuesChanged;
-            _readItems = _tagsByItemId.Keys.Select(itemId => AddItem(itemId, true)).ToArray();
+            // Every monitored item remains active and subscribed. Only the
+            // control-read list excludes counters configured as subscription-only.
+            var polled = PolledItemIds(options.OpcTopic, monitoredTags, subscriptionOnlyTags);
+            var monitoredItems = _tagsByItemId.Keys.Select(itemId => AddItem(itemId, true)).ToArray();
+            _readItems = monitoredItems.Where(item => polled.Contains(item.ItemId)).ToArray();
             _group.IsActive = true;
             _group.IsSubscribed = true;
             if (!_group.IsSubscribed) throw new IOException("Le serveur OPC DA n’a pas activé les notifications de lecture.");
@@ -141,7 +153,7 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
         .ToArray();
 
     public async Task<IReadOnlyList<OpcDaReading>> ReadAsync(CancellationToken token) =>
-        ConvertReadings(await _group!.ReadAsync(_readItems, token));
+        _readItems.Length == 0 ? [] : ConvertReadings(await _group!.ReadAsync(_readItems, token));
 
     public async Task WriteAsync(string tag, int value, CancellationToken token)
     {
