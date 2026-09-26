@@ -1,13 +1,13 @@
 @page "/plan-convoyeur"
 
-<PageTitle>Plan du convoyeur</PageTitle>
+<PageTitle>St-Hubert — Convoyeur du haut</PageTitle>
 
 <header class="map-header">
-    <div><span class="eyebrow">VUE D’ENSEMBLE</span><h1>Plan du convoyeur</h1></div>
+    <div><span class="eyebrow">PLAN DU CONVOYEUR · ST-HUBERT</span><h1>Convoyeur du haut</h1></div>
     <span class="map-status">Plan statique · suivi des colis à venir</span>
 </header>
 
-<section class="map-panel" aria-label="Schéma du convoyeur">
+<section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
     <div class="map-toolbar">
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
         <div class="map-zoom" aria-label="Zoom du plan">
@@ -20,7 +20,7 @@
     <div class="map-viewport" tabindex="0" aria-label="Plan du convoyeur, défilement horizontal au zoom">
         <div class="map-canvas" style="@($"width: {_zoom}%")"><ConveyorDiagram /></div>
     </div>
-    <p class="map-note">Schéma simplifié, non à l’échelle. Sorties 1 à 12 et 21 à 41.</p>
+    <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 12 et 21 à 41.</p>
 </section>
 
 @code {
