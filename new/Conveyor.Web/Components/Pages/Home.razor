@@ -53,8 +53,8 @@
         </div>
         <ServiceStatus />
         <div class="conveyor-tag-counts" aria-label="Compteurs du convoyeur">
-            <div title="@($"{Options.Value.General?.FullChutesTag} — pourcentage mobile : valeur du tag ÷ total des colis des lignes du convoyeur × 100")"><strong class="desktop-tag-value">@SharedTagCount(Supervisor.FullChutesCount)</strong><strong class="mobile-tag-value">@SharedTagRate(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
-            <div title="@($"{Options.Value.General?.Code42Tag} — pourcentage mobile : valeur du tag ÷ total des colis des lignes du convoyeur × 100")"><strong class="desktop-tag-value">@SharedTagCount(Supervisor.Code42Count)</strong><strong class="mobile-tag-value">@SharedTagRate(Supervisor.Code42Count)</strong><span>Code 42</span></div>
+            <div title="@($"{Options.Value.General?.FullChutesTag} — valeur du tag ÷ total des colis des lignes du convoyeur × 100")"><strong>@SharedTagRate(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
+            <div title="@($"{Options.Value.General?.Code42Tag} — valeur du tag ÷ total des colis des lignes du convoyeur × 100")"><strong>@SharedTagRate(Supervisor.Code42Count)</strong><span>Code 42</span></div>
         </div>
         <div class="mobile-only shipment-freshness">
             <span class="mobile-indicator" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel"><span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span></span>
@@ -164,7 +164,6 @@
     internal static bool? ResolveMobileLineRunning(bool? scaleFaultActive, bool? conveyorRunning) =>
         scaleFaultActive == true || conveyorRunning == false ? false
         : scaleFaultActive == false && conveyorRunning == true ? true : null;
-    private string SharedTagCount(int? count) => !PlcSimulated() && PlcConnected() && count.HasValue ? count.Value.ToString("N0") : "—";
     private string SharedTagRate(int? count) => !PlcSimulated() && PlcConnected() && count.HasValue
         ? Percentage(count.Value, _lines.Sum(line => line.Counters.TotalParcels)).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) + " %"
         : "—";

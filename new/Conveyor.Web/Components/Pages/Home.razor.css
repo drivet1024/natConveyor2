@@ -3,7 +3,7 @@
 .mobile-counters { display: none; }
 .conveyor-tag-counts { display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .conveyor-tag-counts strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-.conveyor-tag-counts .mobile-tag-value { display: none; }
+.conveyor-tag-counts strong { white-space: nowrap; }
 @media (min-width: 769px) {
     .conveyor-tag-counts { order: -1; }
 }
@@ -124,8 +124,6 @@
     .conveyor-tag-counts > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; min-width: 0; }
     .conveyor-tag-counts > div:first-child { padding-right: .75rem; }
     .conveyor-tag-counts > div + div { border-left: 1px solid var(--line); padding-left: .75rem; justify-content: flex-end; text-align: right; }
-    .conveyor-tag-counts .desktop-tag-value { display: none; }
-    .conveyor-tag-counts .mobile-tag-value { display: block; white-space: nowrap; }
     .shipment-freshness .connection-led { flex-shrink: 0; }
     .shipment-freshness .connection-led.sim { background: var(--orange); box-shadow: none; }
     .header-summary ::deep .service-status { grid-column: 2; grid-row: 1; }
