@@ -26,7 +26,7 @@ public sealed class SmsAlerts(IOptions<ConveyorOptions> options, IHttpClientFact
         if (!config.Sms.Enabled) return;
         if (config.Simulation)
         {
-            logger.LogInformation("SMS simulé : {Action}, ligne {Line}; aucun envoi Twilio", action, lineId + 1);
+            logger.LogDebug("SMS simulé : {Action}, ligne {Line}; aucun envoi Twilio", action, lineId + 1);
             return;
         }
         var general = config.General;
@@ -70,10 +70,14 @@ public sealed class SmsAlerts(IOptions<ConveyorOptions> options, IHttpClientFact
             });
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            logger.LogDebug("Envoi HTTP POST à Twilio pour un SMS");
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             using var response = await client.SendAsync(request, timeout.Token);
+            logger.LogDebug("Réponse HTTP Twilio : {Status}, durée {ElapsedMs} ms",
+                (int)response.StatusCode, System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             // Never log credentials, full phone numbers or the provider response body.
             if (response.IsSuccessStatusCode)
-                logger.LogInformation("SMS accepté par Twilio (livraison non confirmée)");
+                logger.LogDebug("SMS accepté par Twilio (livraison non confirmée)");
             else
                 logger.LogWarning("SMS refusé par Twilio : HTTP {Status}; consulter la console Twilio", (int)response.StatusCode);
         }

@@ -18,7 +18,10 @@
 .metrics { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .metrics .metric { grid-column: span 3; border-right: 1px solid var(--line); }
 .metrics .metric strong { color: #fff; }
-.metrics .metric .registered-total.overdue strong { color: #fff; }
+.database-local-status { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding-right: .8rem; border-right: 1px solid var(--line); }
+.database-local-status .database-summary-title { padding: 0; border: 0; }
+.database-local-status .registered-total { text-align: center; }
+.database-local-status .registered-total.overdue strong { color: var(--red); }
 .metrics .metric .metric-percentage { color: var(--muted); }
 .metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
@@ -37,13 +40,11 @@
 .metric-scale > div { min-width: 0; }
 .metric-scale > div > span { display: block; margin-top: .15rem; color: var(--muted); font-size: .72rem; }
 .scale-fault-total { margin-left: auto; text-align: right; }
-.btn-scale-test.test-on { color: var(--orange); border-color: var(--orange); background: #f2992e18; }
 
 @media (max-width: 768px) {
     .control-heading,
     .conveyor-controls,
-    .desktop-only,
-    .metrics .registered-total { display: none; }
+    .desktop-only { display: none; }
 
     .dashboard-header {
         margin-bottom: .5rem;
@@ -115,6 +116,12 @@
     .header-summary ::deep .service-status { grid-column: 2; grid-row: 1; }
     .header-summary ::deep .service-uptime { white-space: normal; text-align: right; }
     .mobile-counters { display: block; }
+    .line-title.compact-line-title { flex-wrap: wrap; gap: .5rem; }
+    .line-state-badges { margin-left: auto; }
+    .mobile-data-button { align-items: center; justify-content: center; padding: .4rem .5rem; font-size: .7rem; }
+    .mobile-data-button[aria-expanded="true"] { color: var(--orange); border-color: var(--orange); background: #f2992e18; }
+    .decision-section { display: none; }
+    .decision-section.mobile-data-open { display: block; }
     .mobile-counter-summary, .mobile-counter-rejections, .mobile-counter-quality { display: grid; }
     .mobile-counter-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mobile-counter-rejections { grid-template-columns: repeat(4, minmax(0, 1fr)); }

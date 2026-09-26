@@ -43,7 +43,10 @@
         </section>
         <button type="button" class="shared-status plc-restart-button" title="@(PlcTitle() + " — cliquer pour redémarrer RSLinx")" aria-label="Automate : ouvrir le redémarrage RSLinx" @onclick="() => _rslinxDialog = true"><span class="connection-led @PlcCss()"></span><span><small>AUTOMATE</small><strong>@PlcLabel()</strong></span></button>
         <div class="database-summary">
-            <div class="database-summary-title" title="@DatabaseTitle()"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
+            <div class="database-local-status">
+                <div class="database-summary-title" title="@DatabaseTitle()"><span class="connection-led @DatabaseCss()"></span><span>BASE LOCALE</span></div>
+                <div class="database-count registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><small>En attente</small></div>
+            </div>
             <div class="database-count @(_database.Parcels == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.Parcels)</strong><small>colis</small></div>
             <div class="database-count @(_database.PostalCodes == 0 ? "empty-count" : "")"><strong>@FormatCount(_database.PostalCodes)</strong><small>codes postaux</small></div>
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
@@ -71,6 +74,11 @@
                 <span class="mobile-only code98-state @(line.Code98Enabled ? "enabled" : "disabled")"
                       title="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")"
                       aria-label="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")">98</span>
+                <button type="button" class="btn mobile-only mobile-data-button"
+                        aria-expanded="@(_mobileDataLines.Contains(line.LineId) ? "true" : "false")"
+                        aria-controls="@($"last-decision-{line.LineId}")"
+                        aria-label="@($"Afficher ou masquer la dernière décision de la ligne {line.LineId + 1}")"
+                        @onclick="() => ToggleMobileData(line.LineId)">DATA</button>
             </div>
         </div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
@@ -97,7 +105,6 @@
         </div>
         <div class="metrics desktop-only"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
-            <div class="registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><span>En attente</span></div>
         </div>
             @foreach (var cause in line.Counters.RejectionCauses())
             {
@@ -110,7 +117,7 @@
             @ScaleErrorMetric(line.Counters)
             @PercentageMetric("Code 97 · Recirculation", line.Counters.Code97, line.Counters.TotalParcels, "Colis envoyés vers la chute 97, y compris les détournements de la chute 39 fermée")</div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
-        <div class="desktop-only"><LastDecision Decision="line.LastDecision" /></div>
+        <div id="@($"last-decision-{line.LineId}")" class="decision-section @(_mobileDataLines.Contains(line.LineId) ? "mobile-data-open" : null)"><LastDecision Decision="line.LastDecision" /></div>
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error desktop-only">@line.LastError</div> }
         <div class="actions desktop-only">
             <button type="button" class="btn btn-code98 @(line.Code98Enabled ? "code98-on" : "code98-off")"
@@ -118,15 +125,6 @@
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
                     title="@(line.Code98Enabled ? "Code 98 actif — poids ou dimensions manquants : chute 98. Cliquer pour désactiver sur cette ligne." : "Code 98 désactivé — conserver la chute de tri. Cliquer pour activer sur cette ligne.")"
                     @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
-
-            @if (line.LineId == 1)
-            {
-                <button type="button" class="btn btn-scale-test @(_scaleFaultTestBusy ? "test-on" : null)"
-                        disabled="@_scaleFaultTestBusy"
-                        title="Envoie immédiatement 1 au tag de faute balance, puis 0 après sept secondes."
-                        @onclick="() => TriggerScaleFaultTest(line.LineId)">@(_scaleFaultTestBusy ? "TEST EN COURS…" : "TEST BALANCE")</button>
-                @if (!string.IsNullOrWhiteSpace(_scaleFaultTestError)) { <span class="shift-error" role="alert">@_scaleFaultTestError</span> }
-            }
 
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
             @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
@@ -148,6 +146,11 @@
 </section>
 
 @code {
+    private readonly HashSet<int> _mobileDataLines = [];
+    private void ToggleMobileData(int lineId)
+    {
+        if (!_mobileDataLines.Add(lineId)) _mobileDataLines.Remove(lineId);
+    }
     private bool? MobileRunning => !PlcSimulated() && PlcConnected() ? Supervisor.ConveyorRunning : null;
     private string MobileConveyorName => Options.Value.General?.DepotId == 1
         ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")
@@ -247,17 +250,6 @@
     </div>;
     private bool _resettingData;
     private string? _resetDataMessage;
-    private bool _scaleFaultTestBusy;
-    private string? _scaleFaultTestError;
-    private async Task TriggerScaleFaultTest(int lineId)
-    {
-        if (_scaleFaultTestBusy) return;
-        _scaleFaultTestBusy = true;
-        _scaleFaultTestError = null;
-        try { await Supervisor.TriggerScaleFaultTestAsync(lineId); }
-        catch (Exception exception) { _scaleFaultTestError = exception.Message; }
-        finally { _scaleFaultTestBusy = false; }
-    }
     private async Task ResetData()
     {
         if (_resettingData) return;

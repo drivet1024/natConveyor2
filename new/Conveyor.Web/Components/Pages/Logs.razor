@@ -12,6 +12,7 @@
 <section class="log-toolbar">
     <label>Niveau
         <select @bind="_minimum" @bind:after="Refresh">
+            <option value="Debug">Debug</option>
             <option value="Information">Information</option>
             <option value="Warning">Avertissement</option>
             <option value="Error">Erreur</option>
@@ -49,6 +50,6 @@
     private void Clear() => LogStore.Clear();
     private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
     private static string ShortSource(string source) => source switch { "Conveyor.Line.0" => "line 0", "Conveyor.Line.1" => "line 1", _ => "" };
-    private static string Label(LogLevel level) => level switch { LogLevel.Warning => "AVERT.", LogLevel.Error or LogLevel.Critical => "ERREUR", _ => "INFO" };
+    private static string Label(LogLevel level) => level switch { LogLevel.Debug => "DEBUG", LogLevel.Warning => "AVERT.", LogLevel.Error or LogLevel.Critical => "ERREUR", _ => "INFO" };
     public void Dispose() => LogStore.Changed -= OnChanged;
 }

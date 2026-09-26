@@ -26,6 +26,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 var logStore = new InMemoryLogStore();
 builder.Logging.AddProvider(logStore);
+builder.Logging.AddFilter<InMemoryLogStore>("Conveyor.Web.Services.SmsAlerts", LogLevel.Debug);
 builder.Services.AddSingleton<ILogStore>(logStore);
 
 // Add services to the container.
@@ -65,7 +66,8 @@ builder.Services.AddSingleton<IConveyorRepository>(services =>
         ? new SimulationConveyorRepository()
         : ActivatorUtilities.CreateInstance<MySqlConveyorRepository>(services));
 builder.Services.AddSingleton<SortEngine>();
-builder.Services.AddHttpClient("TwilioSms").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHttpClient("TwilioSms").RemoveAllLoggers()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<SmsAlerts>();
 builder.Services.AddSingleton<ISmsAlerts>(services => services.GetRequiredService<SmsAlerts>());
 builder.Services.AddHostedService(services => services.GetRequiredService<SmsAlerts>());

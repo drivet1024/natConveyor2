@@ -49,7 +49,7 @@ public sealed class InMemoryLogStore : ILoggerProvider, ILogStore
     private sealed class StoreLogger(InMemoryLogStore store, string source) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Debug && logLevel != LogLevel.None;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
