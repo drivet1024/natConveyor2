@@ -11,10 +11,13 @@
         <article class="content px-4">
             @Body
         </article>
+        <footer class="software-footer" aria-label="Version du logiciel">@SoftwareVersion</footer>
     </main>
 </div>
 
 @code {
+    private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainLayout).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
     private bool _menuCollapsed = true;
     private void ToggleMenu() => _menuCollapsed = !_menuCollapsed;
     protected override async Task OnAfterRenderAsync(bool firstRender)
