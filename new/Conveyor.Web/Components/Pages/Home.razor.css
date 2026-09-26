@@ -126,7 +126,7 @@
     .decision-section.mobile-data-open { display: block; }
     .mobile-counter-summary, .mobile-counter-rejections, .mobile-counter-quality { display: grid; }
     .mobile-counter-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .mobile-counter-rejections { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .mobile-counter-rejections { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .mobile-counter-quality { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .mobile-counter { min-width: 0; padding: .85rem .55rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .mobile-counter:last-child { border-right: 0; }

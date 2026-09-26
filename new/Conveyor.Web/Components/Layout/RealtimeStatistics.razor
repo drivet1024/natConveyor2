@@ -45,7 +45,7 @@
             <h3 id="profile-title">Profil des colis</h3>
             <div class="metric-grid profile-grid">
                 @Metric("Colis légers", Counters.LightParcels, Counters.TotalParcels, null, LightParcelRule)
-                @Metric("Petits colis", Counters.SmallParcels, Counters.TotalParcels)
+                @Metric("Petits colis", Counters.SmallParcels, Counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger")
                 @Metric("Dimensions inversées", Counters.InverseLengthParcels, Counters.TotalParcels, "2e mesure ≥ 1re mesure + 2 po")
             </div>
         </section>

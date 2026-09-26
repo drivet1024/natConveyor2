@@ -52,11 +52,14 @@
             @Metric("Triés sans problème", counters.SortedWithoutIssue, counters.TotalParcels, "Colis avec une route connue, des mesures valides et sans détournement ÷ total des colis", false)
         </div>
 
-        <div class="supervision-metrics">
+        <div class="supervision-metrics rejection-metrics">
             @foreach (var cause in counters.RejectionCauses())
             {
                 @Metric(cause.Label, cause.Count, counters.TotalParcels, $"{cause.Label} ÷ total des colis")
             }
+            @Metric("Petits colis", counters.SmallParcels, counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger ÷ total des colis", false)
+        </div>
+        <div class="supervision-metrics">
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
             @if (line.Code98Enabled)
             {

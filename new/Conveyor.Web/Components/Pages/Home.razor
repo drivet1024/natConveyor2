@@ -96,6 +96,7 @@
                     @MobileMetric(cause.Label, cause.Count, line.Counters.TotalParcels)
                 }
                 @MobileMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels)
+                @MobileMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, false)
             </div>
             <div class="mobile-counter-quality">
                 @MobileMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels)

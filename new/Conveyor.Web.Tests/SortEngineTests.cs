@@ -10,6 +10,34 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Theory]
+    [InlineData(6, 1.99, 6, 2, 1)]
+    [InlineData(6, 2, 6, 2, 0)]
+    [InlineData(6, 3, 6, 2, 0)]
+    [InlineData(7, 1, 6, 2, 0)]
+    [InlineData(-1, 1, 6, 2, 0)]
+    [InlineData(6, -1, 6, 2, 0)]
+    [InlineData(6, 0, 6, 2, 0)]
+    [InlineData(6, 1, 0, 2, 0)]
+    [InlineData(6, 1, 6, 0, 0)]
+    public async Task SmallParcelCounterRequiresBothSizeAndWeight(
+        decimal side, decimal weight, decimal sizeThreshold, decimal weightThreshold, long expected)
+    {
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.SmallParcelMaximumSide = sizeThreshold;
+        line.LightParcelMaximumWeight = weightThreshold;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(side, 4, 3), weight);
+            Assert.Equal(expected, controller.Snapshot().Counters.SmallParcels);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
     [Fact]
     public void ScaleFaultReadbackIsIndependentPerLineAndUnknownWhenDisconnected()
     {
@@ -56,12 +84,16 @@ public sealed class SortEngineTests
     }
 
     [Theory]
-    [InlineData(4, 8, 3, 6, true)]
-    [InlineData(6, 8, 7, 6, true)]
+    [InlineData(4, 6, 3, 6, true)]
+    [InlineData(6, 4, 3, 6, true)]
+    [InlineData(4, 3, 6, 6, true)]
+    [InlineData(4, 8, 3, 6, false)]
+    [InlineData(6, 8, 7, 6, false)]
+    [InlineData(4, 3, 7, 6, false)]
     [InlineData(7, 8, 9, 6, false)]
     [InlineData(-1, 8, 3, 6, false)]
     [InlineData(4, 8, 3, 0, false)]
-    public void SmallParcelUsesTheSmallestPositiveSide(decimal length, decimal width, decimal height,
+    public void SmallParcelRequiresAllPositiveSidesWithinThreshold(decimal length, decimal width, decimal height,
         decimal threshold, bool expected)
     {
         Assert.Equal(expected, LineController.IsSmallParcel(new(length, width, height), threshold));
@@ -131,7 +163,7 @@ public sealed class SortEngineTests
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
         try
         {
-            await controller.SimulateAsync("12345678901", new(4, 8, 3), 4.99m);
+            await controller.SimulateAsync("12345678901", new(4, 6, 3), 4.99m);
             await controller.SimulateAsync("12345678902", new(9, 8, 7), 5m);
 
             var counters = controller.Snapshot().Counters;

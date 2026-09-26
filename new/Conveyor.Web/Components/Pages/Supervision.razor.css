@@ -32,6 +32,9 @@
 .shift-choice select{min-width:12rem;padding:.65rem 2rem .65rem .8rem;border:1px solid #36464d;border-radius:4px;background:#0d1317;color:#fff;font-size:.95rem;font-weight:600}
 .supervision-actions .gear-button{display:grid;place-items:center;min-width:46px;min-height:46px;padding:.6rem;font-size:1.05rem}
 .shift-error{color:#ff6677;font-size:.75rem}
+.supervision-metrics.rejection-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.rejection-metrics .supervision-metric{border-right:1px solid var(--line)}
+.rejection-metrics .supervision-metric:last-child{border-right:0}
 .supervision-grid.single-line{grid-template-columns:minmax(0,720px);justify-content:center}
 .supervision-grid.single-line ::deep .barcode-value{font-size:clamp(1.4rem,4.8cqi,2rem)}
 @media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}

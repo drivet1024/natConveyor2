@@ -353,7 +353,8 @@ internal sealed class LineController
             weight?.Timestamp);
         lock (_gate)
         {
-            if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide)) parcelCounters.SmallParcels++;
+            if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide) &&
+                IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
             if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
             if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
         }
@@ -510,7 +511,7 @@ internal sealed class LineController
 
     internal static bool IsSmallParcel(Dimension dimension, decimal maximumSide) =>
         maximumSide > 0 && dimension.Length > 0 && dimension.Width > 0 && dimension.Height > 0 &&
-        Math.Min(dimension.Length, Math.Min(dimension.Width, dimension.Height)) <= maximumSide;
+        Math.Max(dimension.Length, Math.Max(dimension.Width, dimension.Height)) <= maximumSide;
 
     internal static bool IsLightParcel(decimal weight, decimal maximumWeight) =>
         maximumWeight > 0 && weight > 0 && weight < maximumWeight;
