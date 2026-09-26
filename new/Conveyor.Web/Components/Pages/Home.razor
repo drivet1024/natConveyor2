@@ -71,13 +71,14 @@
 <section class="line-grid @(_lines.Count == 1 ? "single-line" : null)">
 @foreach (var line in _lines)
 {
+    var mobileLineRunning = ResolveMobileLineRunning(line.ScaleFaultActive, MobileRunning);
     <article class="line-card">
         <div class="line-title compact-line-title">
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2>
             <div class="line-state-badges">
                 <span class="run-state desktop-only @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
-                <span class="run-state mobile-only @(line.ScaleFaultActive == true ? "off" : line.ScaleFaultActive == false ? "on" : "unavailable")"
-                      title="État du tag de faute balance de cette ligne">@(line.ScaleFaultActive == true ? "ARRÊTÉ" : line.ScaleFaultActive == false ? "EN MARCHE" : "ÉTAT INCONNU")</span>
+                <span class="run-state mobile-only @(mobileLineRunning == true ? "on" : mobileLineRunning == false ? "off" : "unavailable")"
+                      title="En marche uniquement si le tag faute balance vaut 0 et que le convoyeur fonctionne">@(mobileLineRunning == true ? "EN MARCHE" : mobileLineRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
                 <span class="mobile-only code98-state @(line.Code98Enabled ? "enabled" : "disabled")"
                       title="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")"
                       aria-label="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")">98</span>
@@ -160,6 +161,9 @@
         if (!_mobileDataLines.Add(lineId)) _mobileDataLines.Remove(lineId);
     }
     private bool? MobileRunning => !PlcSimulated() && PlcConnected() ? Supervisor.ConveyorRunning : null;
+    internal static bool? ResolveMobileLineRunning(bool? scaleFaultActive, bool? conveyorRunning) =>
+        scaleFaultActive == true || conveyorRunning == false ? false
+        : scaleFaultActive == false && conveyorRunning == true ? true : null;
     private string SharedTagCount(int? count) => !PlcSimulated() && PlcConnected() && count.HasValue ? count.Value.ToString("N0") : "—";
     private string ConveyorMotionLabel => MobileRunning == true ? "Convoyeur en fonction" : MobileRunning == false ? "Convoyeur arrêté" : "État du convoyeur inconnu";
     private string MobileConveyorName => Options.Value.General?.DepotId == 1
