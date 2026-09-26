@@ -103,7 +103,7 @@
                 @if (line.Code98Enabled)
                 {
                     @MobileMetric("Erreurs poids", line.Counters.ScaleErrors, Math.Max(0, line.Counters.TotalParcels - line.Counters.NoReads))
-                    @MobileMetric("Erreurs dimensionneur", line.Counters.DimensionErrors, Math.Max(0, line.Counters.TotalParcels - line.Counters.NoReads))
+                    @MobileMetric("Erreurs dim", line.Counters.DimensionErrors, Math.Max(0, line.Counters.TotalParcels - line.Counters.NoReads))
                 }
             </div>
         </div>
