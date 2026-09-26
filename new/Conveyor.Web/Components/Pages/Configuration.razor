@@ -83,7 +83,7 @@ else
                 <label class="toggle-field"><InputCheckbox @bind-Value="_model.RslinxRestart.AutoRestart" /><span>Redémarrer RSLinx automatiquement si l’automate se déconnecte</span><small>Après 45 secondes de déconnexion : alerte SMS et une tentative par incident. Les SMS exigent l’activation de Twilio. Les déconnexions volontaires sont ignorées.</small></label>
                 @if (_model.RslinxRestart.Mode == "Application")
                 {
-                    <label><span>Chemin complet de RSLINX.exe</span><InputText @bind-Value="_model.RslinxRestart.ExecutablePath" /><small>Conveyor.Web et RSLinx doivent fonctionner dans la même session Windows interactive.</small></label>
+                    <label><span>Chemin complet de RSLINX.exe</span><InputText @bind-Value="_model.RslinxRestart.ExecutablePath" /><small>RSLinx est relancé avec sa fenêtre visible. Conveyor.Web et RSLinx doivent fonctionner dans la même session Windows interactive.</small></label>
                 }
                 <label><span>Tag démarrage convoyeur</span><InputText @bind-Value="_general.ConveyorStartTag" /><small>Commun aux deux lignes : 1 démarre le convoyeur et 0 l’arrête.</small></label>
                 @TextField("Tag nombre de chutes pleines — convoyeur", _general.FullChutesTag, value => _general.FullChutesTag = value.Trim())

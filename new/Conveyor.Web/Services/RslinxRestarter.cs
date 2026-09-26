@@ -89,8 +89,8 @@ public sealed class RslinxRestarter(ILogger<RslinxRestarter> logger) : IRslinxRe
                 $startInfo.FileName = $exe
                 $startInfo.WorkingDirectory = [IO.Path]::GetDirectoryName($exe)
                 $startInfo.UseShellExecute = $true
-                $startInfo.CreateNoWindow = $true
-                $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+                $startInfo.CreateNoWindow = $false
+                $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
                 $started = [System.Diagnostics.Process]::Start($startInfo)
                 if ($started.WaitForExit(3000)) { throw 'RSLinx quitte immediatement apres son lancement.' }
             } else { throw 'Mode de redemarrage inconnu.' }
