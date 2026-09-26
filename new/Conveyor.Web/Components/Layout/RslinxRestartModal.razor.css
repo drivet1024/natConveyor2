@@ -3,3 +3,6 @@
 h2 { font-size: 1.1rem; }
 p { font-size: .9rem; }
 .rslinx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+.rslinx-success { display: block; width: 100%; margin-top: 1rem; padding: 1.4rem 1rem; border: 1px solid #36d982; border-radius: 6px; background: #36d982; color: #071d11; font: inherit; font-size: 1.8rem; font-weight: 800; cursor: pointer; }
+.rslinx-success:hover { background: #5ae59b; }
+.rslinx-success:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }

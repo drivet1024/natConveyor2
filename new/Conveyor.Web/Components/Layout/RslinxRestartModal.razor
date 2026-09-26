@@ -4,15 +4,21 @@
 
 <dialog @ref="_dialog" class="rslinx-dialog" aria-labelledby="rslinx-title">
     <h2 id="rslinx-title">Redémarrer RSLinx</h2>
-    <p>Le redémarrage interrompt les communications automate des deux lignes. Le convoyeur doit être arrêté.</p>
-    @if (_message is not null) { <p role="status">@_message</p> }
-    <div class="rslinx-actions">
-        <button type="button" class="btn" autofocus disabled="@(_busy && !_waitingForConnection)" @onclick="OnClose">@(_waitingForConnection ? "Fermer la fenêtre" : _completed ? "Fermer" : "Annuler")</button>
-        @if (!_completed)
-        {
+    @if (_completed)
+    {
+        <div role="status">
+            <button type="button" class="rslinx-success" aria-label="SUCCÈS — fermer la fenêtre" @onclick="OnClose">SUCCÈS</button>
+        </div>
+    }
+    else
+    {
+        <p>Le redémarrage interrompt les communications automate des deux lignes. Le convoyeur doit être arrêté.</p>
+        @if (_message is not null) { <p role="status">@_message</p> }
+        <div class="rslinx-actions">
+            <button type="button" class="btn" autofocus disabled="@(_busy && !_waitingForConnection)" @onclick="OnClose">@(_waitingForConnection ? "Fermer la fenêtre" : "Annuler")</button>
             <button type="button" class="btn btn-test" disabled="@_busy" @onclick="Restart">@(_waitingForConnection ? "Reconnexion en cours…" : _busy ? "Redémarrage…" : "Redémarrer RSLinx")</button>
-        }
-    </div>
+        </div>
+    }
 </dialog>
 
 @code {
