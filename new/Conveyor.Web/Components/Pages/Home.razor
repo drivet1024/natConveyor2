@@ -98,7 +98,7 @@
             <div class="mobile-counter-rejections">
                 @foreach (var cause in line.Counters.RejectionCauses())
                 {
-                    @MobileMetric(cause.Label, cause.Count, line.Counters.TotalParcels)
+                    @MobileMetric(cause.Label == "Plusieurs code-barres" ? "Plusieurs CB" : cause.Label, cause.Count, line.Counters.TotalParcels)
                 }
                 @MobileMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels)
                 @MobileMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, false)
