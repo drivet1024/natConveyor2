@@ -319,6 +319,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     }
     public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);
+    public Task SetLineMotionAsync(int lineId, bool start) => WithConnectionGateAsync(() => Get(lineId).SetLineMotionAsync(start));
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();
     public Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight) => Get(lineId).SimulateAsync(cameraData, dimension, weight);
     private LineController Get(int lineId) => _lines.TryGetValue(lineId, out var line) ? line : throw new KeyNotFoundException($"Ligne {lineId} inconnue.");

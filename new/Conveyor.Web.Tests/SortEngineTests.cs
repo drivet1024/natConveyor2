@@ -1107,15 +1107,56 @@ public sealed class SortEngineTests
     private sealed class MotionPlc : IPlcGateway
     {
         public bool IsConnected { get; set; } = true;
+        public bool FailWrite { get; set; }
         public List<(string Tag, int Value, int Repeat)> Commands { get; } = [];
         public Task ConnectAsync(CancellationToken token) => Task.CompletedTask;
         public Task DisconnectAsync() => Task.CompletedTask;
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(IsConnected);
         public Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken token)
         {
+            if (FailWrite) throw new IOException("Write failed");
             Commands.Add((tag, chute, repeat));
             return Task.CompletedTask;
         }
+    }
+
+    [Theory]
+    [InlineData("FAUTE_M31")]
+    [InlineData("FAUTE_M30")]
+    public async Task ManualLineMotionWritesStopZeroAndStartOneToConfiguredTag(string tag)
+    {
+        var line = Line();
+        line.Plc.ScaleFaultTag = tag;
+        var repo = new FakeRepository();
+        var plc = new MotionPlc();
+        var controller = new LineController(line, true, repo, plc, false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        await controller.SetLineMotionAsync(false);
+        await controller.SetLineMotionAsync(true);
+        Assert.Equal(new[] { (tag, 0, 1), (tag, 1, 1) }, plc.Commands);
+        Assert.Equal(0, controller.Snapshot().Counters.ScaleFaults);
+    }
+
+    [Fact]
+    public async Task ManualLineMotionRejectsMissingTagAndDisconnectedPlcAndPropagatesWriteFailure()
+    {
+        var line = Line();
+        line.Plc.ScaleFaultTag = "";
+        var repo = new FakeRepository();
+        var plc = new MotionPlc();
+        var controller = new LineController(line, true, repo, plc, false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SetLineMotionAsync(true));
+        line.Plc.ScaleFaultTag = "FAUTE_M31";
+        plc.IsConnected = false;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SetLineMotionAsync(true));
+        plc.IsConnected = true;
+        plc.FailWrite = true;
+        await Assert.ThrowsAsync<IOException>(() => controller.SetLineMotionAsync(true));
+        Assert.Empty(plc.Commands);
+        plc.FailWrite = false;
+        await controller.SetLineMotionAsync(false);
+        Assert.Single(plc.Commands);
     }
 
     private static ParcelContext Parcel(string camera) => new(camera, DateTimeOffset.Now, new Dimension(12, 8, 5), DateTimeOffset.Now, 4.75m, DateTimeOffset.Now);

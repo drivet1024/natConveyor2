@@ -93,6 +93,16 @@
                     aria-label="@(line.Code98Enabled ? "Désactiver le code 98 pour cette ligne" : "Activer le code 98 pour cette ligne")"
                     title="@(line.Code98Enabled ? "Code 98 actif — cliquer pour désactiver sur cette ligne" : "Code 98 désactivé — cliquer pour activer sur cette ligne")"
                     @onclick="() => Supervisor.SetCode98Enabled(line.LineId, !line.Code98Enabled)">98</button>
+            <button type="button" class="btn line-motion @(line.ScaleFaultActive == true ? "line-motion-green" : line.ScaleFaultActive == false ? "line-motion-red" : null)"
+                    disabled="@(_lineMotionBusy.Contains(line.LineId) || !line.Connections.Plc || line.ScaleFaultActive is null)"
+                    title="Commande du tag faute balance : arrêt = 0, démarrage = 1"
+                    @onclick="() => SetLineMotion(line.LineId, line.ScaleFaultActive != true)">
+                @(_lineMotionBusy.Contains(line.LineId) ? "ENVOI…" : line.ScaleFaultActive == true ? "ARRÊTER LIGNE" : line.ScaleFaultActive == false ? "DÉMARRER LIGNE" : "ÉTAT INCONNU")
+            </button>
+            @if (_lineMotionErrors.TryGetValue(line.LineId, out var motionError))
+            {
+                <span class="shift-error" role="alert">@motionError</span>
+            }
             @if (!string.IsNullOrEmpty(_shiftError))
             {
                 <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span>
@@ -128,6 +138,17 @@
     private IReadOnlyList<ConveyorShift> _shifts = [];
     private bool _changingShift;
     private string? _shiftError;
+    private readonly HashSet<int> _lineMotionBusy = [];
+    private readonly Dictionary<int, string> _lineMotionErrors = [];
+
+    private async Task SetLineMotion(int lineId, bool start)
+    {
+        if (!_lineMotionBusy.Add(lineId)) return;
+        _lineMotionErrors.Remove(lineId);
+        try { await Supervisor.SetLineMotionAsync(lineId, start); Refresh(); }
+        catch (Exception exception) { _lineMotionErrors[lineId] = exception.Message; }
+        finally { _lineMotionBusy.Remove(lineId); }
+    }
     private int? _converterLineId;
     private bool? _motionStart;
     private bool _motionBusy;

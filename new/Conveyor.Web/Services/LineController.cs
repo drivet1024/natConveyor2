@@ -285,6 +285,25 @@ internal sealed class LineController
 
     public Task TriggerScaleFaultTestAsync() => SendScaleFaultPulseAsync(CancellationToken.None);
 
+    public async Task SetLineMotionAsync(bool start)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Plc.ScaleFaultTag))
+            throw new InvalidOperationException($"Aucun tag de faute balance n'est configuré pour la ligne {_options.Id + 1}.");
+        if (!_plc.IsConnected) throw new InvalidOperationException("La connexion automate n’est pas disponible.");
+        if (!await _scaleFaultPulseGate.WaitAsync(0))
+            throw new InvalidOperationException("Une impulsion faute balance est en cours sur cette ligne. Réessayer après sa fin.");
+        try
+        {
+            var value = start ? 1 : 0;
+            await _plc.SendChuteAsync(_options.Plc.ScaleFaultTag, value, 1, CancellationToken.None);
+            _logger.LogInformation("Ligne {Line} : commande {Action}, valeur {Value} envoyée au tag {Tag}",
+                _options.Id + 1, start ? "DÉMARRER LIGNE" : "ARRÊTER LIGNE", value, _options.Plc.ScaleFaultTag);
+            // Reflect the accepted write; subsequent PLC notifications remain authoritative.
+            RecordScaleFaultReception(value.ToString());
+        }
+        finally { _scaleFaultPulseGate.Release(); }
+    }
+
     public async Task SimulateAsync(string cameraData, Dimension dimension, decimal weight)
     {
         if (!_simulation) throw new InvalidOperationException("L'injection est disponible uniquement en mode simulation.");

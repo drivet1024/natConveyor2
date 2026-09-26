@@ -33,6 +33,10 @@
 .supervision-metric.metric-critical strong{color:#ff4e5b;font-size:2.25rem}
 .supervision-actions{display:flex;align-items:center;gap:.8rem;min-height:78px;margin-top:auto;padding:1rem 1.2rem}
 .supervision-actions .btn-code98{display:grid;place-items:center;min-width:50px;min-height:46px;margin-left:0;padding:.65rem;font-size:.9rem}
+.supervision-actions{flex-wrap:wrap}
+.line-motion{min-height:46px;white-space:nowrap}
+.line-motion-green{color:#071d11;background:#36d982;border-color:#36d982}
+.line-motion-red{color:#fff;background:#b92436;border-color:#b92436}
 .line-tools{display:flex;align-items:center;gap:.5rem;margin-left:auto}
 .shift-choice{display:inline-flex;align-items:center;gap:.55rem;color:var(--muted);font-size:.95rem}
 .shift-choice select{min-width:12rem;padding:.65rem 2rem .65rem .8rem;border:1px solid #36464d;border-radius:4px;background:#0d1317;color:#fff;font-size:.95rem;font-weight:600}

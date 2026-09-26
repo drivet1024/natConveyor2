@@ -65,6 +65,7 @@ public interface IConveyorSupervisor
     Task StopLineAsync(int lineId);
     void ResetCounters(int lineId);
     void SetCode98Enabled(int lineId, bool enabled);
+    Task SetLineMotionAsync(int lineId, bool start);
     Task TriggerScaleFaultTestAsync(int lineId);
     Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight);
 }
