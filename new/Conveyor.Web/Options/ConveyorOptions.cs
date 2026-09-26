@@ -67,6 +67,8 @@ public sealed class ConveyorOptions
 public sealed class GeneralOptions
 {
     public const string DefaultConveyorStartTag = "DEPART_SYSTEMES";
+    public string FullChutesTag { get; set; } = "SHARE_NB_CHUTEPLEINE";
+    public string Code42Tag { get; set; } = "SHARE_NB_CODE42";
     public int? ConveyorId { get; set; }
     public bool Maintenance { get; set; }
     public string Name { get; set; } = "Convoyeur";

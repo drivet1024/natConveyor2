@@ -86,6 +86,8 @@ else
                     <label><span>Chemin complet de RSLINX.exe</span><InputText @bind-Value="_model.RslinxRestart.ExecutablePath" /><small>Conveyor.Web et RSLinx doivent fonctionner dans la même session Windows interactive.</small></label>
                 }
                 <label><span>Tag démarrage convoyeur</span><InputText @bind-Value="_general.ConveyorStartTag" /><small>Commun aux deux lignes : 1 démarre le convoyeur et 0 l’arrête.</small></label>
+                @TextField("Tag nombre de chutes pleines — convoyeur", _general.FullChutesTag, value => _general.FullChutesTag = value.Trim())
+                @TextField("Tag nombre de codes 42 — convoyeur", _general.Code42Tag, value => _general.Code42Tag = value.Trim())
                 <label><span>Tag fermeture chute 39</span><InputText @bind-Value="_plc.CloseChute39Tag" /><small>Commun aux deux lignes : 1 détourne les colis de la chute 39 vers la recirculation 97 ; 0 rétablit la chute 39. Lu en DDE ou OPC DA.</small></label>
             </div>
         </div>

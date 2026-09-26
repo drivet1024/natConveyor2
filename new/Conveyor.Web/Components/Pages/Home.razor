@@ -52,6 +52,10 @@
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
+        <div class="conveyor-tag-counts" aria-label="Compteurs du convoyeur">
+            <div title="@Options.Value.General?.FullChutesTag"><strong>@SharedTagCount(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
+            <div class="desktop-only" title="@Options.Value.General?.Code42Tag"><strong>@SharedTagCount(Supervisor.Code42Count)</strong><span>Code 42</span></div>
+        </div>
         <div class="mobile-only shipment-freshness">
             <span class="mobile-indicator" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel"><span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span></span>
             <span class="mobile-indicator" role="status" title="@ConveyorMotionLabel" aria-label="@ConveyorMotionLabel"><span class="connection-led @(MobileRunning == true ? "ok" : MobileRunning == false ? "ko" : "sim")" aria-hidden="true"></span><span>Convoyeur</span></span>
@@ -156,6 +160,7 @@
         if (!_mobileDataLines.Add(lineId)) _mobileDataLines.Remove(lineId);
     }
     private bool? MobileRunning => !PlcSimulated() && PlcConnected() ? Supervisor.ConveyorRunning : null;
+    private string SharedTagCount(int? count) => !PlcSimulated() && PlcConnected() && count.HasValue ? count.Value.ToString("N0") : "—";
     private string ConveyorMotionLabel => MobileRunning == true ? "Convoyeur en fonction" : MobileRunning == false ? "Convoyeur arrêté" : "État du convoyeur inconnu";
     private string MobileConveyorName => Options.Value.General?.DepotId == 1
         ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")

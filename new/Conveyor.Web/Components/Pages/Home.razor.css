@@ -1,6 +1,9 @@
 
 .mobile-only { display: none; }
 .mobile-counters { display: none; }
+.conveyor-tag-counts { display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.conveyor-tag-counts strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.conveyor-tag-counts span { display: block; color: var(--muted); font-size: .7rem; }
 .line-state-badges { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-shrink: 0; }
 .code98-state { align-items: center; justify-content: center; padding: .35rem .5rem; border: 1px solid; border-radius: 4px; font-size: .75rem; font-weight: 800; }
 .code98-state.enabled { color: var(--green); border-color: var(--green); background: #49d17d18; }
@@ -113,6 +116,8 @@
     .header-summary { display: contents; }
     .shipment-freshness { grid-column: 1 / -1; grid-row: 2; align-items: center; gap: 1.2rem; font-size: .78rem; }
     .mobile-indicator { display: inline-flex; align-items: center; gap: .5rem; }
+    .conveyor-tag-counts { grid-column: 1 / -1; grid-row: 3; }
+    .conveyor-tag-counts > div:not(.desktop-only) { display: flex; align-items: baseline; gap: .5rem; }
     .shipment-freshness .connection-led { flex-shrink: 0; }
     .shipment-freshness .connection-led.sim { background: var(--orange); box-shadow: none; }
     .header-summary ::deep .service-status { grid-column: 2; grid-row: 1; }

@@ -22,8 +22,12 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly IRslinxRestarter? _rslinxRestarter;
     private readonly string _closeChute39Tag;
     private readonly string _motionTag;
+    private readonly string _fullChutesTag;
+    private readonly string _code42Tag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
+    public int? FullChutesCount { get; private set; }
+    public int? Code42Count { get; private set; }
     public bool Maintenance => _configuration.General?.Maintenance == true;
     public bool HasStartedOperatingMode { get; private set; }
     private volatile bool _rslinxRestartInProgress;
@@ -100,9 +104,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var primaryLine = activeLines.First();
         _closeChute39Tag = primaryLine.Plc.CloseChute39Tag;
         _motionTag = configuration.General?.ConveyorStartTag?.Trim() ?? ConveyorMotion.DefaultMotionTag;
+        var sharedTags = configuration.General ?? new GeneralOptions();
+        _fullChutesTag = sharedTags.FullChutesTag.Trim();
+        _code42Tag = sharedTags.Code42Tag.Trim();
         PlcConfiguration.Validate(primaryLine.Plc);
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
-            .Append(_closeChute39Tag).Append(_motionTag).Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
+            .Append(_closeChute39Tag).Append(_motionTag)
+            .Append(_fullChutesTag).Append(_code42Tag)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
@@ -128,6 +137,17 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     internal void RecordPlcTagChange(string tag, string value)
     {
+        var fullChutes = !string.IsNullOrWhiteSpace(_fullChutesTag) &&
+            string.Equals(tag, _fullChutesTag, StringComparison.OrdinalIgnoreCase);
+        var code42 = !string.IsNullOrWhiteSpace(_code42Tag) &&
+            string.Equals(tag, _code42Tag, StringComparison.OrdinalIgnoreCase);
+        if (fullChutes || code42)
+        {
+            int? count = int.TryParse(value.Trim('\0', ' ', '\r', '\n', '\t'), out var parsed) && parsed >= 0 ? parsed : null;
+            if (fullChutes) FullChutesCount = count;
+            if (code42) Code42Count = count;
+            Changed?.Invoke();
+        }
         if (!string.IsNullOrWhiteSpace(_closeChute39Tag) && string.Equals(tag, _closeChute39Tag, StringComparison.OrdinalIgnoreCase))
         {
             var state = value.Trim('\0', ' ', '\r', '\n', '\t');
@@ -244,6 +264,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             _logger.LogWarning("Redémarrage RSLinx demandé ; interruption temporaire des échanges automate");
             await _plc.DisconnectAsync();
             ConveyorRunning = null;
+            FullChutesCount = null;
+            Code42Count = null;
             Changed?.Invoke();
             var reconnected = false;
             try { await _rslinxRestarter.RestartAsync(_configuration.RslinxRestart, timeout.Token); }

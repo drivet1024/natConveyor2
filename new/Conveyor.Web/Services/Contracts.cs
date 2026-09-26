@@ -50,6 +50,8 @@ public interface IConveyorSupervisor
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }
     bool? ConveyorRunning { get; }
+    int? FullChutesCount { get; }
+    int? Code42Count { get; }
     bool Maintenance { get; }
     bool HasStartedOperatingMode { get; }
     bool CanChangeOperatingMode { get; }

@@ -8,6 +8,38 @@ namespace Conveyor.Web.Tests;
 
 public sealed class ShiftSelectionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SharedConveyorCountsFollowTheirConfiguredTags(bool customTags)
+    {
+        var options = CreateOptions(1);
+        if (customTags)
+        {
+            options.General!.FullChutesTag = "FULL_CUSTOM";
+            options.General.Code42Tag = "CODE42_CUSTOM";
+        }
+        using var supervisor = CreateSupervisor(options);
+        Assert.Null(supervisor.FullChutesCount);
+        Assert.Null(supervisor.Code42Count);
+        var notifications = 0;
+        supervisor.Changed += () => notifications++;
+        supervisor.RecordPlcTagChange(options.General!.FullChutesTag.ToLowerInvariant(), " 3\0\r\n");
+        supervisor.RecordPlcTagChange(options.General.Code42Tag, "42");
+        Assert.Equal(3, supervisor.FullChutesCount);
+        Assert.Equal(42, supervisor.Code42Count);
+        Assert.Equal(2, notifications);
+        supervisor.RecordPlcTagChange("UNRELATED", "9");
+        Assert.Equal(2, notifications);
+        supervisor.RecordPlcTagChange(options.General.FullChutesTag, "0");
+        Assert.Equal(0, supervisor.FullChutesCount);
+        Assert.Equal(42, supervisor.Code42Count);
+        supervisor.RecordPlcTagChange(options.General.FullChutesTag, "invalid");
+        supervisor.RecordPlcTagChange(options.General.Code42Tag, "-1");
+        Assert.Null(supervisor.FullChutesCount);
+        Assert.Null(supervisor.Code42Count);
+    }
+
     [Fact]
     public async Task SelectionUpdatesBothLinesAndNotifiesObservers()
     {
