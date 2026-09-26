@@ -120,8 +120,10 @@
     .header-summary { display: contents; }
     .shipment-freshness { grid-column: 1 / -1; grid-row: 2; align-items: center; gap: 1.2rem; font-size: .78rem; }
     .mobile-indicator { display: inline-flex; align-items: center; gap: .5rem; }
-    .conveyor-tag-counts { grid-column: 1 / -1; grid-row: 3; flex-wrap: wrap; }
-    .conveyor-tag-counts > div { display: flex; align-items: baseline; gap: .5rem; }
+    .conveyor-tag-counts { grid-column: 1 / -1; grid-row: 3; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; align-items: stretch; }
+    .conveyor-tag-counts > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; min-width: 0; }
+    .conveyor-tag-counts > div:first-child { padding-right: .75rem; }
+    .conveyor-tag-counts > div + div { border-left: 1px solid var(--line); padding-left: .75rem; justify-content: flex-end; text-align: right; }
     .conveyor-tag-counts .desktop-tag-value { display: none; }
     .conveyor-tag-counts .mobile-tag-value { display: block; white-space: nowrap; }
     .shipment-freshness .connection-led { flex-shrink: 0; }
