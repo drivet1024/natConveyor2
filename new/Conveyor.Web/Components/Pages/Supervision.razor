@@ -21,6 +21,10 @@
         <h1>Supervision</h1>
     </div>
     <div class="supervision-header-actions">
+        <div class="conveyor-rates" aria-label="Pourcentages du convoyeur" title="Valeur du tag ÷ total des colis de toutes les lignes du convoyeur × 100">
+            <div><strong>@SharedTagRate(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
+            <div><strong>@SharedTagRate(Supervisor.Code42Count)</strong><span>Code 42</span></div>
+        </div>
         <section class="supervision-conveyor-controls" aria-label="Commandes du convoyeur">
             <span class="@(Supervisor.ConveyorRunning == true ? "running" : null)">CONVOYEUR</span>
             <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
@@ -106,6 +110,12 @@
 
 @code {
     private IReadOnlyList<LineSnapshot> _lines = [];
+    private string SharedTagRate(int? count)
+    {
+        var running = _lines.Where(line => line.Running).ToArray();
+        if (!count.HasValue || running.Length == 0 || running.Any(line => line.Connections.Simulated || !line.Connections.Plc)) return "—";
+        return FormatPercentage(count.Value, _lines.Sum(line => line.Counters.TotalParcels)) + " %";
+    }
     private IReadOnlyList<ConveyorShift> _shifts = [];
     private bool _changingShift;
     private string? _shiftError;
