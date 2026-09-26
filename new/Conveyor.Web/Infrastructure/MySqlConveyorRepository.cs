@@ -263,16 +263,14 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         catch { return false; }
     }
 
-    public async Task<bool?> HasOverdueShipmentsAsync(CancellationToken cancellationToken)
+    public async Task<bool?> HasRecentShipmentUpdatesAsync(CancellationToken cancellationToken)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
-        const string sql = "select exists(select 1 from conveyor_shipment where INSERT_DATE < @cutoff), exists(select 1 from conveyor_shipment where INSERT_DATE is null)";
+        const string sql = "select exists(select 1 from conveyor_shipment where UPDATE_DATE > DATE_SUB(NOW(), INTERVAL 60 MINUTE))";
         await using var command = new MySqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@cutoff", DateTime.Now.AddMinutes(-10).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken)) return null;
-        return reader.GetBoolean(0) ? true : reader.GetBoolean(1) ? null : false;
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value is null or DBNull ? null : Convert.ToBoolean(value, CultureInfo.InvariantCulture);
     }
 
     public async Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken)

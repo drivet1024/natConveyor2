@@ -11,24 +11,24 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
-    public async Task ShipmentAgeRefreshesIndependentlyOfLatestShipmentUpdateAndClearsOnFailure()
+    public async Task ShipmentSyncRefreshesIndependentlyOfLatestShipmentUpdateAndClearsOnFailure()
     {
-        var repository = new FakeRepository { ParcelCount = 2, ShipmentUpdate = DateTimeOffset.Now, OverdueShipments = false };
+        var repository = new FakeRepository { ParcelCount = 2, ShipmentUpdate = DateTimeOffset.Now, RecentShipmentUpdates = false };
         using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
         await metrics.RefreshAsync();
-        Assert.False(metrics.Current.HasOverdueShipments);
-        repository.OverdueShipments = true;
+        Assert.False(metrics.Current.HasRecentShipmentUpdates);
+        repository.RecentShipmentUpdates = true;
         await metrics.RefreshAsync();
-        Assert.True(metrics.Current.HasOverdueShipments);
+        Assert.True(metrics.Current.HasRecentShipmentUpdates);
         Assert.Equal(1, repository.ShipmentDateReads);
-        repository.FailShipmentAge = true;
+        repository.FailShipmentSync = true;
         await metrics.RefreshAsync();
-        Assert.Null(metrics.Current.HasOverdueShipments);
+        Assert.Null(metrics.Current.HasRecentShipmentUpdates);
         Assert.True(metrics.Current.Connected);
-        repository.FailShipmentAge = false;
-        repository.OverdueShipments = false;
+        repository.FailShipmentSync = false;
+        repository.RecentShipmentUpdates = false;
         await metrics.RefreshAsync();
-        Assert.False(metrics.Current.HasOverdueShipments);
+        Assert.False(metrics.Current.HasRecentShipmentUpdates);
     }
 
     [Theory]
@@ -1061,10 +1061,10 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
-        public bool? OverdueShipments { get; set; }
-        public bool FailShipmentAge { get; set; }
-        public Task<bool?> HasOverdueShipmentsAsync(CancellationToken token) => FailShipmentAge
-            ? throw new IOException("Shipment age unavailable") : Task.FromResult(OverdueShipments);
+        public bool? RecentShipmentUpdates { get; set; }
+        public bool FailShipmentSync { get; set; }
+        public Task<bool?> HasRecentShipmentUpdatesAsync(CancellationToken token) => FailShipmentSync
+            ? throw new IOException("Shipment age unavailable") : Task.FromResult(RecentShipmentUpdates);
         private readonly Dictionary<(string Type, string Barcode), int> _exceptionPasses = [];
         public List<SortDecision> SavedDecisions { get; } = [];
         public List<decimal> SavedParcelWeights { get; } = [];

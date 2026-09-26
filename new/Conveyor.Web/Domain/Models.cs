@@ -96,7 +96,7 @@ public sealed record DeviceReception(string Raw, DateTimeOffset ReceivedAt, long
 
 public sealed record PlcDispatch(DateTimeOffset SentAt, int Chute, long ElapsedMs, long Sequence);
 
-public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false, DateTimeOffset? LastShipmentUpdate = null, bool? HasOverdueShipments = null);
+public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false, DateTimeOffset? LastShipmentUpdate = null, bool? HasRecentShipmentUpdates = null);
 
 public sealed record LineSnapshot(
     int LineId,

@@ -49,8 +49,8 @@
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
-        <div class="mobile-only shipment-freshness" role="status" title="Âge depuis l’insertion dans conveyor_shipment — seuil de 10 minutes">
-            <span class="connection-led @ShipmentFreshnessCss"></span><span>@ShipmentFreshnessLabel</span>
+        <div class="mobile-only shipment-freshness" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel">
+            <span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span>
         </div>
     </div>
 </header>
@@ -64,9 +64,38 @@
 @foreach (var line in _lines)
 {
     <article class="line-card">
-        <div class="line-title compact-line-title"><h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2><span class="run-state @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span></div>
+        <div class="line-title compact-line-title">
+            <h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2>
+            <div class="line-state-badges">
+                <span class="run-state @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
+                <span class="mobile-only code98-state @(line.Code98Enabled ? "enabled" : "disabled")"
+                      title="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")"
+                      aria-label="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")">98</span>
+            </div>
+        </div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
-        <div class="metrics"><div class="metric metric-parcels">
+        <div class="mobile-counters">
+            <div class="mobile-counter-summary">
+                <div class="mobile-counter"><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis convoyés</span></div>
+                @MobileMetric("Triés sans problème", line.Counters.SortedWithoutIssue, line.Counters.TotalParcels, false)
+            </div>
+            <div class="mobile-counter-rejections">
+                @foreach (var cause in line.Counters.RejectionCauses())
+                {
+                    @MobileMetric(cause.Label, cause.Count, line.Counters.TotalParcels)
+                }
+                @MobileMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels)
+            </div>
+            <div class="mobile-counter-quality">
+                @MobileMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels)
+                @if (line.Code98Enabled)
+                {
+                    @MobileMetric("Erreurs poids", line.Counters.ScaleErrors, Math.Max(0, line.Counters.TotalParcels - line.Counters.NoReads))
+                    @MobileMetric("Erreurs dimensionneur", line.Counters.DimensionErrors, Math.Max(0, line.Counters.TotalParcels - line.Counters.NoReads))
+                }
+            </div>
+        </div>
+        <div class="metrics desktop-only"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
             <div class="registered-total @(_database.HasOverdueScans ? "overdue" : "")" title="@(_database.HasOverdueScans ? "Au moins un enregistrement attend depuis plus de 5 minutes dans scan_history. Total toutes lignes, actualisé toutes les 2 secondes." : "Total en attente dans scan_history — toutes les lignes, actualisé toutes les 2 secondes")"><strong>@_database.Scans.ToString("N0")</strong><span>En attente</span></div>
         </div>
@@ -124,10 +153,10 @@
         ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")
         : Options.Value.General?.ConveyorId is { } id ? $"Convoyeur {id} — {Options.Value.General.Name}" : Options.Value.General?.Name ?? "Convoyeur";
     private bool ShipmentFreshnessKnown => _database.Connected && !_database.Simulated &&
-        DateTimeOffset.Now - _database.UpdatedAt <= TimeSpan.FromSeconds(15) && _database.HasOverdueShipments.HasValue;
-    private string ShipmentFreshnessCss => !ShipmentFreshnessKnown ? "sim" : _database.HasOverdueShipments == true ? "ko" : "ok";
-    private string ShipmentFreshnessLabel => _database.Simulated ? "Colis : simulation" : !ShipmentFreshnessKnown ? "Âge des colis indisponible"
-        : _database.HasOverdueShipments == true ? "Colis de plus de 10 min" : "Aucun colis de plus de 10 min";
+        DateTimeOffset.Now - _database.UpdatedAt <= TimeSpan.FromSeconds(15) && _database.HasRecentShipmentUpdates.HasValue;
+    private string ShipmentFreshnessCss => !ShipmentFreshnessKnown ? "sim" : _database.HasRecentShipmentUpdates == true ? "ok" : "ko";
+    private string ShipmentFreshnessLabel => _database.Simulated ? "Synchro : simulation" : !ShipmentFreshnessKnown ? "Synchro : vérification indisponible"
+        : _database.HasRecentShipmentUpdates == true ? "Synchro : colis mis à jour dans les 60 dernières minutes" : "Synchro : aucun colis mis à jour dans les 60 dernières minutes";
     private bool _rslinxDialog;
     private string MotionTag => Options.Value.General?.ConveyorStartTag ?? ConveyorMotion.DefaultMotionTag;
     private bool? _motionStart;
@@ -209,6 +238,13 @@
         <span>@label</span>
     </div>;
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
+    private RenderFragment MobileMetric(string label, long count, long total, bool emphasizeHigh = true) => @<div
+        class="mobile-counter @(emphasizeHigh ? Percentage(count, total) > 3 ? "counter-critical" : Percentage(count, total) > 1 ? "counter-warning" : null : null)"
+        title="@($"{label} : {count:N0} ÷ {total:N0} × 100")">
+        <strong>@Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</strong>
+        <small>@count.ToString("N0") colis</small>
+        <span>@label</span>
+    </div>;
     private bool _resettingData;
     private string? _resetDataMessage;
     private bool _scaleFaultTestBusy;

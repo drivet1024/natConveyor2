@@ -44,11 +44,11 @@ public sealed class DatabaseMetricsService(IConveyorRepository repository, ILogg
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 { logger.LogWarning(exception, "Impossible de lire la date de mise à jour des colis"); }
             }
-            bool? overdueShipments = null;
-            try { overdueShipments = await repository.HasOverdueShipmentsAsync(cancellationToken); }
+            bool? recentShipmentUpdates = null;
+            try { recentShipmentUpdates = await repository.HasRecentShipmentUpdatesAsync(cancellationToken); }
             catch (Exception exception) when (exception is not OperationCanceledException)
-            { logger.LogWarning(exception, "Impossible de vérifier les colis de plus de 10 minutes"); }
-            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, counts.Scans, true, repository.IsSimulation, DateTimeOffset.Now, counts.HasOverdueScans, lastUpdate, overdueShipments);
+            { logger.LogWarning(exception, "Impossible de vérifier la synchronisation des colis dans les 60 dernières minutes"); }
+            lock (_gate) _current = new(counts.Parcels, counts.PostalCodes, counts.Scans, true, repository.IsSimulation, DateTimeOffset.Now, counts.HasOverdueScans, lastUpdate, recentShipmentUpdates);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

@@ -7,7 +7,7 @@ public interface IConveyorRepository
     bool IsSimulation { get; }
     Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken);
     Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken);
-    Task<bool?> HasOverdueShipmentsAsync(CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
+    Task<bool?> HasRecentShipmentUpdatesAsync(CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
     Task ResetDataAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken);
     Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
