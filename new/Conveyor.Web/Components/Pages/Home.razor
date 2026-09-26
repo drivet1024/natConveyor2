@@ -119,7 +119,7 @@
             @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100")
             @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters)
             @ScaleErrorMetric(line.Counters)
-            @PercentageMetric("Code 97 · Recirculation", line.Counters.Code97, line.Counters.TotalParcels, "Colis envoyés vers la chute 97, y compris les détournements de la chute 39 fermée")</div>
+        </div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
         <div id="@($"last-decision-{line.LineId}")" class="decision-section @(_mobileDataLines.Contains(line.LineId) ? "mobile-data-open" : null)"><LastDecision Decision="line.LastDecision" /></div>
         @if (!string.IsNullOrWhiteSpace(line.LastError)) { <div class="line-error desktop-only">@line.LastError</div> }
