@@ -15,6 +15,23 @@
 <section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
     <div class="map-toolbar">
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
+        <label class="map-shift">Shift d’affichage
+            <select @bind:get="_displayShift" @bind:set="ChangeDisplayShift" disabled="@(_shifts.Count == 0)" title="Consulter les destinations sans modifier le shift du tri">
+                @if (!_shifts.Any(shift => shift.Id == _displayShift))
+                {
+                    <option value="@_displayShift">Shift @_displayShift</option>
+                }
+                @foreach (var shift in _shifts)
+                {
+                    <option value="@shift.Id">@shift.Name</option>
+                }
+            </select>
+            <small>Consultation seulement</small>
+        </label>
+        @if (_shiftError is not null)
+        {
+            <span class="shift-error" role="alert">@_shiftError <button class="btn" type="button" @onclick="LoadShifts">Réessayer</button></span>
+        }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
         <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" /></div>
@@ -31,32 +48,67 @@
     private Task? _refreshTask;
     private bool _disposed;
     private int? _loadedShift;
+    private int _displayShift;
+    private IReadOnlyList<ConveyorShift> _shifts = [];
+    private string? _shiftError;
+    private int _loadVersion;
+    private bool _loading;
     private DateTimeOffset _nextRefresh;
 
     protected override async Task OnInitializedAsync()
     {
+        _displayShift = Supervisor.CurrentShiftId;
+        await LoadShifts();
         await LoadDestinations();
         if (!_disposed) _refreshTask = RefreshDestinations();
     }
 
+    private async Task LoadShifts()
+    {
+        try
+        {
+            _shifts = await Repository.GetShiftsAsync(_stopping.Token);
+            _shiftError = _shifts.Count == 0 ? "Aucun shift disponible." : null;
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            _shiftError = "Impossible de charger les shifts.";
+            Logger.LogWarning(exception, "Chargement des shifts du plan impossible");
+        }
+    }
+
+    internal async Task ChangeDisplayShift(int shift)
+    {
+        if (_displayShift == shift || !_shifts.Any(item => item.Id == shift)) return;
+        _displayShift = shift;
+        await LoadDestinations();
+    }
+
     private async Task LoadDestinations()
     {
-        var shift = Supervisor.CurrentShiftId;
+        if (_disposed) return;
+        var shift = _displayShift;
+        var version = ++_loadVersion;
+        _loading = true;
         _destinations = new Dictionary<int, string>();
         _destinationStatus = "Chargement des destinations…";
         try
         {
             var destinations = await Repository.GetChuteDestinationsAsync(shift, _stopping.Token);
-            if (shift != Supervisor.CurrentShiftId) return;
+            if (_disposed || version != _loadVersion) return;
             _destinations = destinations;
             _destinationStatus = Repository.IsSimulation ? "Destinations indisponibles en simulation" : null;
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { return; }
         catch (Exception exception)
         {
+            if (_disposed || version != _loadVersion) return;
             _destinationStatus = "Destinations temporairement indisponibles";
             Logger.LogWarning(exception, "Chargement des dépôts de destination impossible pour le shift {Shift}", shift);
         }
+        finally { if (version == _loadVersion) _loading = false; }
+        if (_disposed || version != _loadVersion) return;
         _loadedShift = shift;
         _nextRefresh = DateTimeOffset.UtcNow.AddSeconds(60);
     }
@@ -70,7 +122,7 @@
             {
                 await InvokeAsync(async () =>
                 {
-                    if (_loadedShift == Supervisor.CurrentShiftId && DateTimeOffset.UtcNow < _nextRefresh) return;
+                    if (_loading || (_loadedShift == _displayShift && DateTimeOffset.UtcNow < _nextRefresh)) return;
                     var load = LoadDestinations();
                     StateHasChanged();
                     await load;
