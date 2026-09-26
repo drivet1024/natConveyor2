@@ -10,6 +10,30 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Fact]
+    public async Task LastParcelTimeTracksCameraAndSurvivesCounterReset()
+    {
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            Assert.Null(controller.Snapshot().LastParcelReceivedAt);
+            await controller.SimulateAsync("12345678901", new(4, 4, 4), 1);
+            var first = controller.Snapshot();
+            Assert.Equal(first.CameraInput!.ReceivedAt, first.LastParcelReceivedAt);
+            controller.ResetCounters();
+            Assert.Equal(first.LastParcelReceivedAt, controller.Snapshot().LastParcelReceivedAt);
+            await controller.SimulateAsync("?", new(4, 4, 4), 1);
+            var second = controller.Snapshot();
+            Assert.Equal(second.CameraInput!.ReceivedAt, second.LastParcelReceivedAt);
+            Assert.True(second.LastParcelReceivedAt >= first.LastParcelReceivedAt);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
     [Theory]
     [InlineData(6, 1.99, 6, 2, 1)]
     [InlineData(6, 2, 6, 2, 0)]

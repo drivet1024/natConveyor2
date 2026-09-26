@@ -1,0 +1,32 @@
+@implements IAsyncDisposable
+
+<span class="line-idle-time" title="Temps depuis la dernière trame caméra de cette ligne">
+    Sans colis : @(LastParcelAt is { } received ? FormatElapsed(DateTimeOffset.Now - received) : "—")
+</span>
+
+@code {
+    [Parameter] public DateTimeOffset? LastParcelAt { get; set; }
+    private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(1));
+    private Task? _updates;
+    private bool _disposed;
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _updates = UpdateAsync();
+    }
+    private async Task UpdateAsync()
+    {
+        while (await _timer.WaitForNextTickAsync())
+            await InvokeAsync(() => { if (!_disposed) StateHasChanged(); });
+    }
+    internal static string FormatElapsed(TimeSpan elapsed)
+    {
+        if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+        return $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _timer.Dispose();
+        if (_updates is not null) await _updates;
+    }
+}

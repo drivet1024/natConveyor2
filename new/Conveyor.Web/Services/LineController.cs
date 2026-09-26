@@ -66,6 +66,7 @@ internal sealed class LineController
         _changed();
     }
     private DeviceReception? _cameraInput;
+    private DateTimeOffset? _lastParcelReceivedAt;
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
     private PlcDispatch? _lastPlcDispatch;
@@ -82,7 +83,7 @@ internal sealed class LineController
                 DateTimeOffset.Now, (previous?.Sequence ?? 0) + 1, frame.Length > 4096);
             switch (device)
             {
-                case "camera": _cameraInput = input; break;
+                case "camera": _cameraInput = input; _lastParcelReceivedAt = input.ReceivedAt; break;
                 case "dimension": _dimensionInput = input; break;
                 default: _scaleInput = input; break;
             }
@@ -643,7 +644,7 @@ internal sealed class LineController
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
                 _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy(),
-                connections.Plc && !connections.Simulated ? _scaleFaultActive : null);
+                connections.Plc && !connections.Simulated ? _scaleFaultActive : null, _lastParcelReceivedAt);
         }
     }
 }

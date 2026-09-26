@@ -8,7 +8,7 @@
     .conveyor-tag-counts { order: -1; }
 }
 .conveyor-tag-counts span { display: block; color: var(--muted); font-size: .7rem; }
-.line-state-badges { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-shrink: 0; }
+.line-state-badges { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
 .code98-state { align-items: center; justify-content: center; padding: .35rem .5rem; border: 1px solid; border-radius: 4px; font-size: .75rem; font-weight: 800; }
 .code98-state.enabled { color: var(--green); border-color: var(--green); background: #49d17d18; }
 .code98-state.disabled { color: var(--red); border-color: var(--red); background: #ff5f6318; }

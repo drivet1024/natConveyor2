@@ -76,6 +76,14 @@
         <div class="line-title compact-line-title">
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2>
             <div class="line-state-badges">
+                @if (MobileRunning == true)
+                {
+                    <span class="desktop-only"><LineIdleTime LastParcelAt="line.LastParcelReceivedAt" /></span>
+                }
+                @if (mobileLineRunning == true)
+                {
+                    <span class="mobile-only"><LineIdleTime LastParcelAt="line.LastParcelReceivedAt" /></span>
+                }
                 <span class="run-state desktop-only @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
                 <span class="run-state mobile-only @(mobileLineRunning == true ? "on" : mobileLineRunning == false ? "off" : "unavailable")"
                       title="En marche uniquement si le tag faute balance vaut 0 et que le convoyeur fonctionne">@(mobileLineRunning == true ? "EN MARCHE" : mobileLineRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>

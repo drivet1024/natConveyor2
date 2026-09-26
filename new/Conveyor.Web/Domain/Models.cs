@@ -121,4 +121,5 @@ public sealed record LineSnapshot(
     bool Maintenance = false,
     LineCounters? ProductionCounters = null,
     LineCounters? MaintenanceCounters = null,
-    bool? ScaleFaultActive = null);
+    bool? ScaleFaultActive = null,
+    DateTimeOffset? LastParcelReceivedAt = null);

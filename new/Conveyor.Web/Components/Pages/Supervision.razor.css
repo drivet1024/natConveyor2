@@ -13,6 +13,8 @@
 .supervision-conveyor-controls .btn{padding:.4rem .6rem;font-size:.7rem;white-space:nowrap}
 .supervision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .supervision-line{min-width:0}
+.line-state-badges{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+.line-title.compact-line-title{flex-wrap:wrap;gap:.5rem}
 .supervision-line .connections{grid-template-columns:repeat(3,1fr);padding:.7rem 1.2rem}
 .supervision-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-bottom:1px solid var(--line)}
 .supervision-summary .supervision-metric{border-bottom:0}
