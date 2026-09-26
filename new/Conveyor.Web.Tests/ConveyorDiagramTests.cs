@@ -1,4 +1,7 @@
 using Conveyor.Web.Components.Layout;
+using Conveyor.Web.Components.Pages;
+using Conveyor.Web.Services;
+using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +11,31 @@ namespace Conveyor.Web.Tests;
 
 public sealed class ConveyorDiagramTests
 {
+    [Fact]
+    public async Task MapPagePassesLoadedDepotCodeInsteadOfLiteralStatusVariable()
+    {
+        using var services = new ServiceCollection().AddLogging()
+            .AddSingleton(DispatchProxy.Create<IConveyorRepository, MapDependencyProxy>())
+            .AddSingleton(DispatchProxy.Create<IConveyorSupervisor, MapDependencyProxy>())
+            .BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>());
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<ConveyorMap>()).ToHtmlString());
+        Assert.DoesNotContain("_destinationStatus", html);
+        Assert.Contains("Chute 23 — BLV", System.Net.WebUtility.HtmlDecode(html));
+    }
+
+    public class MapDependencyProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
+        {
+            "get_CurrentShiftId" => 1,
+            "get_IsSimulation" => false,
+            "GetChuteDestinationsAsync" => Task.FromResult<IReadOnlyDictionary<int, string>>(new Dictionary<int, string> { [23] = "BLV" }),
+            _ => throw new NotSupportedException(method?.Name)
+        };
+    }
+
     [Fact]
     public async Task NumberTooltipsIncludeDestinationsOnRepeatedLabelsAndEscapeDepotNames()
     {
