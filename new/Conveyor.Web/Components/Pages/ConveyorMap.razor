@@ -1,4 +1,8 @@
 @page "/plan-convoyeur"
+@implements IAsyncDisposable
+@inject IConveyorRepository Repository
+@inject IConveyorSupervisor Supervisor
+@inject ILogger<ConveyorMap> Logger
 
 <PageTitle>St-Hubert — Convoyeur du haut</PageTitle>
 
@@ -13,9 +17,75 @@
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram /></div>
+        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="_destinationStatus" /></div>
     </div>
     <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 11, 13, 16 et 21 à 41.</p>
 </section>
 
 </div>
+
+@code {
+    private IReadOnlyDictionary<int, string> _destinations = new Dictionary<int, string>();
+    private string? _destinationStatus = "Chargement des destinations…";
+    private readonly CancellationTokenSource _stopping = new();
+    private Task? _refreshTask;
+    private bool _disposed;
+    private int? _loadedShift;
+    private DateTimeOffset _nextRefresh;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDestinations();
+        if (!_disposed) _refreshTask = RefreshDestinations();
+    }
+
+    private async Task LoadDestinations()
+    {
+        var shift = Supervisor.CurrentShiftId;
+        _destinations = new Dictionary<int, string>();
+        _destinationStatus = "Chargement des destinations…";
+        try
+        {
+            var destinations = await Repository.GetChuteDestinationsAsync(shift, _stopping.Token);
+            if (shift != Supervisor.CurrentShiftId) return;
+            _destinations = destinations;
+            _destinationStatus = Repository.IsSimulation ? "Destinations indisponibles en simulation" : null;
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            _destinationStatus = "Destinations temporairement indisponibles";
+            Logger.LogWarning(exception, "Chargement des dépôts de destination impossible pour le shift {Shift}", shift);
+        }
+        _loadedShift = shift;
+        _nextRefresh = DateTimeOffset.UtcNow.AddSeconds(60);
+    }
+
+    private async Task RefreshDestinations()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stopping.Token))
+            {
+                await InvokeAsync(async () =>
+                {
+                    if (_loadedShift == Supervisor.CurrentShiftId && DateTimeOffset.UtcNow < _nextRefresh) return;
+                    var load = LoadDestinations();
+                    StateHasChanged();
+                    await load;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await _stopping.CancelAsync();
+        if (_refreshTask is not null) await _refreshTask;
+        _stopping.Dispose();
+    }
+}

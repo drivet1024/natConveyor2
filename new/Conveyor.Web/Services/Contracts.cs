@@ -10,6 +10,8 @@ public interface IConveyorRepository
     Task<bool?> HasRecentShipmentUpdatesAsync(CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
     Task ResetDataAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<ConveyorShift>> GetShiftsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<int, string>> GetChuteDestinationsAsync(int shiftId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<int, string>>(new Dictionary<int, string>());
     Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
