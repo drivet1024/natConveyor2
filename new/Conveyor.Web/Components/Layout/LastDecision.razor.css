@@ -1,6 +1,6 @@
 .parcel-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .85rem; container-type: inline-size; padding: .8rem 1.35rem; border-bottom: 1px solid var(--line); }
 .parcel-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--orange); font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
-.parcel-heading { grid-column: 1; grid-row: 1; }
+.parcel-heading { grid-column: 1; grid-row: 1; flex-wrap: wrap; }
 .parcel-main { display: contents; }
 .parcel-right { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: flex-end; gap: .6rem; margin-left: auto; }
 .measure-block { text-align: right; }

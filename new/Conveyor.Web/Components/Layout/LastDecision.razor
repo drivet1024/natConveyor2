@@ -1,6 +1,7 @@
 <section class="parcel-panel" aria-label="Dernière décision">
     <div class="parcel-heading">
         <span>DERNIÈRE DÉCISION</span>
+        @HeadingContent
     </div>
     @if (Decision is { } current)
     {
@@ -36,6 +37,7 @@
 
 @code {
     [Parameter] public SortDecision? Decision { get; set; }
+    [Parameter] public RenderFragment? HeadingContent { get; set; }
     private string Code98Css => Decision?.DisableCode98 switch { true => "disabled", false => "enabled", null => "unknown" };
     private string Code98Title => Decision?.DisableCode98 switch
     {
