@@ -52,8 +52,9 @@
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
-        <div class="mobile-only shipment-freshness" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel">
-            <span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span>
+        <div class="mobile-only shipment-freshness">
+            <span class="mobile-indicator" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel"><span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span></span>
+            <span class="mobile-indicator" role="status" title="@ConveyorMotionLabel" aria-label="@ConveyorMotionLabel"><span class="connection-led @(MobileRunning == true ? "ok" : MobileRunning == false ? "ko" : "sim")" aria-hidden="true"></span><span>Convoyeur</span></span>
         </div>
     </div>
 </header>
@@ -70,7 +71,9 @@
         <div class="line-title compact-line-title">
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2>
             <div class="line-state-badges">
-                <span class="run-state @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
+                <span class="run-state desktop-only @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span>
+                <span class="run-state mobile-only @(line.ScaleFaultActive == true ? "off" : line.ScaleFaultActive == false ? "on" : "unavailable")"
+                      title="État du tag de faute balance de cette ligne">@(line.ScaleFaultActive == true ? "ARRÊTÉ" : line.ScaleFaultActive == false ? "EN MARCHE" : "ÉTAT INCONNU")</span>
                 <span class="mobile-only code98-state @(line.Code98Enabled ? "enabled" : "disabled")"
                       title="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")"
                       aria-label="@(line.Code98Enabled ? "Code 98 activé" : "Code 98 désactivé")">98</span>
@@ -152,6 +155,7 @@
         if (!_mobileDataLines.Add(lineId)) _mobileDataLines.Remove(lineId);
     }
     private bool? MobileRunning => !PlcSimulated() && PlcConnected() ? Supervisor.ConveyorRunning : null;
+    private string ConveyorMotionLabel => MobileRunning == true ? "Convoyeur en fonction" : MobileRunning == false ? "Convoyeur arrêté" : "État du convoyeur inconnu";
     private string MobileConveyorName => Options.Value.General?.DepotId == 1
         ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")
         : Options.Value.General?.ConveyorId is { } id ? $"Convoyeur {id} — {Options.Value.General.Name}" : Options.Value.General?.Name ?? "Convoyeur";

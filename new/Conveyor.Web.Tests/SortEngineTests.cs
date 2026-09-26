@@ -11,6 +11,30 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
+    public void ScaleFaultReadbackIsIndependentPerLineAndUnknownWhenDisconnected()
+    {
+        var repository = new FakeRepository();
+        var plc = new MotionPlc();
+        var first = new LineController(Line(), false, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        var second = new LineController(Line(), false, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        Assert.Null(first.Snapshot().ScaleFaultActive);
+        first.RecordScaleFaultReception("1\0\r\n");
+        second.RecordScaleFaultReception("0");
+        Assert.True(first.Snapshot().ScaleFaultActive);
+        Assert.False(second.Snapshot().ScaleFaultActive);
+        first.RecordScaleFaultReception("invalid");
+        Assert.Null(first.Snapshot().ScaleFaultActive);
+        first.RecordScaleFaultReception("0");
+        Assert.False(first.Snapshot().ScaleFaultActive);
+        plc.IsConnected = false;
+        Assert.Null(first.Snapshot().ScaleFaultActive);
+        Assert.Null(second.Snapshot().ScaleFaultActive);
+        Assert.Empty(plc.Commands);
+    }
+
+    [Fact]
     public async Task ShipmentSyncRefreshesIndependentlyOfLatestShipmentUpdateAndClearsOnFailure()
     {
         var repository = new FakeRepository { ParcelCount = 2, ShipmentUpdate = DateTimeOffset.Now, RecentShipmentUpdates = false };

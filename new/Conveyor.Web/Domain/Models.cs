@@ -120,4 +120,5 @@ public sealed record LineSnapshot(
     PlcDispatch? LastPlcDispatch = null,
     bool Maintenance = false,
     LineCounters? ProductionCounters = null,
-    LineCounters? MaintenanceCounters = null);
+    LineCounters? MaintenanceCounters = null,
+    bool? ScaleFaultActive = null);

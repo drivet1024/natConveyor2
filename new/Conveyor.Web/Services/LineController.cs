@@ -35,6 +35,13 @@ internal sealed class LineController
     private DeviceReception? _plcInput;
     private DeviceReception? _plcTransferInput;
     private bool _chute39Closed;
+    private bool? _scaleFaultActive;
+    public void RecordScaleFaultReception(string value)
+    {
+        var active = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        lock (_gate) _scaleFaultActive = active;
+        _changed();
+    }
     public void SetChute39Closed(bool closed)
     {
         lock (_gate)
@@ -634,7 +641,8 @@ internal sealed class LineController
             return new(_options.Id, _options.Name, Running, connections, counters, _lastDecision, _lastError, DateTimeOffset.Now,
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
-                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy());
+                _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy(),
+                connections.Plc && !connections.Simulated ? _scaleFaultActive : null);
         }
     }
 }

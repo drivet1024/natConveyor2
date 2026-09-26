@@ -20,7 +20,8 @@
 .metrics .metric strong { color: #fff; }
 .database-local-status { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding-right: .8rem; border-right: 1px solid var(--line); }
 .database-local-status .database-summary-title { padding: 0; border: 0; }
-.database-local-status .registered-total { text-align: center; }
+.database-local-status .registered-total { display: flex; align-items: baseline; justify-content: center; gap: .35rem; min-width: 0; text-align: center; white-space: nowrap; }
+.database-local-status .registered-total strong { font-size: .8rem; }
 .database-local-status .registered-total.overdue strong { color: var(--red); }
 .metrics .metric .metric-percentage { color: var(--muted); }
 .metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
@@ -110,7 +111,8 @@
     .dashboard-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .6rem; }
     .mobile-location { grid-column: 1; grid-row: 1; }
     .header-summary { display: contents; }
-    .shipment-freshness { grid-column: 1 / -1; grid-row: 2; align-items: center; gap: .5rem; font-size: .78rem; }
+    .shipment-freshness { grid-column: 1 / -1; grid-row: 2; align-items: center; gap: 1.2rem; font-size: .78rem; }
+    .mobile-indicator { display: inline-flex; align-items: center; gap: .5rem; }
     .shipment-freshness .connection-led { flex-shrink: 0; }
     .shipment-freshness .connection-led.sim { background: var(--orange); box-shadow: none; }
     .header-summary ::deep .service-status { grid-column: 2; grid-row: 1; }

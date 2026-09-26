@@ -101,7 +101,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _closeChute39Tag = primaryLine.Plc.CloseChute39Tag;
         _motionTag = configuration.General?.ConveyorStartTag?.Trim() ?? ConveyorMotion.DefaultMotionTag;
         PlcConfiguration.Validate(primaryLine.Plc);
-        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
+        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
             .Append(_closeChute39Tag).Append(_motionTag).Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
@@ -147,6 +147,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             Get(line.Id).RecordPlcReception(value);
         foreach (var line in _configuration.GetConfiguredLines().Where(line => string.Equals(line.Plc.TransferTag, tag, StringComparison.OrdinalIgnoreCase)))
             Get(line.Id).RecordPlcTransferReception(value);
+        foreach (var line in _configuration.GetConfiguredLines().Where(line => !string.IsNullOrWhiteSpace(line.Plc.ScaleFaultTag) && string.Equals(line.Plc.ScaleFaultTag, tag, StringComparison.OrdinalIgnoreCase)))
+            Get(line.Id).RecordScaleFaultReception(value);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
