@@ -122,8 +122,8 @@
             @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100")
             @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")
             @PercentageMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger ÷ total des colis × 100")
-            @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100")
             @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters)
+            @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100")
             @ScaleErrorMetric(line.Counters)
         </div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
