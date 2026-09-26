@@ -207,10 +207,10 @@
         var percentage = Percentage(count, total);
         return percentage > 3 ? "metric-critical" : percentage > 1 ? "metric-warning" : "";
     }
-    private static bool LineAvailable(LineSnapshot line) => line.Connections.Simulated ||
-        (line.Connections.Camera && line.Connections.Dimensioner && line.Connections.Scale && line.Connections.Database && line.Connections.Plc);
-    private static string LineStateLabel(LineSnapshot line) => !line.Running ? "EN ARRÊT" : LineAvailable(line) ? "EN MARCHE" : "NON DISPONIBLE";
-    private static string LineStateCss(LineSnapshot line) => !line.Running ? "off" : LineAvailable(line) ? "on" : "unavailable";
+    private bool? ConveyorState(LineSnapshot line) => line.Running && line.Connections.Plc && !line.Connections.Simulated
+        ? Supervisor.ConveyorRunning : null;
+    private string LineStateLabel(LineSnapshot line) => ConveyorState(line) switch { true => "EN MARCHE", false => "ARRÊTÉ", _ => "ÉTAT INCONNU" };
+    private string LineStateCss(LineSnapshot line) => ConveyorState(line) switch { true => "on", false => "off", _ => "unavailable" };
 
     public void Dispose() => Supervisor.Changed -= OnChanged;
 }

@@ -10,6 +10,27 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Fact]
+    public async Task ShipmentAgeRefreshesIndependentlyOfLatestShipmentUpdateAndClearsOnFailure()
+    {
+        var repository = new FakeRepository { ParcelCount = 2, ShipmentUpdate = DateTimeOffset.Now, OverdueShipments = false };
+        using var metrics = new DatabaseMetricsService(repository, NullLogger<DatabaseMetricsService>.Instance);
+        await metrics.RefreshAsync();
+        Assert.False(metrics.Current.HasOverdueShipments);
+        repository.OverdueShipments = true;
+        await metrics.RefreshAsync();
+        Assert.True(metrics.Current.HasOverdueShipments);
+        Assert.Equal(1, repository.ShipmentDateReads);
+        repository.FailShipmentAge = true;
+        await metrics.RefreshAsync();
+        Assert.Null(metrics.Current.HasOverdueShipments);
+        Assert.True(metrics.Current.Connected);
+        repository.FailShipmentAge = false;
+        repository.OverdueShipments = false;
+        await metrics.RefreshAsync();
+        Assert.False(metrics.Current.HasOverdueShipments);
+    }
+
     [Theory]
     [InlineData(4, 8, 3, 6, true)]
     [InlineData(6, 8, 7, 6, true)]
@@ -140,7 +161,13 @@ public sealed class SortEngineTests
             var dispatch = controller.Snapshot().LastPlcDispatch;
             Assert.NotNull(dispatch);
             Assert.Equal(4, dispatch.Chute);
-            Assert.True(dispatch.ElapsedMs >= line.CorrelationDelayMs);
+            // Task.Delay and the wall-clock timestamps do not share a precise
+            // millisecond boundary on Windows (timer ticks can be ~16 ms).
+            // Still reject an immediate dispatch, without failing on one tick
+            // of scheduling/clock granularity in the CI runner.
+            const int clockToleranceMs = 20;
+            Assert.True(dispatch.ElapsedMs >= line.CorrelationDelayMs - clockToleranceMs,
+                $"Dispatch after {dispatch.ElapsedMs} ms; expected about {line.CorrelationDelayMs} ms (tolerance {clockToleranceMs} ms).");
         }
         finally { await controller.StopAsync(); }
     }
@@ -1034,6 +1061,10 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public bool? OverdueShipments { get; set; }
+        public bool FailShipmentAge { get; set; }
+        public Task<bool?> HasOverdueShipmentsAsync(CancellationToken token) => FailShipmentAge
+            ? throw new IOException("Shipment age unavailable") : Task.FromResult(OverdueShipments);
         private readonly Dictionary<(string Type, string Barcode), int> _exceptionPasses = [];
         public List<SortDecision> SavedDecisions { get; } = [];
         public List<decimal> SavedParcelWeights { get; } = [];

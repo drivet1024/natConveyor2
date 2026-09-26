@@ -30,6 +30,7 @@
 }
 
 <header class="dashboard-header">
+    <div class="mobile-only mobile-location"><strong>@Options.Value.General?.GetDepotDisplayName()</strong><span>@MobileConveyorName</span></div>
     <div class="control-heading"><h1 class="eyebrow">CENTRE DE CONTRÔLE</h1><span class="software-version" title="Version du logiciel" aria-label="@($"Version du logiciel {SoftwareVersion}")">@SoftwareVersion</span></div>
     <div class="header-summary">
         <section class="conveyor-controls" aria-labelledby="conveyor-controls-title">
@@ -48,6 +49,9 @@
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
+        <div class="mobile-only shipment-freshness" role="status" title="Âge depuis l’insertion dans conveyor_shipment — seuil de 10 minutes">
+            <span class="connection-led @ShipmentFreshnessCss"></span><span>@ShipmentFreshnessLabel</span>
+        </div>
     </div>
 </header>
 
@@ -60,7 +64,7 @@
 @foreach (var line in _lines)
 {
     <article class="line-card">
-        <div class="line-title compact-line-title"><h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2><span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span></div>
+        <div class="line-title compact-line-title"><h2 class="line-number">LIGNE @(line.LineId + 1)@if (Supervisor.HasStartedOperatingMode) { <text> - @(Supervisor.Maintenance ? "MAINTENANCE" : "PRODUCTION")</text> }</h2><span class="run-state @(MobileRunning == true ? "on" : MobileRunning == false ? "off" : "unavailable")">@(MobileRunning == true ? "EN MARCHE" : MobileRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU")</span></div>
         <div class="connections">@Connection("Caméra",line.Connections.Camera,line.Connections.Simulated) @Connection("Dimensionneur",line.Connections.Dimensioner,line.Connections.Simulated) @Connection("Balance",line.Connections.Scale,line.Connections.Simulated)</div>
         <div class="metrics"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
@@ -115,6 +119,15 @@
 </section>
 
 @code {
+    private bool? MobileRunning => !PlcSimulated() && PlcConnected() ? Supervisor.ConveyorRunning : null;
+    private string MobileConveyorName => Options.Value.General?.DepotId == 1
+        ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")
+        : Options.Value.General?.ConveyorId is { } id ? $"Convoyeur {id} — {Options.Value.General.Name}" : Options.Value.General?.Name ?? "Convoyeur";
+    private bool ShipmentFreshnessKnown => _database.Connected && !_database.Simulated &&
+        DateTimeOffset.Now - _database.UpdatedAt <= TimeSpan.FromSeconds(15) && _database.HasOverdueShipments.HasValue;
+    private string ShipmentFreshnessCss => !ShipmentFreshnessKnown ? "sim" : _database.HasOverdueShipments == true ? "ko" : "ok";
+    private string ShipmentFreshnessLabel => _database.Simulated ? "Colis : simulation" : !ShipmentFreshnessKnown ? "Âge des colis indisponible"
+        : _database.HasOverdueShipments == true ? "Colis de plus de 10 min" : "Aucun colis de plus de 10 min";
     private bool _rslinxDialog;
     private string MotionTag => Options.Value.General?.ConveyorStartTag ?? ConveyorMotion.DefaultMotionTag;
     private bool? _motionStart;
@@ -242,10 +255,6 @@
     private string PlcCss() => PlcSimulated() ? "sim" : PlcConnected() ? "ok" : "ko";
     private string PlcLabel() => PlcSimulated() ? "Simulation" : PlcConnected() ? "Connecté" : "Déconnecté";
     private string PlcTitle() => PlcSimulated() ? "Automate simulé — aucune connexion physique" : PlcConnected() ? "Connexion automate établie" : "Connexion automate indisponible";
-    private static bool LineAvailable(LineSnapshot line) => line.Connections.Simulated ||
-        (line.Connections.Camera && line.Connections.Dimensioner && line.Connections.Scale && line.Connections.Database && line.Connections.Plc);
-    private static string LineStateLabel(LineSnapshot line) => !line.Running ? "EN ARRÊT" : LineAvailable(line) ? "EN MARCHE" : "NON DISPONIBLE";
-    private static string LineStateCss(LineSnapshot line) => !line.Running ? "off" : LineAvailable(line) ? "on" : "unavailable";
     private static string FormatCount(long value) => value.ToString("N0");
     public void Dispose() { Supervisor.Changed -= OnChanged; DatabaseMetrics.Changed -= OnChanged; }
 }
