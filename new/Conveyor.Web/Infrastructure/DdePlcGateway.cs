@@ -100,6 +100,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             if (!ReferenceEquals(client, _client) || !_tags.TryGetValue(tag, out var state)) return;
             state.Value = Normalize(value);
             state.Version++;
+            state.MissedNotifications = 0;
             state.ReadFailed = false;
             UpdateReadHealth();
             Publish(tag, state.Value);
@@ -153,6 +154,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             _consecutiveReadFailures = 0;
             bool restart;
             bool subscribe;
+            bool reconnect;
             lock (_receptionGate)
             {
                 var state = _tags[tag];
@@ -160,9 +162,19 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
                 state.ReadFailed = false;
                 // Never overwrite a newer notification delivered during Request.
                 restart = state.Subscribed && state.Version == version && state.Value is not null && state.Value != value;
+                // An accepted subscription does not prove that notifications resume.
+                // Escalate repeated silent changes instead of restarting the same loop forever.
+                if (restart) state.MissedNotifications++;
+                reconnect = restart && state.MissedNotifications >= 3;
                 subscribe = !state.Subscribed || restart;
                 if (state.Version == version) { state.Value = value; Publish(tag, value); }
                 UpdateReadHealth();
+            }
+            if (reconnect)
+            {
+                _logger.LogWarning("Notifications DDE toujours absentes pour {Tag} après plusieurs reprises; reconnexion complète de la conversation (valeur {Value})", tag, value);
+                await OpenConnectionAsync(token);
+                return ReadsHealthy;
             }
             if (restart)
                 _logger.LogWarning("Lecture directe DDE reçue pour {Tag} sans notification correspondante; reprise de l’abonnement (valeur {Value})", tag, value);
@@ -229,7 +241,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
             client = _client;
             _client = null;
             _readsHealthy = false;
-            foreach (var state in _tags.Values) { state.Subscribed = false; state.ReadFailed = false; state.Value = null; state.Version = 0; }
+            foreach (var state in _tags.Values) { state.Subscribed = false; state.ReadFailed = false; state.Value = null; state.Version = 0; state.MissedNotifications = 0; }
         }
         if (client is null) return;
         try { client.Advise -= _adviseHandler; }
@@ -257,6 +269,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
     {
         public string? Value;
         public long Version;
+        public int MissedNotifications;
         public bool Subscribed;
         public bool ReadFailed;
     }

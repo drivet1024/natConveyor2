@@ -39,6 +39,59 @@ public sealed class DdePlcGatewayTests
     }
 
     [Fact]
+    public async Task RepeatedSilentChangesReconnectAndNewNotificationsReachSubscribersWithoutReplayingWrites()
+    {
+        var first = new FakeConnection();
+        var second = new FakeConnection();
+        var connections = new Queue<FakeConnection>([first, second]);
+        var clock = new Clock();
+        using var gateway = Create(() => connections.Dequeue(), clock);
+        var values = new List<string>();
+        gateway.TagChanged += (_, value) => values.Add(value);
+        await gateway.ConnectAsync(default);
+        await gateway.SendChuteAsync("COLISDDE", 5, 1, default);
+        first.Emit("5");
+        foreach (var value in new[] { "68", "16", "39" })
+        {
+            first.Value = value;
+            Assert.True(await gateway.PingAsync(default));
+            clock.Advance();
+        }
+        Assert.True(first.Disposed);
+        Assert.Equal(2, first.Stops);
+        Assert.Equal(1, second.Subscriptions);
+        second.Emit("7");
+        first.Emit("99");
+        Assert.Equal(["5", "68", "16", "39", "7"], values);
+        Assert.Single(first.Writes);
+        Assert.Empty(second.Writes);
+    }
+
+    [Fact]
+    public async Task ResumedNotificationsResetSilentChangeCount()
+    {
+        var client = new FakeConnection();
+        var clock = new Clock();
+        var created = 0;
+        using var gateway = Create(() => { created++; return client; }, clock);
+        await gateway.ConnectAsync(default);
+        client.Emit("5");
+        for (var cycle = 0; cycle < 3; cycle++)
+        {
+            foreach (var value in new[] { "68", "16" })
+            {
+                client.Value = value;
+                Assert.True(await gateway.PingAsync(default));
+                clock.Advance();
+            }
+            client.Emit("5");
+        }
+        Assert.Equal(1, created);
+        Assert.False(client.Disposed);
+        Assert.Equal(6, client.Stops);
+    }
+
+    [Fact]
     public async Task ConstantValueRefreshesReceptionWithoutRestartingSubscription()
     {
         var client = new FakeConnection();

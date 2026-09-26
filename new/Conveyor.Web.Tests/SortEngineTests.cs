@@ -795,6 +795,39 @@ public sealed class SortEngineTests
         finally { await supervisor.StopLineAsync(0); await supervisor.StopLineAsync(1); }
     }
     [Theory]
+    [InlineData(false, -1, 12, 1)]
+    [InlineData(false, 5, -1, 1)]
+    [InlineData(false, -1, -1, 1)]
+    [InlineData(false, 500, 500, 1)]
+    [InlineData(true, -1, 12, 0)]
+    [InlineData(true, 5, -1, 0)]
+    [InlineData(true, -1, -1, 0)]
+    [InlineData(true, 500, 500, 0)]
+    [InlineData(true, 5, 12, 1)]
+    public async Task SortedWithoutIssueIgnoresMeasurementErrorsWhenCode98IsDisabled(
+        bool code98Enabled, int weight, int length, long expected)
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Sorting = new() { CorrelationDelayMs = 0, RejectedChute = 16,
+                ValidateDimensionsAndWeight = code98Enabled, MaximumWeight = 100, MaximumDimension = 100 },
+            Lines = [new() { Id = 0 }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(length, 8, 5), weight);
+            var counters = supervisor.GetSnapshots()[0].Counters;
+            Assert.Equal(1, counters.TotalParcels);
+            Assert.Equal(expected, counters.SortedWithoutIssue);
+            Assert.Equal(weight <= 0 || weight > 100 ? 1 : 0, counters.ScaleErrors);
+            Assert.Equal(length <= 0 || length > 100 ? 1 : 0, counters.DimensionErrors);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Theory]
     [InlineData("98765432101", 1, false, 1)]
     [InlineData("98765432101", 1, true, 1)]
     [InlineData("12345678901", 1, false, 0)]

@@ -414,7 +414,7 @@ internal sealed class LineController
                 var routed = routingReason is "Route de l'expédition" or "Route du code postal";
                 var measurementsValid = parcel.Dimension.IsValid(_options.MaximumDimension) &&
                                         parcel.Weight > 0 && parcel.Weight <= _options.MaximumWeight;
-                if (routed && measurementsValid && !decision.ShipmentNotFound &&
+                if (routed && (!_options.ValidateDimensionsAndWeight || measurementsValid) && !decision.ShipmentNotFound &&
                     effectiveChute == decision.PlcChute && decision.PlcChute != _options.RejectedChute)
                     parcelCounters.SortedWithoutIssue++;
                 _lastDimension = null;
