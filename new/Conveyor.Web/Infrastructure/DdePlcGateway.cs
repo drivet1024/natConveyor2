@@ -75,6 +75,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
 
     private async Task SubscribeAsync(IDdeConnection client, string tag, bool restart, CancellationToken token)
     {
+        lock (_receptionGate) { if (_tags[tag].Disabled) return; }
         lock (_receptionGate) { _tags[tag].Subscribed = false; UpdateReadHealth(); }
         try
         {
@@ -97,11 +98,12 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
     {
         lock (_receptionGate)
         {
-            if (!ReferenceEquals(client, _client) || !_tags.TryGetValue(tag, out var state)) return;
+            if (!ReferenceEquals(client, _client) || !_tags.TryGetValue(tag, out var state) || state.Disabled) return;
             state.Value = Normalize(value);
             state.Version++;
             state.MissedNotifications = 0;
             state.ReadFailed = false;
+            state.FirstReadFailure = null;
             UpdateReadHealth();
             Publish(tag, state.Value);
         }
@@ -131,20 +133,49 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
                 _logger.LogWarning("Connexion DDE perdue ou indisponible; tentative de reconnexion à {Service}|{Topic}", _options.DdeService, _options.DdeTopic);
                 await OpenConnectionAsync(token);
             }
-            if (_tags.Count == 0) return ReadsHealthy;
+            string[] activeTags;
+            lock (_receptionGate) activeTags = _tags.Where(pair => !pair.Value.Disabled).Select(pair => pair.Key).ToArray();
+            if (activeTags.Length == 0) return ReadsHealthy;
             var client = _client!;
-            var tag = _tags.Keys.ElementAt(_probeIndex);
-            _probeIndex = (_probeIndex + 1) % _tags.Count;
+            var tag = activeTags[_probeIndex % activeTags.Length];
+            _probeIndex = (_probeIndex + 1) % activeTags.Length;
             long version;
             lock (_receptionGate) version = _tags[tag].Version;
             string value;
             try { value = Normalize(await Task.Run(() => client.Request(tag, 1_000), token)); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                lock (_receptionGate) { _tags[tag].ReadFailed = true; UpdateReadHealth(); }
+                bool disabled;
+                bool subscribed;
+                lock (_receptionGate)
+                {
+                    var state = _tags[tag];
+                    // A notification received during Request proves the tag is still readable.
+                    if (state.Version != version) return ReadsHealthy;
+                    state.ReadFailed = true;
+                    state.FirstReadFailure ??= _time.GetUtcNow();
+                    disabled = _time.GetUtcNow() - state.FirstReadFailure.Value >= TimeSpan.FromMinutes(2);
+                    subscribed = state.Subscribed;
+                    if (disabled) { state.Disabled = true; state.Subscribed = false; }
+                    UpdateReadHealth();
+                }
+                if (disabled)
+                {
+                    _logger.LogWarning("Lecture DDE désactivée pour {Tag} après deux minutes d’échecs. Nouvelle tentative au redémarrage de l’application", tag);
+                    if (subscribed)
+                    {
+                        try { await Task.Run(() => client.StopAdvise(tag, 1_000), token); }
+                        catch (Exception stopError) when (stopError is not OperationCanceledException)
+                        {
+                            _logger.LogDebug(stopError, "Impossible d’arrêter l’abonnement DDE du tag désactivé {Tag}; ses notifications seront ignorées", tag);
+                        }
+                    }
+                    _consecutiveReadFailures = 0;
+                    return ReadsHealthy;
+                }
                 _logger.LogWarning("Lecture directe DDE échouée pour {Tag}: {Error}. La conversation reste connectée et les autres tags continuent",
                     tag, exception.Message);
-                if (++_consecutiveReadFailures >= Math.Max(3, _tags.Count))
+                if (++_consecutiveReadFailures >= Math.Max(3, activeTags.Length))
                 {
                     _logger.LogWarning("Échecs consécutifs des lectures DDE; reconnexion au prochain contrôle");
                     DisposeClient();
@@ -160,6 +191,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
                 var state = _tags[tag];
                 if (state.ReadFailed) _logger.LogInformation("Lecture directe DDE rétablie pour {Tag}", tag);
                 state.ReadFailed = false;
+                state.FirstReadFailure = null;
                 // Never overwrite a newer notification delivered during Request.
                 restart = state.Subscribed && state.Version == version && state.Value is not null && state.Value != value;
                 // An accepted subscription does not prove that notifications resume.
@@ -229,9 +261,9 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
 
     private static string Normalize(string value) => value.TrimEnd('\0', '\r', '\n');
     // A bad or missing tag must not report the whole DDE conversation as disconnected.
-    // The unavailable tag remains marked for retry while healthy tags continue to operate.
+    // Disabled tags remain suspended across automatic transport reconnections.
     private void UpdateReadHealth() =>
-        _readsHealthy = _tags.Count == 0 || _tags.Values.Any(state => state.Subscribed && !state.ReadFailed);
+        _readsHealthy = _tags.Count == 0 || _tags.Values.Any(state => !state.Disabled && state.Subscribed && !state.ReadFailed);
 
     private void DisposeClient()
     {
@@ -272,5 +304,7 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
         public int MissedNotifications;
         public bool Subscribed;
         public bool ReadFailed;
+        public DateTimeOffset? FirstReadFailure;
+        public bool Disabled;
     }
 }

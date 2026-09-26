@@ -276,11 +276,106 @@ public sealed class DdePlcGatewayTests
         Assert.Single(client.Writes);
     }
 
+    [Fact]
+    public async Task InvalidTagIsSuspendedAfterTwoMinutesAndStaysSuspendedAcrossReconnects()
+    {
+        var clock = new Clock();
+        var first = new FakeConnection();
+        first.FailedTags.Add("INVALID");
+        var second = new FakeConnection();
+        var connections = new Queue<FakeConnection>([first, second]);
+        using var gateway = new DdePlcGateway(new(), NullLogger<DdePlcGateway>.Instance,
+            ["INVALID", "COLISDDE"], () => connections.Dequeue(), clock);
+        await gateway.ConnectAsync(default);
+        for (var index = 0; index < 24; index++)
+        {
+            Assert.True(await gateway.PingAsync(default));
+            clock.Advance();
+        }
+        Assert.Equal(0, first.Stops); // 115 seconds: keep retrying.
+        Assert.True(await gateway.PingAsync(default)); // 120 seconds: suspend INVALID.
+        Assert.Equal(1, first.Stops);
+        Assert.Equal(13, first.RequestedTags.Count(tag => tag == "INVALID"));
+        for (var index = 0; index < 6; index++)
+        {
+            clock.Advance();
+            Assert.True(await gateway.PingAsync(default));
+        }
+        Assert.Equal(13, first.RequestedTags.Count(tag => tag == "INVALID"));
+        first.IsConnected = false;
+        clock.Advance();
+        Assert.True(await gateway.PingAsync(default));
+        Assert.Equal(["COLISDDE"], second.SubscribedTags);
+        Assert.Equal(["COLISDDE"], second.RequestedTags);
+        await gateway.SendChuteAsync("INVALID", 1, 1, default);
+        Assert.Single(second.Writes); // Only reads are suspended.
+
+        var restarted = new FakeConnection();
+        using var newGateway = new DdePlcGateway(new(), NullLogger<DdePlcGateway>.Instance,
+            ["INVALID"], () => restarted, clock);
+        await newGateway.ConnectAsync(default);
+        Assert.True(await newGateway.PingAsync(default));
+        Assert.Equal(["INVALID"], restarted.RequestedTags);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SuccessfulReceptionRestartsFailureWindow(bool notification)
+    {
+        var clock = new Clock();
+        var client = new FakeConnection { FailRequest = true };
+        using var gateway = Create(() => client, clock);
+        await gateway.ConnectAsync(default);
+        await gateway.PingAsync(default);
+        clock.Advance(115);
+        if (notification) client.Emit("16");
+        else
+        {
+            client.FailRequest = false;
+            await gateway.PingAsync(default);
+            client.FailRequest = true;
+        }
+        clock.Advance();
+        await gateway.PingAsync(default);
+        Assert.Equal(0, client.Stops);
+        Assert.True(client.IsConnected);
+    }
+
+    [Fact]
+    public async Task AllFailedTagsStaySuspendedWithoutFurtherReadsOrReconnects()
+    {
+        var clock = new Clock();
+        var clients = new List<FakeConnection>();
+        using var gateway = Create(() =>
+        {
+            var client = new FakeConnection { FailRequest = true };
+            clients.Add(client);
+            return client;
+        }, clock);
+        await gateway.ConnectAsync(default);
+        for (var index = 0; index <= 24; index++)
+        {
+            Assert.False(await gateway.PingAsync(default));
+            clock.Advance();
+        }
+        var count = clients.Count;
+        var requests = clients.Sum(client => client.Requests);
+        for (var index = 0; index < 10; index++)
+        {
+            Assert.False(await gateway.PingAsync(default));
+            clock.Advance();
+        }
+        Assert.Equal(count, clients.Count);
+        Assert.Equal(requests, clients.Sum(client => client.Requests));
+        Assert.True(gateway.IsConnected);
+    }
+
     private sealed class Clock : TimeProvider
     {
         private DateTimeOffset _now = DateTimeOffset.UtcNow;
         public override DateTimeOffset GetUtcNow() => _now;
-        public void Advance() => _now = _now.AddSeconds(5);
+        public void Advance(int seconds = 5) => _now = _now.AddSeconds(seconds);
     }
 
     private sealed class FakeConnection : IDdeConnection
@@ -293,6 +388,8 @@ public sealed class DdePlcGatewayTests
         public Action? DuringRequest;
         public Action? DuringPoke;
         public HashSet<string> FailedTags = [];
+        public List<string> RequestedTags = [];
+        public List<string> SubscribedTags = [];
         public List<(string Tag, string Value)> Writes = [];
         public void Connect()
         {
@@ -303,6 +400,7 @@ public sealed class DdePlcGatewayTests
         public void StartAdvise(string tag, int timeout)
         {
             Subscriptions++;
+            SubscribedTags.Add(tag);
             if (FailSubscribe) throw new IOException("Subscription failed");
         }
         public void StopAdvise(string tag, int timeout)
@@ -313,6 +411,7 @@ public sealed class DdePlcGatewayTests
         public string Request(string tag, int timeout)
         {
             Requests++;
+            RequestedTags.Add(tag);
             if (FailRequest || FailedTags.Contains(tag)) throw new IOException("Read timeout");
             DuringRequest?.Invoke();
             return Value;
