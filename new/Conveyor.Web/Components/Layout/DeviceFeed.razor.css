@@ -4,6 +4,9 @@
 .feed-heading > span { color: var(--muted); font-size: .55rem; }
 .feed-row { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: .65rem; padding: .55rem .7rem; }
 .feed-row + .feed-row { border-top: 1px solid var(--line); }
+.feed-row.late-scale { background: #ff5f6318; box-shadow: inset 3px 0 var(--red); }
+.late-scale .feed-label strong, .late-scale .feed-payload code, .late-scale .feed-time { color: var(--red); }
+.late-scale-label { display: block; margin-top: .25rem; font-size: .65rem; color: var(--red); }
 .feed-label strong { display: block; font-size: .61rem; color: var(--ink); }
 .feed-label small, .feed-empty { color: var(--muted); font-size: .65rem; }
 .feed-label small { display: block; }
