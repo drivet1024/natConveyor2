@@ -32,6 +32,7 @@
 .shift-choice select{min-width:12rem;padding:.65rem 2rem .65rem .8rem;border:1px solid #36464d;border-radius:4px;background:#0d1317;color:#fff;font-size:.95rem;font-weight:600}
 .supervision-actions .gear-button{display:grid;place-items:center;min-width:46px;min-height:46px;padding:.6rem;font-size:1.05rem}
 .shift-error{color:#ff6677;font-size:.75rem}
-.supervision-grid.single-line{grid-template-columns:minmax(0,calc((100% - 1.2rem)/2));justify-content:center}
-@media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-grid.single-line{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.supervision-grid.single-line{grid-template-columns:minmax(0,720px);justify-content:center}
+.supervision-grid.single-line ::deep .barcode-value{font-size:clamp(1.4rem,4.8cqi,2rem)}
+@media(max-width:1100px){.supervision-grid{grid-template-columns:1fr}.supervision-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.supervision-header{align-items:flex-start;flex-direction:column}.supervision-header-actions{align-items:flex-start;flex-direction:column}.supervision-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.supervision-metric:nth-child(3n){border-right:1px solid var(--line)}.supervision-metric:nth-child(2n){border-right:0}.supervision-actions{padding:.85rem}.shift-choice select{min-width:9rem}}
