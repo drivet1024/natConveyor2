@@ -209,8 +209,17 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await Task.WhenAll(_lines.Values.Select(line => line.StopAsync()));
-        await base.StopAsync(cancellationToken);
+        try
+        {
+            await Task.WhenAll(_lines.Values.Select(line => line.StopAsync()));
+        }
+        finally
+        {
+            // Close the shared transport even if the primary line was already stopped
+            // or a device failed during shutdown. Do not defer COM cleanup to DI disposal.
+            try { await _plc.DisconnectAsync(); }
+            finally { await base.StopAsync(cancellationToken); }
+        }
         if (_coordinateStatistics && _statistics!.Initialized)
         {
             try

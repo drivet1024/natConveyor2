@@ -35,7 +35,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
         _time = time;
         var monitored = tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         _lastReceived = monitored.ToDictionary(tag => tag, _ => DateTimeOffset.MinValue, StringComparer.OrdinalIgnoreCase);
-        _factory = factory ?? (() => new OpcDaConnection(options, monitored, subscriptionOnlyTags));
+        _factory = factory ?? (() => new OpcDaConnection(options, monitored, subscriptionOnlyTags, logger));
     }
 
     public async Task ConnectAsync(CancellationToken token)
@@ -149,7 +149,12 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
     public async Task DisconnectAsync()
     {
         await _gate.WaitAsync();
-        try { _requested = false; DisposeClient(); }
+        try
+        {
+            _requested = false;
+            DisposeClient();
+            _logger.LogInformation("Connexion automate OPC DA fermée volontairement");
+        }
         finally { _gate.Release(); }
     }
 

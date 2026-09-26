@@ -156,6 +156,41 @@ public sealed class OpcDaPlcGatewayTests
         Assert.Equal(2, received);
     }
 
+    [Fact]
+    public async Task ShutdownWaitsForReadThenReleasesClientOnceAndIgnoresLateCallbacks()
+    {
+        var client = new FakeConnection();
+        using var gateway = Create(() => client);
+        var received = new List<string>();
+        gateway.TagChanged += (_, value) => received.Add(value);
+        await gateway.ConnectAsync(default);
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.DuringRead = () =>
+        {
+            entered.TrySetResult();
+            Assert.True(release.Wait(TimeSpan.FromSeconds(5)));
+        };
+        var read = gateway.PingAsync(default);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var shutdown = gateway.DisconnectAsync();
+        try
+        {
+            Assert.False(shutdown.IsCompleted);
+            Assert.False(client.Disposed);
+        }
+        finally { release.Set(); }
+        await read;
+        await shutdown;
+        var count = received.Count;
+        client.Emit(39);
+        await gateway.DisconnectAsync();
+        gateway.Dispose();
+        Assert.Equal(count, received.Count);
+        Assert.Equal(1, client.DisposeCount);
+        Assert.False(await gateway.PingAsync(default));
+    }
+
     private static OpcDaPlcGateway Create(Func<IOpcDaConnection> factory, TimeProvider? clock = null) =>
         new(new PlcOptions { Protocol = "OpcDa" }, NullLogger<OpcDaPlcGateway>.Instance,
             ["COLISDDE"], factory, clock ?? new Clock());
@@ -171,6 +206,7 @@ public sealed class OpcDaPlcGatewayTests
     {
         public bool IsConnected { get; set; }
         public bool Disposed, FailRead, FailWrite, OmitReads;
+        public int DisposeCount;
         public Action? DuringRead;
         private DateTimeOffset _timestamp = DateTimeOffset.UtcNow;
         public event Action<IReadOnlyList<OpcDaReading>>? ValuesChanged;
@@ -196,6 +232,6 @@ public sealed class OpcDaPlcGatewayTests
             _timestamp = _timestamp.AddSeconds(1);
             ValuesChanged?.Invoke([new("COLISDDE", value, good, _timestamp)]);
         }
-        public void Dispose() { Disposed = true; IsConnected = false; }
+        public void Dispose() { DisposeCount++; Disposed = true; IsConnected = false; }
     }
 }

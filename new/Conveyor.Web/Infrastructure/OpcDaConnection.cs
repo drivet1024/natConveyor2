@@ -19,7 +19,8 @@ internal interface IOpcDaConnection : IDisposable
     Task WriteAsync(string tag, int value, CancellationToken token);
 }
 
-internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags, string[]? subscriptionOnlyTags = null) : IOpcDaConnection
+internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags, string[]? subscriptionOnlyTags = null,
+    ILogger? logger = null) : IOpcDaConnection
 {
     private static readonly MethodInfo SetComObject = typeof(OpcDaServer)
         .GetProperty(nameof(OpcDaServer.ComObject), BindingFlags.Instance | BindingFlags.Public)!
@@ -90,6 +91,7 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
         {
             if (!_server.IsConnected) _server.Connect();
             _group = _server.AddGroup("Conveyor-" + Guid.NewGuid().ToString("N"));
+            logger?.LogInformation("Groupe OPC DA créé : {Group}, processus {ProcessId}", _group.Name, Environment.ProcessId);
             _group.UpdateRate = TimeSpan.FromMilliseconds(options.OpcUpdateRateMs);
             _group.ValuesChanged += OnValuesChanged;
             // Every monitored item remains active and subscribed. Only the
@@ -168,11 +170,34 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
     public void Dispose()
     {
         var server = _server;
+        var group = _group;
         _server = null;
-        if (_group is not null) _group.ValuesChanged -= OnValuesChanged;
         _group = null;
         _items.Clear();
         _readItems = [];
-        server?.Dispose();
+        if (server is null) return;
+        try
+        {
+            if (group is not null)
+            {
+                group.ValuesChanged -= OnValuesChanged;
+                try { group.IsSubscribed = false; }
+                catch (Exception exception) { logger?.LogWarning(exception, "Arrêt de l’abonnement OPC DA impossible : {Group}", group.Name); }
+                try
+                {
+                    server.RemoveGroup(group);
+                    // RemoveGroup can swallow COM errors; check its tracked groups too.
+                    if (server.Groups.Contains(group))
+                        logger?.LogWarning("Suppression du groupe OPC DA non confirmée : {Group}. Nouvelle tentative pendant la fermeture du serveur", group.Name);
+                    else
+                        logger?.LogInformation("Groupe OPC DA retiré : {Group}", group.Name);
+                }
+                catch (Exception exception) { logger?.LogWarning(exception, "Suppression du groupe OPC DA échouée : {Group}", group.Name); }
+            }
+        }
+        finally
+        {
+            server.Dispose();
+        }
     }
 }
