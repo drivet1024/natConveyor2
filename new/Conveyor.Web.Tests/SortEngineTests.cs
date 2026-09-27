@@ -805,6 +805,20 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task Camera_candidates_are_validated_in_one_batch_lookup()
+    {
+        var repository = new FakeRepository();
+        var engine = new SortEngine(repository, NullLogger<SortEngine>.Instance);
+
+        var result = await engine.DecideAsync(Line(),
+            Parcel("00821780031258,312582309351535054,24549373.0041,12345678901"), CancellationToken.None);
+
+        Assert.Equal("12345678901", result.Barcode);
+        Assert.Equal(1, repository.BatchShipmentLookupCount);
+        Assert.Equal(4, repository.LastBatchShipmentLookupSize);
+    }
+
+    [Fact]
     public async Task Invalid_measurements_use_code_98()
     {
         var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
@@ -1264,6 +1278,8 @@ public sealed class SortEngineTests
         public bool Disable98 { get; set; }
         public bool Code86Allowed { get; set; } = true;
         public int ShipmentLookupDelayMs { get; set; }
+        public int BatchShipmentLookupCount { get; private set; }
+        public int LastBatchShipmentLookupSize { get; private set; }
         public int? RouteChute { get; set; } = 4;
         public bool IsSimulation { get; set; } = true;
         public async Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token)
@@ -1271,6 +1287,19 @@ public sealed class SortEngineTests
             if (ShipmentLookupDelayMs > 0) await Task.Delay(ShipmentLookupDelayMs, token);
             return barcode.StartsWith("123456789", StringComparison.Ordinal)
                 ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null;
+        }
+        public async Task<IReadOnlyDictionary<string, Shipment>> FindShipmentsAsync(
+            IReadOnlyCollection<string> barcodes, CancellationToken token)
+        {
+            BatchShipmentLookupCount++;
+            LastBatchShipmentLookupSize = barcodes.Count;
+            var shipments = new Dictionary<string, Shipment>(StringComparer.OrdinalIgnoreCase);
+            foreach (var barcode in barcodes)
+            {
+                var shipment = await FindShipmentAsync(barcode, token);
+                if (shipment is not null) shipments[barcode] = shipment;
+            }
+            return shipments;
         }
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);

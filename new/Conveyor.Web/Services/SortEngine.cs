@@ -35,11 +35,12 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
                 parcel.Dimension, parcel.Weight, parcel.CameraTimestamp, ShipmentNotFound: false);
         }
 
+        var lookupCandidates = candidates.Select(RenameBentley).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var shipments = await repository.FindShipmentsAsync(lookupCandidates, token);
         foreach (var raw in candidates)
         {
             var candidate = RenameBentley(raw);
-            var shipment = await repository.FindShipmentAsync(candidate, token);
-            if (shipment is null)
+            if (!shipments.TryGetValue(candidate, out var shipment))
             {
                 if (goodBarcodes.Count == 0 && candidate.Length is 11 or 12) barcode = candidate;
                 continue;

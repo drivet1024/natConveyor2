@@ -13,6 +13,17 @@ public interface IConveyorRepository
     Task<IReadOnlyDictionary<int, string>> GetChuteDestinationsAsync(int shiftId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<int, string>>(new Dictionary<int, string>());
     Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken cancellationToken);
+    async Task<IReadOnlyDictionary<string, Shipment>> FindShipmentsAsync(
+        IReadOnlyCollection<string> barcodes, CancellationToken cancellationToken)
+    {
+        var shipments = new Dictionary<string, Shipment>(StringComparer.OrdinalIgnoreCase);
+        foreach (var barcode in barcodes)
+        {
+            var shipment = await FindShipmentAsync(barcode, cancellationToken);
+            if (shipment is not null) shipments.TryAdd(barcode, shipment);
+        }
+        return shipments;
+    }
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
     Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken cancellationToken);

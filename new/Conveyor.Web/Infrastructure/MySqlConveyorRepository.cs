@@ -68,6 +68,98 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         return await ReadShipmentAsync(command, cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<string, Shipment>> FindShipmentsAsync(
+        IReadOnlyCollection<string> barcodes, CancellationToken cancellationToken)
+    {
+        var candidates = barcodes.Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (candidates.Length == 0)
+            return new Dictionary<string, Shipment>(StringComparer.OrdinalIgnoreCase);
+
+        var numericCandidates = candidates.Where(x => x.Length > 10 && long.TryParse(x, out _)).ToArray();
+        var conditions = new List<string>();
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+
+        var barcodeParameters = AddStringParameters(command, "barcode", candidates);
+        conditions.Add($"customer_barcode in ({string.Join(", ", barcodeParameters)})");
+        if (numericCandidates.Length > 0)
+        {
+            var shippingPrefixes = numericCandidates.Select(x => x[..9]).Distinct().ToArray();
+            var references = numericCandidates.Select(x => x[..11]).Distinct().ToArray();
+            var shippingParameters = AddStringParameters(command, "shipping", shippingPrefixes);
+            var referenceParameters = AddStringParameters(command, "reference", references);
+            conditions.Add($"left(trim(cast(shipping_id as char)), 9) in ({string.Join(", ", shippingParameters)})");
+            conditions.Add($"(customer_id = 129326 and reference_no in ({string.Join(", ", referenceParameters)}))");
+        }
+
+        command.CommandText = $"""
+            select shipping_id, customer_id, route_id, disable_code98, dest_postal_code,
+                   customer_barcode, reference_no
+            from conveyor_shipment
+            where {string.Join(" or ", conditions)}
+            """;
+
+        var rows = new List<ShipmentLookupRow>();
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var shipment = new Shipment(
+                    Convert.ToString(reader["shipping_id"], CultureInfo.InvariantCulture)!,
+                    reader.GetInt32("customer_id"),
+                    reader.GetInt32("route_id"),
+                    !reader.IsDBNull(reader.GetOrdinal("disable_code98")) && reader.GetBoolean("disable_code98"),
+                    reader.IsDBNull(reader.GetOrdinal("dest_postal_code"))
+                        ? null : Convert.ToString(reader["dest_postal_code"], CultureInfo.InvariantCulture));
+                rows.Add(new ShipmentLookupRow(
+                    shipment,
+                    reader.IsDBNull(reader.GetOrdinal("customer_barcode"))
+                        ? null : Convert.ToString(reader["customer_barcode"], CultureInfo.InvariantCulture),
+                    reader.IsDBNull(reader.GetOrdinal("reference_no"))
+                        ? null : Convert.ToString(reader["reference_no"], CultureInfo.InvariantCulture)));
+            }
+        }
+
+        var results = new Dictionary<string, Shipment>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in candidates)
+        {
+            var row = rows.FirstOrDefault(x => string.Equals(x.CustomerBarcode, candidate, StringComparison.OrdinalIgnoreCase));
+            if (row is null && candidate.Length > 10 && long.TryParse(candidate, out _))
+            {
+                var shippingPrefix = candidate[..9];
+                var reference = candidate[..11];
+                row = rows.FirstOrDefault(x =>
+                    ShippingIdMatchesPrefix(x.Shipment.ShippingId, shippingPrefix) ||
+                    (x.Shipment.CustomerId == 129326 &&
+                     string.Equals(x.ReferenceNumber, reference, StringComparison.OrdinalIgnoreCase)));
+            }
+            if (row is not null) results[candidate] = row.Shipment;
+        }
+        return results;
+    }
+
+    private static string[] AddStringParameters(MySqlCommand command, string prefix, IReadOnlyList<string> values)
+    {
+        var names = new string[values.Count];
+        for (var index = 0; index < values.Count; index++)
+        {
+            names[index] = $"@{prefix}{index}";
+            command.Parameters.AddWithValue(names[index], values[index]);
+        }
+        return names;
+    }
+
+    private static bool ShippingIdMatchesPrefix(string shippingId, string prefix)
+    {
+        var normalized = shippingId.Trim();
+        return normalized.Length >= 9 &&
+               string.Equals(normalized[..9], prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record ShipmentLookupRow(Shipment Shipment, string? CustomerBarcode, string? ReferenceNumber);
+
     private static async Task<Shipment?> QueryShipmentAsync(MySqlConnection connection, string sql, string barcode, CancellationToken token)
     {
         await using var command = new MySqlCommand(sql, connection);
