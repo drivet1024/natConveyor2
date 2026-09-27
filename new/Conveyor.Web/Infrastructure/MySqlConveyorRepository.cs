@@ -103,12 +103,12 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         await using var connection = CreateConnection();
         await connection.OpenAsync(token);
         const string sql = """
-            select distinct c.chute_no, trim(d.depot_short_name) as depot_name
+            select distinct c.chute_no, trim(d.depot_name_short) as depot_name
             from conveyor_shift_route c
             inner join location l on l.route_id = c.new_route_id
             inner join depot d on d.depot_id = l.depot_id
             where c.shift_id = @shift and c.chute_no is not null
-              and d.depot_short_name is not null and trim(d.depot_short_name) <> ''
+              and d.depot_name_short is not null and trim(d.depot_name_short) <> ''
             order by c.chute_no, depot_name
             """;
         await using var command = new MySqlCommand(sql, connection);
