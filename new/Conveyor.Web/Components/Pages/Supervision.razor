@@ -99,7 +99,7 @@
                     disabled="@(_lineMotionBusy.Contains(line.LineId) || !line.Connections.Plc || line.ScaleFaultActive is null)"
                     title="Commande du tag faute balance : arrêt = 0, démarrage = 1"
                     @onclick="() => SetLineMotion(line.LineId, line.ScaleFaultActive != true)">
-                    @(_lineMotionBusy.Contains(line.LineId) ? "ENVOI…" : line.ScaleFaultActive == true ? "ARRÊTER LIGNE" : line.ScaleFaultActive == false ? "DÉMARRER LIGNE" : "ÉTAT INCONNU")
+                    @(_lineMotionBusy.Contains(line.LineId) ? "ENVOI…" : line.ScaleFaultActive == true ? "FERMER LIGNE" : line.ScaleFaultActive == false ? "DÉMARRER LIGNE" : "ÉTAT INCONNU")
                 </button>
                 @if (_lineMotionErrors.TryGetValue(line.LineId, out var motionError))
                 {
