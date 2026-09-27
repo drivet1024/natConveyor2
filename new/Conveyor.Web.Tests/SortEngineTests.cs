@@ -11,6 +11,26 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Fact]
+    public async Task Plc_dispatch_log_contains_camera_scale_dimension_and_timestamps()
+    {
+        using var logs = new InMemoryLogStore();
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), logs.CreateLogger("Conveyor.Line.Test"), () => { });
+
+        await controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
+
+        var message = Assert.Single(logs.GetRecent(),
+            entry => entry.Message.Contains("envoi automate normal confirmé")).Message;
+        Assert.Contains($"{line.Plc.ChuteTag}=4", message);
+        Assert.Contains("caméra [12345678901] reçue à 20", message);
+        Assert.Contains("balance 4.75 lb reçue à 20", message);
+        Assert.Contains("dimensions 12 x 8 x 5 reçues à 20", message);
+    }
+
+    [Fact]
     public async Task LastParcelTimeTracksCameraAndSurvivesCounterReset()
     {
         var repository = new FakeRepository();

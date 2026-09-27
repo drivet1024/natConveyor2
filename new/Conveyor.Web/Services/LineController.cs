@@ -419,7 +419,7 @@ internal sealed class LineController
             }
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
-            await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, timestamp, token);
+            await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, fallback: false, token);
             _plcConnected = true;
             code98Sent = decision.PlcChute == 98;
             if (code98Sent && !string.IsNullOrWhiteSpace(decision.Barcode))
@@ -490,7 +490,7 @@ internal sealed class LineController
                 else
                 {
                     var fallbackChute = ResolveClosedChute(_options.RejectedChute);
-                    await SendParcelToPlcAsync(fallbackChute, 1, timestamp, token);
+                    await SendParcelToPlcAsync(fallbackChute, 1, parcel, fallback: true, token);
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
                 }
@@ -500,18 +500,39 @@ internal sealed class LineController
         _changed();
     }
 
-    private async Task SendParcelToPlcAsync(int chute, int repeat, DateTimeOffset cameraTimestamp, CancellationToken token)
+    private async Task SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, bool fallback,
+        CancellationToken token)
     {
         await _plc.SendChuteAsync(_options.Plc.ChuteTag, chute, repeat, token);
         var sentAt = DateTimeOffset.Now;
         lock (_gate)
         {
             _lastPlcDispatch = new(sentAt, chute,
-                Math.Max(0, (long)(sentAt - cameraTimestamp).TotalMilliseconds),
+                Math.Max(0, (long)(sentAt - parcel.CameraTimestamp).TotalMilliseconds),
                 (_lastPlcDispatch?.Sequence ?? 0) + 1);
         }
+        _logger.LogInformation(
+            "Ligne {Line}: envoi automate {Mode} confirmé à {SentAt}; {Tag}={Chute}, répétitions={Repeat}; " +
+            "caméra [{CameraData}] reçue à {CameraAt}; balance {Weight} reçue à {WeightAt}; " +
+            "dimensions {Dimensions} reçues à {DimensionAt}",
+            _options.Id + 1, fallback ? "rejet de secours" : "normal", FormatTimestamp(sentAt),
+            _options.Plc.ChuteTag, chute, repeat, parcel.CameraData, FormatTimestamp(parcel.CameraTimestamp),
+            FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
+            FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp));
         _changed();
     }
+
+    private static string FormatTimestamp(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
+        .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
+
+    private static string FormatWeight(decimal weight, DateTimeOffset? timestamp) => timestamp.HasValue
+        ? weight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " lb"
+        : "absente";
+
+    private static string FormatDimensions(Dimension dimension, DateTimeOffset? timestamp) => timestamp.HasValue
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"{dimension.Length:0.##} x {dimension.Width:0.##} x {dimension.Height:0.##}")
+        : "absentes";
 
     private (TimedValue<Dimension>? Dimension, TimedValue<decimal>? Weight) CaptureMeasurements(
         DateTimeOffset cameraTimestamp, TimeSpan window, bool captureDimension = true, bool captureWeight = true)
