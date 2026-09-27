@@ -534,6 +534,55 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task LateScaleReceivedBeforePlcSendIsAppliedToTheCurrentParcel()
+    {
+        var line = Line();
+        var ports = GetAvailablePorts(3);
+        line.CameraPort = ports[0];
+        line.DimensionPort = ports[1];
+        line.ScalePort = ports[2];
+        line.CorrelationDelayMs = 0;
+        line.CorrelationWindowMs = 1_500;
+        line.ValidateDimensionsAndWeight = true;
+        var repository = new FakeRepository { ShipmentLookupDelayMs = 250 };
+        var plc = new MotionPlc();
+        var controller = new LineController(line, false, repository, plc, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+
+        await controller.StartAsync();
+        using var camera = new TcpClient();
+        using var dimensioner = new TcpClient();
+        using var scale = new TcpClient();
+        try
+        {
+            await camera.ConnectAsync(IPAddress.Loopback, line.CameraPort);
+            await dimensioner.ConnectAsync(IPAddress.Loopback, line.DimensionPort);
+            await scale.ConnectAsync(IPAddress.Loopback, line.ScalePort);
+
+            await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000008200620048\u0003"));
+            await Task.Delay(75);
+            await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
+            await Task.Delay(75);
+            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002001.05LB\r\n"));
+
+            SortDecision? decision = null;
+            for (var attempt = 0; attempt < 120 && decision is null; attempt++)
+            {
+                decision = controller.Snapshot().LastDecision;
+                if (decision is null) await Task.Delay(25);
+            }
+
+            Assert.NotNull(decision);
+            Assert.Equal(1.05m, decision.Weight);
+            Assert.Equal(new Dimension(8.2m, 6.2m, 4.8m), decision.Dimension);
+            Assert.Equal(4, decision.PlcChute);
+            Assert.Equal(4, Assert.Single(plc.Commands).Value);
+            Assert.Equal(0, controller.Snapshot().Counters.ScaleErrors);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task Three_missing_scale_readings_count_fault_and_manual_test_sends_direct_pulse()
     {
         var line = Line();
@@ -1214,10 +1263,15 @@ public sealed class SortEngineTests
         public bool FailSave { get; set; }
         public bool Disable98 { get; set; }
         public bool Code86Allowed { get; set; } = true;
+        public int ShipmentLookupDelayMs { get; set; }
         public int? RouteChute { get; set; } = 4;
         public bool IsSimulation { get; set; } = true;
-        public Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token) => Task.FromResult<Shipment?>(
-            barcode.StartsWith("123456789", StringComparison.Ordinal) ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null);
+        public async Task<Shipment?> FindShipmentAsync(string barcode, CancellationToken token)
+        {
+            if (ShipmentLookupDelayMs > 0) await Task.Delay(ShipmentLookupDelayMs, token);
+            return barcode.StartsWith("123456789", StringComparison.Ordinal)
+                ? new Shipment(barcode[..9], 1, 10, Disable98, "G1K 3X2") : null;
+        }
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
         public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(Code86Allowed);

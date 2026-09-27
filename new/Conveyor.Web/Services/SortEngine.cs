@@ -72,7 +72,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
                 }
             }
 
-            if (line.EnableCode86 && chute != 98)
+            if (line.EnableCode86 && chute != 98 && !(code98Enabled && missingMeasurements))
             {
                 chute = await repository.ShouldUseExceptionChuteAsync("86", barcode, line.Code86Retry, token)
                     ? 86 : line.RejectedChute;

@@ -364,20 +364,13 @@ internal sealed class LineController
         // included in the same parcel decision.
         var window = TimeSpan.FromMilliseconds(_options.CorrelationWindowMs);
         var (dimension, weight) = CaptureMeasurements(timestamp, window);
+        var hasCorrelatedDimension = dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window;
         var hasCorrelatedWeight = weight is not null && (timestamp - weight.Timestamp).Duration() <= window;
-        RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
         var parcel = new ParcelContext(frame, timestamp,
-            dimension is not null && (timestamp - dimension.Timestamp).Duration() <= window ? dimension.Value : Dimension.Missing,
+            hasCorrelatedDimension ? dimension!.Value : Dimension.Missing,
             dimension?.Timestamp,
             hasCorrelatedWeight ? NormalizeWeight(weight!.Value) : -1,
             weight?.Timestamp);
-        lock (_gate)
-        {
-            if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide) &&
-                IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
-            if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
-            if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
-        }
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
         var recirculationCounted = false;
@@ -385,6 +378,35 @@ internal sealed class LineController
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
+            if (!hasCorrelatedDimension || !hasCorrelatedWeight)
+            {
+                stage = "actualisation des mesures avant l'envoi automate";
+                var (lateDimension, lateWeight) = CaptureMeasurements(timestamp, window,
+                    captureDimension: !hasCorrelatedDimension, captureWeight: !hasCorrelatedWeight);
+                var lateDimensionCorrelated = lateDimension is not null && (timestamp - lateDimension.Timestamp).Duration() <= window;
+                var lateWeightCorrelated = lateWeight is not null && (timestamp - lateWeight.Timestamp).Duration() <= window;
+                if (lateDimensionCorrelated || lateWeightCorrelated)
+                {
+                    hasCorrelatedDimension |= lateDimensionCorrelated;
+                    hasCorrelatedWeight |= lateWeightCorrelated;
+                    parcel = parcel with
+                    {
+                        Dimension = lateDimensionCorrelated ? lateDimension!.Value : parcel.Dimension,
+                        DimensionTimestamp = lateDimensionCorrelated ? lateDimension!.Timestamp : parcel.DimensionTimestamp,
+                        Weight = lateWeightCorrelated ? NormalizeWeight(lateWeight!.Value) : parcel.Weight,
+                        WeightTimestamp = lateWeightCorrelated ? lateWeight!.Timestamp : parcel.WeightTimestamp
+                    };
+                    decision = await _sortEngine.DecideAsync(_options, parcel, token);
+                }
+            }
+            RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
+            lock (_gate)
+            {
+                if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide) &&
+                    IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
+                if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
+                if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
+            }
             var routingReason = decision.Reason;
             var effectiveChute = ResolveClosedChute(decision.PlcChute);
             if (effectiveChute != decision.PlcChute)
@@ -487,12 +509,16 @@ internal sealed class LineController
     }
 
     private (TimedValue<Dimension>? Dimension, TimedValue<decimal>? Weight) CaptureMeasurements(
-        DateTimeOffset cameraTimestamp, TimeSpan window)
+        DateTimeOffset cameraTimestamp, TimeSpan window, bool captureDimension = true, bool captureWeight = true)
     {
         lock (_gate)
         {
             TimedValue<Dimension>? dimension;
-            if (_dimensionInput is { } dimensionInput && dimensionInput.Sequence > _lastUsedDimensionSequence)
+            if (!captureDimension)
+            {
+                dimension = null;
+            }
+            else if (_dimensionInput is { } dimensionInput && dimensionInput.Sequence > _lastUsedDimensionSequence)
             {
                 _lastUsedDimensionSequence = dimensionInput.Sequence;
                 var parsed = SensorParsers.ParseDimension(dimensionInput.Raw);
@@ -507,7 +533,11 @@ internal sealed class LineController
             }
 
             TimedValue<decimal>? weight;
-            if (_scaleInput is { } scaleInput && scaleInput.Sequence > _lastUsedScaleSequence)
+            if (!captureWeight)
+            {
+                weight = null;
+            }
+            else if (_scaleInput is { } scaleInput && scaleInput.Sequence > _lastUsedScaleSequence)
             {
                 _lastUsedScaleSequence = scaleInput.Sequence;
                 var parsed = SensorParsers.ParseWeight(scaleInput.Raw, _options.ScaleProtocol);
