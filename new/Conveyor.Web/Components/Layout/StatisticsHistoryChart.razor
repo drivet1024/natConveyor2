@@ -23,8 +23,19 @@
                     <tr>
                         <th scope="col">Début du shift</th>
                         <th scope="col">Colis</th>
+                        <th scope="col">Triés</th>
+                        <th scope="col">Pas dans le système</th>
+                        <th scope="col">Route non configurée</th>
+                        <th scope="col">Plusieurs code-barres</th>
+                        <th scope="col">Code 98</th>
+                        <th scope="col">Code 68</th>
                         <th scope="col">Erreurs balance</th>
                         <th scope="col">Erreurs dimensionneur</th>
+                        <th scope="col">Sans lecture</th>
+                        <th scope="col">Colis légers</th>
+                        <th scope="col">Petits colis</th>
+                        <th scope="col">Dimensions inversées</th>
+                        <th scope="col">Fautes balance</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -33,16 +44,27 @@
                         <tr>
                             <th scope="row">@point.ShiftStart.ToString("dd MMM yyyy · HH:mm", CultureInfo.GetCultureInfo("fr-CA"))</th>
                             <td class="numeric parcels">@point.TotalParcels.ToString("N0")</td>
+                            <td class="numeric">@FormatPercent(point.SortedPercent)</td>
+                            <td class="numeric">@FormatPercent(point.ShipmentNotFoundPercent)</td>
+                            <td class="numeric">@FormatPercent(point.RouteNotConfiguredPercent)</td>
+                            <td class="numeric">@FormatPercent(point.MultipleBarcodesPercent)</td>
+                            <td class="numeric">@FormatPercent(point.Code98Percent)</td>
+                            <td class="numeric">@FormatPercent(point.Code68Percent)</td>
                             <td class="numeric">@FormatPercent(point.BalanceErrorPercent)</td>
                             <td class="numeric">@FormatPercent(point.DimensionErrorPercent)</td>
+                            <td class="numeric">@FormatPercent(point.NoReadPercent)</td>
+                            <td class="numeric">@FormatPercent(point.LightParcelPercent)</td>
+                            <td class="numeric">@FormatPercent(point.SmallParcelPercent)</td>
+                            <td class="numeric">@FormatPercent(point.InverseDimensionPercent)</td>
+                            <td class="numeric">@(point.ScaleFaults?.ToString("N0") ?? "—")</td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
-        @if (Points.Any(point => point.DimensionErrorPercent is null))
+        @if (Points.Any(HasMissingDetail))
         {
-            <p class="history-note">— signifie que le taux d’erreurs du dimensionneur n’est pas disponible pour ce shift.</p>
+            <p class="history-note">— signifie que cette statistique détaillée n’était pas encore enregistrée pour ce shift.</p>
         }
     }
 </section>
@@ -52,4 +74,8 @@
     private StatisticsHistoryPoint Last => Points[^1];
     private static string FormatPercent(double value) => value.ToString("0.##", CultureInfo.GetCultureInfo("fr-CA")) + " %";
     private static string FormatPercent(double? value) => value.HasValue ? FormatPercent(value.Value) : "—";
+    private static bool HasMissingDetail(StatisticsHistoryPoint point) =>
+        point.DimensionErrorPercent is null || point.ShipmentNotFoundPercent is null ||
+        point.RouteNotConfiguredPercent is null || point.MultipleBarcodesPercent is null ||
+        point.NoReadPercent is null || point.InverseDimensionPercent is null;
 }

@@ -25,7 +25,7 @@
 .history-kpis strong { display: block; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
 .history-kpis span { color: var(--muted); font-size: .72rem; }
 .history-table-scroll { max-height: 460px; overflow: auto; }
-.history-table { width: 100%; min-width: 650px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.history-table { width: 100%; min-width: 2100px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .history-table th, .history-table td { padding: .8rem 1.35rem; border-bottom: 1px solid var(--line); }
 .history-table thead th {
     position: sticky;
