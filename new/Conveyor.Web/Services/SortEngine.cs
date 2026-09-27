@@ -29,8 +29,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
         if (isNoRead)
         {
             reason = "Lecture caméra invalide — envoi au rejet";
-            logger.LogInformation("Ligne {Line}: sans lecture -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]",
-                line.Id + 1, line.RejectedChute, reason, string.Join(", ", candidates));
+            logger.LogInformation("Ligne {Line}, colis #{ParcelId}: sans lecture -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]",
+                line.Id + 1, parcel.ParcelId, line.RejectedChute, reason, string.Join(", ", candidates));
             return new SortDecision("", "", line.RejectedChute, line.RejectedChute, reason,
                 parcel.Dimension, parcel.Weight, parcel.CameraTimestamp, ShipmentNotFound: false);
         }
@@ -109,8 +109,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
         var plcChute = chute == 99 ? line.RejectedChute : chute;
         var shipmentNotFound = goodBarcodes.Count == 0;
-        logger.LogInformation("Ligne {Line}: {Barcode} -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]; codes-barres reconnus [{RecognizedBarcodes}]",
-            line.Id + 1, barcode, chute, reason, string.Join(", ", candidates), string.Join(", ", goodBarcodes));
+        logger.LogInformation("Ligne {Line}, colis #{ParcelId}: {Barcode} -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]; codes-barres reconnus [{RecognizedBarcodes}]",
+            line.Id + 1, parcel.ParcelId, barcode, chute, reason, string.Join(", ", candidates), string.Join(", ", goodBarcodes));
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
             parcel.Dimension, parcel.Weight, parcel.CameraTimestamp,
             goodBarcodes.Count == 1 ? matchedShipment?.DestinationPostalCode : null,

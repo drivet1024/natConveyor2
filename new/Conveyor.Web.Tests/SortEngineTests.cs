@@ -24,10 +24,34 @@ public sealed class SortEngineTests
 
         var message = Assert.Single(logs.GetRecent(),
             entry => entry.Message.Contains("envoi automate normal confirmé")).Message;
+        Assert.Contains("Ligne 1, colis #1", message);
         Assert.Contains($"{line.Plc.ChuteTag}=4", message);
         Assert.Contains("caméra [12345678901] reçue à 20", message);
         Assert.Contains("balance 4.75 lb reçue à 20", message);
         Assert.Contains("dimensions 12 x 8 x 5 reçues à 20", message);
+    }
+
+    [Fact]
+    public async Task Parcel_log_id_restarts_after_counter_reset()
+    {
+        using var logs = new InMemoryLogStore();
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), logs.CreateLogger("Line"), () => { });
+
+        await controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
+        await controller.SimulateAsync("12345678902", new Dimension(12, 8, 5), 4.75m);
+        controller.ResetCounters();
+        await controller.SimulateAsync("12345678903", new Dimension(12, 8, 5), 4.75m);
+
+        var dispatches = logs.GetRecent().Where(entry => entry.Message.Contains("envoi automate normal confirmé"))
+            .Select(entry => entry.Message).ToArray();
+        Assert.Equal(3, dispatches.Length);
+        Assert.Contains("colis #1", dispatches[0]);
+        Assert.Contains("colis #2", dispatches[1]);
+        Assert.Contains("colis #1", dispatches[2]);
     }
 
     [Fact]

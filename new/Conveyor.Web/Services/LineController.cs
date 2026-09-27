@@ -34,6 +34,7 @@ internal sealed class LineController
     private SortDecision? _lastDecision;
     private DeviceReception? _plcInput;
     private DeviceReception? _plcTransferInput;
+    private long _parcelSequenceSinceReset;
     private bool _chute39Closed;
     private bool? _scaleFaultActive;
     public void RecordScaleFaultReception(string value)
@@ -238,6 +239,7 @@ internal sealed class LineController
         {
             _productionCounters = production.Copy();
             _maintenanceCounters = maintenance.Copy();
+            _parcelSequenceSinceReset = Math.Max(0, production.TotalParcels) + Math.Max(0, maintenance.TotalParcels);
             _consecutiveParcelsWithoutScale = 0;
         }
         _changed();
@@ -256,6 +258,7 @@ internal sealed class LineController
             _lastPlcDispatch = null;
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
+            _parcelSequenceSinceReset = 0;
             _consecutiveParcelsWithoutScale = 0;
         }
         _sms?.Notify("Reset compteurs effectué", _options.Id);
@@ -353,10 +356,12 @@ internal sealed class LineController
     {
         LineCounters parcelCounters;
         bool parcelMaintenance;
+        long parcelId;
         lock (_gate)
         {
             parcelCounters = _counters;
             parcelMaintenance = _maintenance;
+            parcelId = ++_parcelSequenceSinceReset;
             parcelCounters.CameraReads++;
             parcelCounters.TotalParcels++;
             if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
@@ -372,7 +377,8 @@ internal sealed class LineController
             hasCorrelatedDimension ? dimension!.Value : Dimension.Missing,
             dimension?.Timestamp,
             hasCorrelatedWeight ? NormalizeWeight(weight!.Value) : -1,
-            weight?.Timestamp);
+            weight?.Timestamp,
+            parcelId);
         var isNoRead = parcel.CameraData.Contains('?');
         var stage = "calcul de la chute";
         var recirculationCounted = false;
@@ -512,10 +518,10 @@ internal sealed class LineController
                 (_lastPlcDispatch?.Sequence ?? 0) + 1);
         }
         _logger.LogInformation(
-            "Ligne {Line}: envoi automate {Mode} confirmé à {SentAt}; {Tag}={Chute}, répétitions={Repeat}; " +
+            "Ligne {Line}, colis #{ParcelId}: envoi automate {Mode} confirmé à {SentAt}; {Tag}={Chute}, répétitions={Repeat}; " +
             "caméra [{CameraData}] reçue à {CameraAt}; balance {Weight} reçue à {WeightAt}; " +
             "dimensions {Dimensions} reçues à {DimensionAt}",
-            _options.Id + 1, fallback ? "rejet de secours" : "normal", FormatTimestamp(sentAt),
+            _options.Id + 1, parcel.ParcelId, fallback ? "rejet de secours" : "normal", FormatTimestamp(sentAt),
             _options.Plc.ChuteTag, chute, repeat, parcel.CameraData, FormatTimestamp(parcel.CameraTimestamp),
             FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
             FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp));

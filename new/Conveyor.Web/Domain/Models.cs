@@ -18,7 +18,8 @@ public sealed record ParcelContext(
     Dimension Dimension,
     DateTimeOffset? DimensionTimestamp,
     decimal Weight,
-    DateTimeOffset? WeightTimestamp);
+    DateTimeOffset? WeightTimestamp,
+    long ParcelId = 0);
 
 public sealed record SortDecision(
     string Barcode,
