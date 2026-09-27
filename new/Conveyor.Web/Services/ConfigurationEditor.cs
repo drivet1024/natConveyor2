@@ -105,6 +105,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         if (options.Sorting is null || options.Sorting.SmallParcelMaximumSide < 0 || options.Sorting.LightParcelMaximumWeight < 0)
             throw new InvalidOperationException("Les seuils petit colis et colis léger doivent être positifs ou nuls.");
         if (options.Lines.Any(line => line.DatabaseLineId is <= 0)) throw new InvalidOperationException("Lorsqu’il est renseigné, le lineId MySQL doit être supérieur à zéro.");
+        if (options.Lines.Any(line => line.UnderweightReplacementWeight is <= 0 or > 1000))
+            throw new InvalidOperationException("Le poids de remplacement pour -99.03 doit être vide ou compris entre 0,01 et 1000 lb.");
         var databaseLineIds = options.Lines.Where(line => line.DatabaseLineId.HasValue).Select(line => line.DatabaseLineId!.Value).ToArray();
         if (databaseLineIds.Distinct().Count() != databaseLineIds.Length) throw new InvalidOperationException("Les lineId MySQL renseignés doivent être uniques.");
         PlcConfiguration.Validate(options.GetConfiguredLines().First().Plc);

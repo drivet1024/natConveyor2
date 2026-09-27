@@ -376,7 +376,7 @@ internal sealed class LineController
         var parcel = new ParcelContext(frame, timestamp,
             hasCorrelatedDimension ? dimension!.Value : Dimension.Missing,
             dimension?.Timestamp,
-            hasCorrelatedWeight ? NormalizeWeight(weight!.Value) : -1,
+            hasCorrelatedWeight ? NormalizeWeight(weight!.Value, _options.UnderweightReplacementWeight) : -1,
             weight?.Timestamp,
             parcelId);
         var isNoRead = parcel.CameraData.Contains('?');
@@ -401,7 +401,9 @@ internal sealed class LineController
                     {
                         Dimension = lateDimensionCorrelated ? lateDimension!.Value : parcel.Dimension,
                         DimensionTimestamp = lateDimensionCorrelated ? lateDimension!.Timestamp : parcel.DimensionTimestamp,
-                        Weight = lateWeightCorrelated ? NormalizeWeight(lateWeight!.Value) : parcel.Weight,
+                        Weight = lateWeightCorrelated
+                            ? NormalizeWeight(lateWeight!.Value, _options.UnderweightReplacementWeight)
+                            : parcel.Weight,
                         WeightTimestamp = lateWeightCorrelated ? lateWeight!.Timestamp : parcel.WeightTimestamp
                     };
                     decision = await _sortEngine.DecideAsync(_options, parcel, token);
@@ -599,6 +601,10 @@ internal sealed class LineController
         maximumWeight > 0 && weight > 0 && weight < maximumWeight;
 
     internal static decimal NormalizeWeight(decimal weight) => weight < 0 ? -1 : weight;
+    internal static decimal NormalizeWeight(decimal weight, decimal? underweightReplacementWeight) =>
+        weight == -99.03m && underweightReplacementWeight is > 0
+            ? underweightReplacementWeight.Value
+            : NormalizeWeight(weight);
 
     internal const decimal InverseLengthMarginInches = 2m;
     internal static bool IsInverseLengthParcel(Dimension dimension) =>

@@ -185,6 +185,7 @@ else
                     <label><span>Convertisseur — modèle</span><InputSelect @bind-Value="line.ScaleConverter.Type"><option value="Old">Vieux (Old)</option><option value="New">Nouveau (New)</option></InputSelect></label>
                     @TextField("Adresse IP du convertisseur (reset)", line.ScaleConverter.IpAddress, value => line.ScaleConverter.IpAddress = value)
                     <label><span>Protocole balance</span><InputSelect @bind-Value="line.ScaleProtocol"><option>Delimited</option><option>Fixed16From0</option><option>Fixed16From1</option><option value="StxToCrLf">STX à CR/LF</option></InputSelect></label>
+                    <label><span>Poids pour valeur -99.03 (lb)</span><InputNumber @bind-Value="line.UnderweightReplacementWeight" min="0.01" step="0.01" /><small>Laisser vide pour traiter -99.03 comme un poids manquant. Mettre 1 pour enregistrer 1 lb lorsque la balance indique un colis trop léger.</small></label>
                 </div>
             </div>
         </section>

@@ -188,6 +188,34 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public void UnderweightCodeUsesConfiguredReplacementOnly()
+    {
+        Assert.Equal(1m, LineController.NormalizeWeight(-99.03m, 1m));
+        Assert.Equal(-1m, LineController.NormalizeWeight(-99.03m, null));
+        Assert.Equal(-1m, LineController.NormalizeWeight(-99.01m, 1m));
+    }
+
+    [Fact]
+    public async Task ConfiguredUnderweightCodeIsSavedAsReplacementWeight()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.UnderweightReplacementWeight = 1m;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12.6m, 7.8m, 2.8m), -99.03m);
+
+            Assert.Equal(1m, Assert.Single(repository.SavedDecisions).Weight);
+            Assert.Equal(1m, Assert.Single(repository.SavedParcelWeights));
+            Assert.Equal(1m, controller.Snapshot().LastDecision!.Weight);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task NegativeScaleValueIsTransferredAsMinusOne()
     {
         var repository = new FakeRepository { RouteChute = 4 };

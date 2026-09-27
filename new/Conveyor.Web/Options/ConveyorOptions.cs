@@ -127,6 +127,7 @@ public sealed class LineOptions
     public ConverterOptions ScaleConverter { get; set; } = new();
     public ConverterOptions DimensionConverter { get; set; } = new();
     public string ScaleProtocol { get; set; } = "Delimited";
+    [Range(typeof(decimal), "0.01", "1000")] public decimal? UnderweightReplacementWeight { get; set; }
     public int RejectedChute { get; set; } = 16;
     public int NoReadChute { get; set; } = 1;
     public bool PostalCodeSort { get; set; } = true;
