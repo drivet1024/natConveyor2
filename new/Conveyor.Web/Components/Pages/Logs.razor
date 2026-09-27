@@ -34,7 +34,6 @@
         <article class="log-row @entry.Level.ToString().ToLowerInvariant()">
             <time>@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</time>
             <span class="log-level">@Label(entry.Level)</span>
-            <span class="log-source">@ShortSource(entry.Source)</span>
             <span class="log-message">@entry.Message</span>
             @if (!string.IsNullOrWhiteSpace(entry.Exception)) { <details><summary>Détails</summary><pre>@entry.Exception</pre></details> }
         </article>
@@ -49,7 +48,6 @@
     private void Refresh() => _entries = LogStore.GetRecent(500, _minimum, _search);
     private void Clear() => LogStore.Clear();
     private void OnChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
-    private static string ShortSource(string source) => source switch { "Conveyor.Line.0" => "line 0", "Conveyor.Line.1" => "line 1", _ => "" };
     private static string Label(LogLevel level) => level switch { LogLevel.Debug => "DEBUG", LogLevel.Warning => "AVERT.", LogLevel.Error or LogLevel.Critical => "ERREUR", _ => "INFO" };
     public void Dispose() => LogStore.Changed -= OnChanged;
 }
