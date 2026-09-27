@@ -26,7 +26,7 @@
             @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
         </div>
     </div>;
-    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null, bool weightDisplay = false) => @<div class="feed-row @(weightDisplay ? "weight-feed" : null) @(weightDisplay && IsAfterDispatch(input, Line.LastPlcDispatch) ? "late-scale" : null)">
+    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null, bool weightDisplay = false) => @<div class="feed-row @(weightDisplay ? "weight-feed" : null)">
         <div class="feed-label">
             <strong>@name</strong>
             <small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small>
@@ -43,16 +43,12 @@
             else
             {
                 <code>@(weightDisplay ? SensorParsers.FormatWeightForDisplay(input.Raw) : Visible(input.Raw))@(input.Truncated ? " … [tronquée]" : "")</code>
-                <span class="feed-time"><span @key="input.Sequence" class="receive-pulse" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff") · trame @input.Sequence</span>
-                @if (weightDisplay && IsAfterDispatch(input, Line.LastPlcDispatch))
-                {
-                    <span class="late-scale-label">Reçue après le dernier envoi automate (@Line.LastPlcDispatch!.SentAt.ToString("HH:mm:ss.fff"))</span>
-                }
+                <span class="feed-time"><span @key="input.Sequence" class="receive-pulse @(weightDisplay && IsAfterCamera(input, Line.CameraInput) ? "late" : null)" aria-hidden="true"></span>@input.ReceivedAt.ToString("HH:mm:ss.fff") · trame @input.Sequence</span>
             }
         </div>
     </div>;
-    internal static bool IsAfterDispatch(DeviceReception? input, PlcDispatch? dispatch) =>
-        input is not null && dispatch is not null && input.ReceivedAt > dispatch.SentAt;
+    internal static bool IsAfterCamera(DeviceReception? scale, DeviceReception? camera) =>
+        scale is not null && camera is not null && scale.ReceivedAt > camera.ReceivedAt;
     private static string Visible(string raw) => string.Concat(raw.Select(character => character switch
     {
         '\r' => "⟨CR⟩", '\n' => "⟨LF⟩", '\u0002' => "⟨STX⟩", '\u0003' => "⟨ETX⟩",

@@ -9,19 +9,19 @@ public sealed class DeviceFeedTests
     [InlineData(-1, false)]
     [InlineData(0, false)]
     [InlineData(1, true)]
-    public void ScaleIsLateOnlyWhenReceivedStrictlyAfterDispatch(int offsetMs, bool expected)
+    public void ScaleIsLateOnlyWhenReceivedStrictlyAfterCamera(int offsetMs, bool expected)
     {
-        var sentAt = DateTimeOffset.UtcNow;
-        var input = new DeviceReception("2.5", sentAt.AddMilliseconds(offsetMs), 1);
-        Assert.Equal(expected, DeviceFeed.IsAfterDispatch(input, new(sentAt, 4, 120, 1)));
+        var cameraAt = DateTimeOffset.UtcNow;
+        var scale = new DeviceReception("2.5", cameraAt.AddMilliseconds(offsetMs), 1);
+        Assert.Equal(expected, DeviceFeed.IsAfterCamera(scale, new("12345678901", cameraAt, 1)));
     }
 
     [Fact]
-    public void MissingReceptionOrDispatchDoesNotShowLateWarning()
+    public void MissingScaleOrCameraDoesNotShowLateIndicator()
     {
         var now = DateTimeOffset.UtcNow;
-        Assert.False(DeviceFeed.IsAfterDispatch(null, new(now, 4, 120, 1)));
-        Assert.False(DeviceFeed.IsAfterDispatch(new("2.5", now, 1), null));
-        Assert.False(DeviceFeed.IsAfterDispatch(null, null));
+        Assert.False(DeviceFeed.IsAfterCamera(null, new("12345678901", now, 1)));
+        Assert.False(DeviceFeed.IsAfterCamera(new("2.5", now, 1), null));
+        Assert.False(DeviceFeed.IsAfterCamera(null, null));
     }
 }
