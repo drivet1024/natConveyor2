@@ -7,14 +7,16 @@ namespace Conveyor.Web.Tests;
 public sealed class OpcDaPlcGatewayTests
 {
     [Fact]
-    public void SubscriptionOnlyChutesTransfersAndSharedCountersAreExcludedFromControlReads()
+    public void SharedCountersArePolledWhileChutesAndTransfersRemainSubscriptionOnly()
     {
         var monitored = new[] { "COLISDDE", "DEPART_SYSTEMES", "TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22",
             "SHARE_NB_CHUTEPLEINE", "[NATIONEX]SHARE_NB_CODE42" };
         var polled = OpcDaConnection.PolledItemIds("NATIONEX", monitored,
-            ["COLISDDE", "TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22", "SHARE_NB_CHUTEPLEINE", "SHARE_NB_CODE42"]);
-        Assert.Single(polled);
+            ["COLISDDE", "TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22"]);
+        Assert.Equal(3, polled.Count);
         Assert.Contains("[NATIONEX]DEPART_SYSTEMES", polled);
+        Assert.Contains("[NATIONEX]SHARE_NB_CHUTEPLEINE", polled);
+        Assert.Contains("[NATIONEX]SHARE_NB_CODE42", polled);
         Assert.DoesNotContain("[NATIONEX]COLISDDE", polled);
         Assert.DoesNotContain("[NATIONEX]TRANSFERT_DDE_M06", polled);
         Assert.DoesNotContain("[NATIONEX]TRANSFERT_DDE_M22", polled);
