@@ -112,7 +112,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
-        var subscriptionOnlyTags = activeLines.Select(line => line.Plc.TransferTag)
+        var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
             .Append(_fullChutesTag).Append(_code42Tag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = configuration.Simulation
