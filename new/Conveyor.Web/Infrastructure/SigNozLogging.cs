@@ -37,6 +37,7 @@ public static class SigNozLogging
                     ["host.name"] = Environment.MachineName,
                     ["deployment.environment.name"] = environmentName
                 }));
+            options.AddProcessor(new SigNozSeverityProcessor());
             options.AddOtlpExporter(exporter =>
             {
                 exporter.Endpoint = endpoint;
@@ -47,5 +48,30 @@ public static class SigNozLogging
                 exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
             });
         });
+    }
+}
+
+internal sealed class SigNozSeverityProcessor : OpenTelemetry.BaseProcessor<LogRecord>
+{
+    // OpenTelemetry 1.19.1 keeps SeverityText internal in its stable build.
+    // Cache the setter once; the OTLP integration test guards this version-bound bridge.
+    // Changing only the text preserves the standard numeric severity and filtering.
+    private static readonly Action<LogRecord, string?> SetSeverityText = typeof(LogRecord)
+        .GetProperty("SeverityText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+        .GetSetMethod(nonPublic: true)!.CreateDelegate<Action<LogRecord, string?>>();
+
+    public override void OnEnd(LogRecord record)
+    {
+        var text = record.LogLevel switch
+        {
+            LogLevel.Trace => "TRACE",
+            LogLevel.Debug => "DEBUG",
+            LogLevel.Information => "INFO",
+            LogLevel.Warning => "WARN",
+            LogLevel.Error => "ERROR",
+            LogLevel.Critical => "FATAL",
+            _ => null
+        };
+        if (text is not null) SetSeverityText(record, text);
     }
 }

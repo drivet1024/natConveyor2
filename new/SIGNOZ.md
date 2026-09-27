@@ -34,6 +34,7 @@ peuvent également être fournis par `SigNoz__Enabled`, `SigNoz__Endpoint`,
 fichier `conveyor.settings.json`, chargé après les variables d’environnement).
 
 Dans SigNoz, filtrer `service.name = Conveyor.Web` et `host.name` égal au serveur
+(les sévérités exportées sont `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`)
 (par exemple `STH-CONV-H-11`). Les niveaux restent contrôlés par `Logging:LogLevel`;
 un filtre spécifique peut être défini sous `Logging:OpenTelemetry:LogLevel`.
 Pour désactiver l’export, mettre `Enabled` à `false` et redémarrer.

@@ -37,10 +37,13 @@ public sealed class SigNozLoggingTests
             ["SigNoz:Protocol"] = "http/protobuf",
             ["SigNoz:ServiceName"] = "conveyor-test"
         }).Build();
-        using var services = new ServiceCollection().AddLogging(builder => builder.AddSigNoz(configuration, "Test"))
+        using var services = new ServiceCollection().AddLogging(builder =>
+            { builder.SetMinimumLevel(LogLevel.Trace); builder.AddSigNoz(configuration, "Test"); })
             .BuildServiceProvider();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("Conveyor.Test");
         logger.LogError(new InvalidOperationException("test-disk-denied"), "Test chute {Chute}", 21);
+        foreach (var level in new[] { LogLevel.Trace, LogLevel.Debug, LogLevel.Information, LogLevel.Warning, LogLevel.Critical })
+            logger.Log(level, "severity-check");
         Assert.Single(services.GetServices<ILoggerProvider>().OfType<OpenTelemetryLoggerProvider>());
         var request = await receiver.GetContextAsync().WaitAsync(TimeSpan.FromSeconds(10));
         using var body = new MemoryStream();
@@ -55,5 +58,8 @@ public sealed class SigNozLoggingTests
         Assert.Contains("test-disk-denied", payload);
         Assert.Contains("conveyor-test", payload);
         Assert.Contains(Environment.MachineName, payload);
+        // OTLP LogRecord field 2 = numeric severity, field 3 = severity_text.
+        foreach (var (number, label) in new[] { (1, "TRACE"), (5, "DEBUG"), (9, "INFO"), (13, "WARN"), (17, "ERROR"), (21, "FATAL") })
+            Assert.Contains($"\u0010{(char)number}\u001a{(char)label.Length}{label}", payload);
     }
 }
