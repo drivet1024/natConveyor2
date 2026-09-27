@@ -328,6 +328,8 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
 public sealed class SimulationConveyorRepository : IConveyorRepository
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<(string Type, string Barcode), int> _exceptionPasses = new();
+    private int _savedScans;
+    public int SavedScans => Volatile.Read(ref _savedScans);
     public bool IsSimulation => true;
     public Task SaveConveyorActionAsync(int conveyorId, bool start, int? cause, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task<DateTimeOffset?> GetLastShipmentUpdateAsync(CancellationToken cancellationToken) => Task.FromResult<DateTimeOffset?>(null);
@@ -342,7 +344,11 @@ public sealed class SimulationConveyorRepository : IConveyorRepository
     public Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token) =>
         Task.FromResult(_exceptionPasses.AddOrUpdate((codeType, barcode), 1, (_, count) => count + 1));
     public Task ClearExceptionCodeAsync(string codeType, string barcode, CancellationToken token) => Task.CompletedTask;
-    public Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken token) => Task.CompletedTask;
+    public Task SaveScanAsync(int lineId, int? databaseLineId, ParcelContext parcel, SortDecision decision, CancellationToken token)
+    {
+        Interlocked.Increment(ref _savedScans);
+        return Task.CompletedTask;
+    }
     public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
     public Task<(long Parcels, long PostalCodes, long Scans, bool HasOverdueScans)> GetReferenceCountsAsync(CancellationToken token, long? cachedPostalCodes = null) => Task.FromResult((0L, cachedPostalCodes ?? 0L, 0L, false));
 }

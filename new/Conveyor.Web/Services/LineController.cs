@@ -352,9 +352,11 @@ internal sealed class LineController
     private async Task HandleCameraAsync(string frame, DateTimeOffset timestamp, CancellationToken token)
     {
         LineCounters parcelCounters;
+        bool parcelMaintenance;
         lock (_gate)
         {
             parcelCounters = _counters;
+            parcelMaintenance = _maintenance;
             parcelCounters.CameraReads++;
             parcelCounters.TotalParcels++;
             if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
@@ -444,13 +446,16 @@ internal sealed class LineController
             {
                 lock (_gate) parcelCounters.CountRejection(routingReason);
             }
-            stage = "insertion MySQL du scan";
-            await _repository.SaveScanAsync(_options.Id, _options.DatabaseLineId, parcel, decision, token);
+            if (!parcelMaintenance)
+            {
+                stage = "insertion MySQL du scan";
+                await _repository.SaveScanAsync(_options.Id, _options.DatabaseLineId, parcel, decision, token);
+            }
             lock (_gate)
             {
                 _lastDecision = decision;
                 _lastError = null;
-                parcelCounters.DatabaseInserts++;
+                if (!parcelMaintenance) parcelCounters.DatabaseInserts++;
                 if (decision.Chute == 98) parcelCounters.Code98++;
                 if (isNoRead) parcelCounters.NoReads++;
                 else
