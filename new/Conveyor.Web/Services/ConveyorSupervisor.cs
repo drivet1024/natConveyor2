@@ -263,9 +263,6 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             if (string.Equals(plcOptions.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase) &&
                 !IsLocalHost(plcOptions.OpcHost))
                 throw new InvalidOperationException("RSLinx est configuré sur un serveur OPC distant. Le redémarrer sur ce serveur.");
-            // On a communication failure the last motion value may be stale.
-            // The automatic recovery requested by the operator never sends a motion command.
-            if (!automatic && ConveyorRunning == true) throw new InvalidOperationException("Arrêter le convoyeur avant de redémarrer RSLinx.");
             if (_configuration.RslinxRestart.ValidationError() is { } error) throw new InvalidOperationException(error);
             if (_rslinxRestarter is null) throw new InvalidOperationException("Service de redémarrage RSLinx indisponible.");
             var reconnect = _lines.OrderBy(pair => pair.Key).First().Value.Running;

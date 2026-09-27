@@ -12,7 +12,7 @@
     }
     else
     {
-        <p>Le redémarrage interrompt les communications automate des deux lignes. Le convoyeur doit être arrêté.</p>
+        <p>Le redémarrage interrompt temporairement les communications automate des deux lignes. Le convoyeur peut continuer à fonctionner, mais aucun nouveau tri ne pourra être transmis pendant la coupure.</p>
         @if (_message is not null) { <p role="status">@_message</p> }
         <div class="rslinx-actions">
             <button type="button" class="btn" autofocus disabled="@(_busy && !_waitingForConnection)" @onclick="OnClose">@(_waitingForConnection ? "Fermer la fenêtre" : "Annuler")</button>

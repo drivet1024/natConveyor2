@@ -10,7 +10,6 @@ public sealed class RslinxRestartTests
 {
     [Theory]
     [InlineData("simulation")]
-    [InlineData("running")]
     [InlineData("tcp")]
     [InlineData("remote")]
     public async Task RejectsUnsupportedRestartBeforeInvokingWindows(string condition)
@@ -21,9 +20,22 @@ public sealed class RslinxRestartTests
         if (condition == "remote") { config.Lines[0].Plc.Protocol = "OpcDa"; config.Lines[0].Plc.OpcHost = "remote-server"; }
         var restarter = new FakeRestarter();
         using var supervisor = Create(config, restarter);
-        if (condition == "running") supervisor.RecordPlcTagChange(config.General!.ConveyorStartTag, "1");
         await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.RestartRslinxAsync());
         Assert.Equal(0, restarter.Calls);
+    }
+
+    [Fact]
+    public async Task ManualRestartIsAllowedWhileConveyorIsRunning()
+    {
+        var config = Configuration();
+        var restarter = new FakeRestarter();
+        using var supervisor = Create(config, restarter);
+        supervisor.RecordPlcTagChange(config.General!.ConveyorStartTag, "1");
+
+        await supervisor.RestartRslinxAsync();
+
+        Assert.Equal(1, restarter.Calls);
+        Assert.Null(supervisor.ConveyorRunning);
     }
 
     [Fact]
