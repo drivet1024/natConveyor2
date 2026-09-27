@@ -1,0 +1,8 @@
+{
+  "SigNoz": {
+    "Enabled": true,
+    "Endpoint": "http://192.168.1.152:4317",
+    "Protocol": "grpc",
+    "ServiceName": "Conveyor.Web"
+  }
+}

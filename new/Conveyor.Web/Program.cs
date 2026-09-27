@@ -28,6 +28,12 @@ var logStore = new InMemoryLogStore();
 builder.Logging.AddProvider(logStore);
 builder.Logging.AddFilter<InMemoryLogStore>("Conveyor.Web.Services.SmsAlerts", LogLevel.Debug);
 builder.Services.AddSingleton<ILogStore>(logStore);
+var sigNozConfiguration = new ConfigurationBuilder()
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("signoz.settings.json", optional: true)
+    .AddConfiguration(builder.Configuration)
+    .Build();
+builder.Logging.AddSigNoz(sigNozConfiguration, builder.Environment.EnvironmentName);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
