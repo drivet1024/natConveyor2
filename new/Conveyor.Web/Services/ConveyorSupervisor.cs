@@ -112,12 +112,15 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
+        var subscriptionOnlyTags = activeLines.Select(line => line.Plc.TransferTag)
+            .Append(_fullChutesTag).Append(_code42Tag)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : string.Equals(primaryLine.Plc.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase)
-                    ? new OpcDaPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<OpcDaPlcGateway>(), monitoredTags, [_fullChutesTag, _code42Tag])
+                    ? new OpcDaPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<OpcDaPlcGateway>(), monitoredTags, subscriptionOnlyTags)
                     : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(), monitoredTags);
         var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         foreach (var line in activeLines.Where(line => !line.Enabled))

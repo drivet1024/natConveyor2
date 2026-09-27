@@ -7,14 +7,18 @@ namespace Conveyor.Web.Tests;
 public sealed class OpcDaPlcGatewayTests
 {
     [Fact]
-    public void SharedCountersAreExcludedFromControlReadsIncludingQualifiedAliases()
+    public void SubscriptionOnlyTransfersAndSharedCountersAreExcludedFromControlReads()
     {
-        var monitored = new[] { "COLISDDE", "DEPART_SYSTEMES", "SHARE_NB_CHUTEPLEINE", "[NATIONEX]SHARE_NB_CODE42" };
-        var polled = OpcDaConnection.PolledItemIds("NATIONEX", monitored, ["SHARE_NB_CHUTEPLEINE", "SHARE_NB_CODE42"]);
+        var monitored = new[] { "COLISDDE", "DEPART_SYSTEMES", "TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22",
+            "SHARE_NB_CHUTEPLEINE", "[NATIONEX]SHARE_NB_CODE42" };
+        var polled = OpcDaConnection.PolledItemIds("NATIONEX", monitored,
+            ["TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22", "SHARE_NB_CHUTEPLEINE", "SHARE_NB_CODE42"]);
         Assert.Equal(2, polled.Count);
         Assert.Contains("[NATIONEX]COLISDDE", polled);
         Assert.Contains("[NATIONEX]DEPART_SYSTEMES", polled);
-        Assert.Equal(4, OpcDaConnection.PolledItemIds("NATIONEX", monitored, null).Count);
+        Assert.DoesNotContain("[NATIONEX]TRANSFERT_DDE_M06", polled);
+        Assert.DoesNotContain("[NATIONEX]TRANSFERT_DDE_M22", polled);
+        Assert.Equal(6, OpcDaConnection.PolledItemIds("NATIONEX", monitored, null).Count);
         Assert.Empty(OpcDaConnection.PolledItemIds("NATIONEX", ["CUSTOM"], ["custom"]));
     }
 
