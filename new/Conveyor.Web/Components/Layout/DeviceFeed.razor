@@ -26,7 +26,7 @@
             @if (!Line.Connections.Plc) { <span class="feed-empty"> · Déconnecté</span> }
         </div>
     </div>;
-    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null, bool weightDisplay = false) => @<div class="feed-row @(weightDisplay && IsAfterDispatch(input, Line.LastPlcDispatch) ? "late-scale" : null)">
+    private RenderFragment DeviceRow(string name, DeviceReception? input, bool connected, PlcDispatch? dispatch = null, bool weightDisplay = false) => @<div class="feed-row @(weightDisplay ? "weight-feed" : null) @(weightDisplay && IsAfterDispatch(input, Line.LastPlcDispatch) ? "late-scale" : null)">
         <div class="feed-label">
             <strong>@name</strong>
             <small>@(Line.Connections.Simulated ? "Simulation" : connected ? "Connecté" : "Déconnecté")</small>
