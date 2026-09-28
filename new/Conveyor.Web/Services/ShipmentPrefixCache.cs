@@ -1,12 +1,24 @@
 using System.Collections.Frozen;
+using Conveyor.Web.Domain;
 
 namespace Conveyor.Web.Services;
 
 public sealed class ShipmentPrefixCache(IConveyorRepository repository, ILogger<ShipmentPrefixCache> logger) : BackgroundService
 {
-    private FrozenSet<string> _prefixes = Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
+    private FrozenDictionary<string, int?[]> _prefixes = new Dictionary<string, int?[]>().ToFrozenDictionary(StringComparer.Ordinal);
 
-    public bool Matches(string barcode) => barcode.Length is 11 or 12 && Volatile.Read(ref _prefixes).Contains(barcode[..3]);
+    public bool Matches(string barcode) => barcode.Length is 11 or 12 && Volatile.Read(ref _prefixes).ContainsKey(barcode[..3]);
+
+    public MissingShipmentAttribution? Identify(IEnumerable<string> barcodes)
+    {
+        var lookup = Volatile.Read(ref _prefixes);
+        var matched = barcodes.Where(code => code.Length is 11 or 12)
+            .Select(code => code[..3]).Where(lookup.ContainsKey).Distinct().Order().ToArray();
+        if (matched.Length == 0) return null;
+        var customers = matched.SelectMany(prefix => lookup[prefix]).Distinct().Order()
+            .Select(id => id?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Inconnu");
+        return new(string.Join(", ", customers), string.Join(", ", matched));
+    }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -19,8 +31,9 @@ public sealed class ShipmentPrefixCache(IConveyorRepository repository, ILogger<
     {
         try
         {
-            var prefixes = (await repository.GetShipmentPrefixesAsync(token))
-                .Where(prefix => prefix.Length == 3).ToFrozenSet(StringComparer.Ordinal);
+            var prefixes = (await repository.GetShipmentCustomerPrefixesAsync(token))
+                .Where(row => row.Prefix.Length == 3).GroupBy(row => row.Prefix)
+                .ToFrozenDictionary(group => group.Key, group => group.Select(row => row.CustomerId).Distinct().ToArray(), StringComparer.Ordinal);
             Volatile.Write(ref _prefixes, prefixes);
             logger.LogInformation("Préfixes du compteur Pas dans le système chargés : {Count} préfixes, depuis le 2026-09-20, hors 518", prefixes.Count);
         }

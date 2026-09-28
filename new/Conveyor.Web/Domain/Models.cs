@@ -37,7 +37,12 @@ public sealed record SortDecision(
     int? Code98PassCount = null,
     bool CountShipmentNotFound = false,
     bool CountNoRead = false,
-    string? Waybill = null);
+    string? Waybill = null,
+    MissingShipmentAttribution? MissingShipmentCustomer = null);
+
+public sealed record ShipmentCustomerPrefix(int? CustomerId, string Prefix);
+public sealed record MissingShipmentAttribution(string Customers, string Prefixes);
+public sealed record MissingShipmentCustomerCount(string Customers, string Prefixes, long Count);
 
 public sealed record UnconfiguredRouteParcel(string Waybill, string? PostalCode, int? RouteId, DateTimeOffset ReceivedAt);
 public sealed record MultipleBarcodeParcel(string CameraData, DateTimeOffset ReceivedAt);
@@ -49,9 +54,24 @@ public sealed class LineCounters
         var copy = (LineCounters)MemberwiseClone();
         copy.UnconfiguredRouteParcels = UnconfiguredRouteParcels.ToArray();
         copy.MultipleBarcodeParcels = MultipleBarcodeParcels.ToArray();
+        copy.MissingShipmentCustomers = MissingShipmentCustomers.ToArray();
         return copy;
     }
     public IReadOnlyList<UnconfiguredRouteParcel> UnconfiguredRouteParcels { get; set; } = [];
+    public IReadOnlyList<MissingShipmentCustomerCount> MissingShipmentCustomers { get; set; } = [];
+    public void RecordMissingShipmentCustomer(MissingShipmentAttribution? attribution)
+    {
+        if (attribution is null) return;
+        var rows = MissingShipmentCustomers.ToList();
+        var index = rows.FindIndex(row => row.Customers == attribution.Customers);
+        if (index < 0) rows.Add(new(attribution.Customers, attribution.Prefixes, 1));
+        else rows[index] = rows[index] with
+        {
+            Count = rows[index].Count + 1,
+            Prefixes = string.Join(", ", rows[index].Prefixes.Split(", ").Concat(attribution.Prefixes.Split(", ")).Distinct().Order())
+        };
+        MissingShipmentCustomers = rows.ToArray();
+    }
     public IReadOnlyList<MultipleBarcodeParcel> MultipleBarcodeParcels { get; set; } = [];
     public void RecordMultipleBarcodes(ParcelContext parcel)
     {

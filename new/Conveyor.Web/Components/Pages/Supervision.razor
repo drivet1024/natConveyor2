@@ -5,6 +5,11 @@
 
 <PageTitle>Supervision des convoyeurs</PageTitle>
 
+@if (_missingShipmentLineId is { } missingLineId && _lines.FirstOrDefault(line => line.LineId == missingLineId) is { } missingLine)
+{
+    <MissingShipmentCustomersModal Line="missingLine" OnClose="() => _missingShipmentLineId = null" />
+}
+
 @if (_multipleBarcodeLineId is { } multipleLineId && _lines.FirstOrDefault(line => line.LineId == multipleLineId) is { } multipleLine)
 {
     <MultipleBarcodesModal Line="multipleLine" OnClose="() => _multipleBarcodeLineId = null" />
@@ -72,7 +77,7 @@
         <div class="supervision-metrics rejection-metrics">
             @foreach (var cause in counters.RejectionCauses())
             {
-                @if (cause.Label is "Route non configurée" or "Plusieurs code-barres")
+                @if (cause.Label is "Route non configurée" or "Plusieurs code-barres" or "Pas dans le système")
                 {
                     <button type="button" class="supervision-metric metric-button @SeverityCss(cause.Count, counters.TotalParcels, true)"
                             aria-haspopup="dialog" aria-label="@($"Afficher les colis : {cause.Label} — ligne {line.LineId + 1}")"
@@ -156,9 +161,11 @@
 @code {
     private int? _routeLineId;
     private int? _multipleBarcodeLineId;
+    private int? _missingShipmentLineId;
     private void OpenParcelDetails(int lineId, string cause)
     {
-        if (cause == "Plusieurs code-barres") _multipleBarcodeLineId = lineId;
+        if (cause == "Pas dans le système") _missingShipmentLineId = lineId;
+        else if (cause == "Plusieurs code-barres") _multipleBarcodeLineId = lineId;
         else _routeLineId = lineId;
     }
     private IReadOnlyList<LineSnapshot> _lines = [];

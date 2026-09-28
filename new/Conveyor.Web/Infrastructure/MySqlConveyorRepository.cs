@@ -217,6 +217,9 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
     }
 
     public async Task<IReadOnlyList<string>> GetShipmentPrefixesAsync(CancellationToken token)
+        => (await GetShipmentCustomerPrefixesAsync(token)).Select(row => row.Prefix).Distinct().ToArray();
+
+    public async Task<IReadOnlyList<ShipmentCustomerPrefix>> GetShipmentCustomerPrefixesAsync(CancellationToken token)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(token);
@@ -230,9 +233,9 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         await using var command = new MySqlCommand(sql, connection);
         command.Parameters.AddWithValue("@since", new DateTime(2026, 9, 20));
         await using var reader = await command.ExecuteReaderAsync(token);
-        var prefixes = new HashSet<string>(StringComparer.Ordinal);
+        var prefixes = new List<ShipmentCustomerPrefix>();
         while (await reader.ReadAsync(token))
-            if (!reader.IsDBNull(1)) prefixes.Add(reader.GetString(1));
+            if (!reader.IsDBNull(1)) prefixes.Add(new(reader.IsDBNull(0) ? null : reader.GetInt32(0), reader.GetString(1)));
         return prefixes.ToArray();
     }
 

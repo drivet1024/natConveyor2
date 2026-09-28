@@ -417,7 +417,11 @@ internal sealed class LineController
                     IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
                 if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
                 if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
-                if (decision.CountShipmentNotFound) parcelCounters.RejectedShipmentNotFound++;
+                if (decision.CountShipmentNotFound)
+                {
+                    parcelCounters.RejectedShipmentNotFound++;
+                    parcelCounters.RecordMissingShipmentCustomer(decision.MissingShipmentCustomer);
+                }
                 if (isNoRead) parcelCounters.NoReads++;
             }
             var routingReason = decision.Reason;

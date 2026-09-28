@@ -10,6 +10,22 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void MissingCustomerCountsCombinePrefixesAndSurvivePersistence()
+    {
+        var counters = new LineCounters();
+        counters.RecordMissingShipmentCustomer(new("42", "987"));
+        var snapshot = counters.Copy();
+        counters.RecordMissingShipmentCustomer(new("42", "986"));
+        counters.RecordMissingShipmentCustomer(new("75", "985"));
+        var restored = System.Text.Json.JsonSerializer.Deserialize<LineCounters>(
+            System.Text.Json.JsonSerializer.Serialize(counters))!;
+        Assert.Equal(1, Assert.Single(snapshot.MissingShipmentCustomers).Count);
+        Assert.Equal(new MissingShipmentCustomerCount("42", "986, 987", 2), restored.MissingShipmentCustomers[0]);
+        Assert.Equal(3, restored.MissingShipmentCustomers.Sum(row => row.Count));
+        Assert.Empty(System.Text.Json.JsonSerializer.Deserialize<LineCounters>("{}")!.MissingShipmentCustomers);
+    }
+
+    [Fact]
     public void MultipleBarcodeDetailsSurvivePersistenceAndKeepSnapshotsIndependent()
     {
         var counters = new LineCounters();

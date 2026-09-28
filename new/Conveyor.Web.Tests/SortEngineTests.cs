@@ -1182,6 +1182,7 @@ public sealed class SortEngineTests
             await supervisor.SimulateParcelAsync(0, cameraData, new Dimension(12, 8, 5), 4.75m);
             var counters = supervisor.GetSnapshots()[0].Counters;
             Assert.Equal(expected, counters.RejectedShipmentNotFound);
+            Assert.Equal(expected, counters.MissingShipmentCustomers.Sum(row => row.Count));
             Assert.Equal(noReads, counters.NoReads);
             Assert.Equal(expected, counters.RejectionCauses().Single(cause => cause.Label == "Pas dans le système").Count);
             Assert.Equal(1, repo.PrefixReads);
@@ -1437,6 +1438,24 @@ public sealed class SortEngineTests
         Assert.Equal(3, repo.PrefixReads);
     }
 
+    [Fact]
+    public async Task MissingCustomersUseAllMatchingPrefixesWithoutDuplicatingParcels()
+    {
+        var repo = new FakeRepository { CustomerPrefixes = [new(42, "987"), new(42, "986"), new(75, "986")] };
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await cache.RefreshAsync(default);
+        var match = cache.Identify(["98765432101", "987654321012", "bad", "98665432101"]);
+        Assert.Equal("42, 75", match!.Customers);
+        Assert.Equal("986, 987", match.Prefixes);
+        Assert.Null(cache.Identify(["987123", "88865432101"]));
+        var counters = new LineCounters();
+        counters.RecordMissingShipmentCustomer(match);
+        Assert.Equal(1, Assert.Single(counters.MissingShipmentCustomers).Count);
+        repo.FailPrefixes = true;
+        await cache.RefreshAsync(default);
+        Assert.Equal(match, cache.Identify(["98665432101", "98765432101"]));
+    }
+
     [Theory]
     [InlineData("98765432101", 1, 0)]
     [InlineData("88865432101", 0, 1)]
@@ -1478,6 +1497,12 @@ public sealed class SortEngineTests
 
     private sealed class FakeRepository : IConveyorRepository
     {
+        public IReadOnlyList<ShipmentCustomerPrefix>? CustomerPrefixes { get; set; }
+        public async Task<IReadOnlyList<ShipmentCustomerPrefix>> GetShipmentCustomerPrefixesAsync(CancellationToken token)
+        {
+            var prefixes = await GetShipmentPrefixesAsync(token);
+            return CustomerPrefixes ?? prefixes.Select(prefix => new ShipmentCustomerPrefix(null, prefix)).ToArray();
+        }
         public IReadOnlyList<string> Prefixes { get; set; } = ["987"];
         public bool FailPrefixes { get; set; }
         public int PrefixReads { get; private set; }

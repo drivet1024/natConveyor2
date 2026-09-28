@@ -109,7 +109,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
         var plcChute = chute == 99 ? line.RejectedChute : chute;
         var shipmentNotFound = goodBarcodes.Count == 0;
-        var countShipmentNotFound = shipmentNotFound && candidates.Any(candidate => prefixes?.Matches(candidate) == true);
+        var missingCustomer = shipmentNotFound ? prefixes?.Identify(candidates) : null;
+        var countShipmentNotFound = missingCustomer is not null;
         logger.LogInformation("Ligne {Line}, colis #{ParcelId}: {Barcode} -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]; codes-barres reconnus [{RecognizedBarcodes}]",
             line.Id + 1, parcel.ParcelId, barcode, chute, reason, string.Join(", ", candidates), string.Join(", ", goodBarcodes));
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
@@ -119,7 +120,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null,
             shipmentNotFound, CountShipmentNotFound: countShipmentNotFound,
             CountNoRead: shipmentNotFound && !countShipmentNotFound,
-            Waybill: goodBarcodes.Count == 1 ? matchedShipment?.ShippingId : null);
+            Waybill: goodBarcodes.Count == 1 ? matchedShipment?.ShippingId : null,
+            MissingShipmentCustomer: missingCustomer);
     }
 
     private static string RenameBentley(string value) =>
