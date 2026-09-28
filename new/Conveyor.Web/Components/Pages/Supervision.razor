@@ -64,6 +64,7 @@
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (line.Maintenance) { <span class="maintenance-mode"> - MAINTENANCE</span> }</h2>
             <div class="line-state-badges">
                 <span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span>
+                <span class="sorting-time" title="Temps cumulé où le convoyeur est en marche, depuis la remise à zéro des compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
             </div>
         </div>
 
@@ -291,7 +292,6 @@
     private RenderFragment VolumeMetric(LineCounters counters) => @<div class="supervision-metric volume-metric" title="Total des colis reçus par la caméra">
         <strong>@counters.TotalParcels.ToString("N0")</strong>
         <span class="metric-label">Colis convoyés</span>
-        <span class="sorting-detail" title="Temps cumulé où le convoyeur est en marche, depuis la remise à zéro des compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
         <span class="sorting-detail" title="Total des colis convoyés ÷ durée de tri en heures">@(counters.ParcelsPerHour?.ToString("N0") ?? "—") colis/heure</span>
     </div>;
 

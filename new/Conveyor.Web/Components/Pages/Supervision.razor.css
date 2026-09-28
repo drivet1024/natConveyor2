@@ -14,6 +14,7 @@
 .supervision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .supervision-line{min-width:0}
 .line-state-badges{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+.sorting-time{color:var(--muted);font-size:.72rem;font-weight:400;letter-spacing:normal;white-space:nowrap;font-variant-numeric:tabular-nums}
 .line-title.compact-line-title{flex-wrap:wrap;gap:.5rem}
 .maintenance-mode{color:var(--orange)}
 .supervision-line .connections{grid-template-columns:repeat(3,1fr);padding:.7rem 1.2rem}
