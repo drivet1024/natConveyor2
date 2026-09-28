@@ -101,8 +101,13 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
             foreach (var reading in values)
             {
                 if (!_lastReceived.TryGetValue(reading.Tag, out var previous)) continue;
-                _diagnostics.Received(reading, source, previous, reading.Timestamp >= previous && reading.Good && reading.Value is not null and not Array);
-                if (reading.Timestamp < previous) continue;
+                // A subscription callback is authoritative by arrival order. RSLinx can
+                // reset or regress its item timestamp while continuing to deliver valid
+                // updates. Timestamp ordering remains necessary for control reads so an
+                // older read cannot overwrite a notification received during that read.
+                var timestampAccepted = source == "subscription" || reading.Timestamp >= previous;
+                _diagnostics.Received(reading, source, previous, timestampAccepted && reading.Good && reading.Value is not null and not Array);
+                if (!timestampAccepted) continue;
                 _lastReceived[reading.Tag] = reading.Timestamp;
                 if (!reading.Good || reading.Value is null or Array)
                 {

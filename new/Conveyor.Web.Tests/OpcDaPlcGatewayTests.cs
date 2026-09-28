@@ -75,6 +75,20 @@ public sealed class OpcDaPlcGatewayTests
     }
 
     [Fact]
+    public async Task SubscriptionWithRegressedOpcTimestampStillUpdatesTheValue()
+    {
+        var client = new FakeConnection();
+        using var gateway = Create(() => client);
+        var values = new List<string>();
+        gateway.TagChanged += (_, value) => values.Add(value);
+        await gateway.ConnectAsync(default);
+
+        client.EmitWithOlderTimestamp(39);
+
+        Assert.Equal(["16", "39"], values);
+    }
+
+    [Fact]
     public async Task ReconnectDoesNotReplayWritesAndManualDisconnectStaysDisconnected()
     {
         var first = new FakeConnection();
@@ -237,6 +251,11 @@ public sealed class OpcDaPlcGatewayTests
         {
             _timestamp = _timestamp.AddSeconds(1);
             ValuesChanged?.Invoke([new("COLISDDE", value, good, _timestamp)]);
+        }
+        public void EmitWithOlderTimestamp(object? value)
+        {
+            _timestamp = _timestamp.AddSeconds(-10);
+            ValuesChanged?.Invoke([new("COLISDDE", value, true, _timestamp)]);
         }
         public void Dispose() { DisposeCount++; Disposed = true; IsConnected = false; }
     }
