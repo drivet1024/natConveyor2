@@ -1200,6 +1200,14 @@ public sealed class SortEngineTests
             await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
             var counters = supervisor.GetSnapshots()[0].Counters;
             Assert.Equal(missingRoute, counters.RejectedRouteNotConfigured);
+            Assert.Equal(missingRoute, counters.UnconfiguredRouteParcels.Count);
+            if (missingRoute > 0)
+            {
+                var parcel = Assert.Single(counters.UnconfiguredRouteParcels);
+                Assert.Equal("123456789", parcel.Waybill);
+                Assert.Equal("G1K 3X2", parcel.PostalCode);
+                Assert.Equal(10, parcel.RouteId);
+            }
             Assert.Equal(code86Limit, counters.RejectedCode86RetryLimit);
             Assert.Equal(1, counters.TotalRejected);
         }

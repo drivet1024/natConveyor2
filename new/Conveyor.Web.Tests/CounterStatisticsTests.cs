@@ -10,6 +10,29 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void RouteDetailsSurvivePersistenceAndRemainBoundedWithoutChangingSnapshots()
+    {
+        var counters = new LineCounters();
+        var decision = new SortDecision("scan", "H2X1Y4", 16, 16,
+            "Route de l'expédition non configurée", Dimension.Missing, 1,
+            DateTimeOffset.UtcNow, RouteId: 10, Waybill: "waybill");
+        counters.RecordUnconfiguredRoute(decision);
+        var snapshot = counters.Copy();
+        for (var i = 0; i < 501; i++)
+            counters.RecordUnconfiguredRoute(decision with { Waybill = i.ToString() });
+
+        Assert.Equal("waybill", Assert.Single(snapshot.UnconfiguredRouteParcels).Waybill);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<LineCounters>(
+            System.Text.Json.JsonSerializer.Serialize(counters))!;
+        Assert.Equal(500, restored.UnconfiguredRouteParcels.Count);
+        Assert.Equal("1", restored.UnconfiguredRouteParcels[0].Waybill);
+        Assert.Equal("500", restored.UnconfiguredRouteParcels[^1].Waybill);
+        Assert.Equal("H2X1Y4", restored.UnconfiguredRouteParcels[^1].PostalCode);
+        Assert.Equal(10, restored.UnconfiguredRouteParcels[^1].RouteId);
+        Assert.Empty(System.Text.Json.JsonSerializer.Deserialize<LineCounters>("{}")!.UnconfiguredRouteParcels);
+    }
+
+    [Fact]
     public void HistoryWindowIncludesTodayAndPreviousTwentyNineDays()
     {
         var (from, to) = StatisticsHistoryService.GetThirtyDayWindow(new DateTime(2026, 9, 24, 15, 30, 0));

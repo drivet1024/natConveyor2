@@ -36,11 +36,27 @@ public sealed record SortDecision(
     bool ShipmentNotFound = false,
     int? Code98PassCount = null,
     bool CountShipmentNotFound = false,
-    bool CountNoRead = false);
+    bool CountNoRead = false,
+    string? Waybill = null);
+
+public sealed record UnconfiguredRouteParcel(string Waybill, string? PostalCode, int? RouteId, DateTimeOffset ReceivedAt);
 
 public sealed class LineCounters
 {
-    public LineCounters Copy() => (LineCounters)MemberwiseClone();
+    public LineCounters Copy()
+    {
+        var copy = (LineCounters)MemberwiseClone();
+        copy.UnconfiguredRouteParcels = UnconfiguredRouteParcels.ToArray();
+        return copy;
+    }
+    public IReadOnlyList<UnconfiguredRouteParcel> UnconfiguredRouteParcels { get; set; } = [];
+    public void RecordUnconfiguredRoute(SortDecision decision)
+    {
+        UnconfiguredRouteParcels = UnconfiguredRouteParcels.TakeLast(499)
+            .Append(new UnconfiguredRouteParcel(decision.Waybill ?? decision.Barcode,
+                string.IsNullOrWhiteSpace(decision.DestinationPostalCode) ? decision.PostalCode : decision.DestinationPostalCode,
+                decision.RouteId, decision.Timestamp)).ToArray();
+    }
     public long CameraReads { get; set; }
     public long DimensionReads { get; set; }
     public long ScaleReads { get; set; }

@@ -118,7 +118,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             goodBarcodes.Count == 1 ? matchedShipment?.RouteId : null,
             goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null,
             shipmentNotFound, CountShipmentNotFound: countShipmentNotFound,
-            CountNoRead: shipmentNotFound && !countShipmentNotFound);
+            CountNoRead: shipmentNotFound && !countShipmentNotFound,
+            Waybill: goodBarcodes.Count == 1 ? matchedShipment?.ShippingId : null);
     }
 
     private static string RenameBentley(string value) =>

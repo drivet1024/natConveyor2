@@ -454,7 +454,11 @@ internal sealed class LineController
             }
             if (!isNoRead && decision.PlcChute == _options.RejectedChute)
             {
-                lock (_gate) parcelCounters.CountRejection(routingReason);
+                lock (_gate)
+                {
+                    parcelCounters.CountRejection(routingReason);
+                    if (routingReason == "Route de l'expédition non configurée") parcelCounters.RecordUnconfiguredRoute(decision);
+                }
             }
             if (!parcelMaintenance)
             {
