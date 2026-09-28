@@ -1,7 +1,7 @@
 @implements IAsyncDisposable
 
 <span class="line-idle-time" title="Temps depuis la dernière trame caméra de cette ligne">
-    Sans colis : @(LastParcelAt is { } received ? FormatElapsed(DateTimeOffset.Now - received) : "—")
+    Idle : @(LastParcelAt is { } received ? FormatElapsed(DateTimeOffset.Now - received) : "—")
 </span>
 
 @code {
