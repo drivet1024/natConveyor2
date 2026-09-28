@@ -79,6 +79,7 @@
             @VolumeMetric(counters)
             <button type="button" class="supervision-metric metric-button success-metric" aria-haspopup="dialog"
                     aria-label="@($"Afficher les petits colis — ligne {line.LineId + 1}")" @onclick="() => _smallParcelLineId = line.LineId">
+                @MetricHelp("Petits colis")
                 <strong>@FormatPercentage(counters.SmallParcels, counters.TotalParcels) %</strong>
                 <span class="metric-count">@counters.SmallParcels.ToString("N0")</span>
                 <span class="metric-label">Petits colis</span>
@@ -93,6 +94,7 @@
                     <button type="button" class="supervision-metric metric-button @SeverityCss(cause.Count, counters.TotalParcels, true)"
                             aria-haspopup="dialog" aria-label="@($"Afficher les colis : {cause.Label} — ligne {line.LineId + 1}")"
                             @onclick="() => OpenParcelDetails(line.LineId, cause.Label)">
+                        @MetricHelp(cause.Label)
                         <strong>@FormatPercentage(cause.Count, counters.TotalParcels) %</strong>
                         <span class="metric-count">@cause.Count.ToString("N0")</span>
                         <span class="metric-label">@cause.Label</span>
@@ -284,16 +286,34 @@
     </div>;
 
     private RenderFragment Metric(string label, long count, long denominator, string title, bool emphasizeHigh = true) => @<div class="supervision-metric @SeverityCss(count, denominator, emphasizeHigh)" title="@title">
+        @MetricHelp(label)
         <strong>@FormatPercentage(count, denominator) %</strong>
         <span class="metric-count">@count.ToString("N0")</span>
         <span class="metric-label">@label</span>
     </div>;
 
     private RenderFragment VolumeMetric(LineCounters counters) => @<div class="supervision-metric volume-metric" title="Total des colis reçus par la caméra">
+        @MetricHelp("Colis convoyés")
         <strong>@counters.TotalParcels.ToString("N0")</strong>
         <span class="metric-label">Colis convoyés</span>
         <span class="sorting-detail" title="Total des colis convoyés ÷ durée de tri en heures">@(counters.ParcelsPerHour?.ToString("N0") ?? "—") colis/heure</span>
     </div>;
+
+    private RenderFragment MetricHelp(string label) => @<span class="metric-help" title="@CalculationDescription(label)" aria-label="@CalculationDescription(label)" @onclick:stopPropagation="true">?</span>;
+
+    private static string CalculationDescription(string label) => label switch
+    {
+        "Colis convoyés" => "Nombre de passages reçus par la caméra, y compris les ??? et les rejets. Cadence : total convoyé ÷ temps de marche cumulé en heures. Remis à zéro avec les compteurs.",
+        "Triés sans problème" => "Colis présents en base, avec une route connue, sans rejet ni détournement, et des mesures valides si leur validation est activée. Envoi automate réussi et scan enregistré en production. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Petits colis" => "Colis dont toutes les dimensions sont positives et dont la plus grande dimension est inférieure ou égale au seuil petit colis, avec un poids positif inférieur au seuil colis léger. Pourcentage = petits colis ÷ total convoyé × 100.",
+        "Pas dans le système" => "Colis absent de la base avec au moins un code-barres de 11 ou 12 caractères commençant par un préfixe autorisé. Compté une fois, quelle que soit la chute. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Route non configurée" => "Colis envoyé au rejet parce que la route de son expédition ne possède pas de chute configurée. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Plusieurs code-barres" => "Colis avec plusieurs codes-barres reconnus, envoyé au rejet. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Sans lecture" => "Lecture contenant un ? ou colis absent sans code-barres admissible au compteur Pas dans le système. Compté une seule fois par passage. Pourcentage = sans lecture ÷ total convoyé × 100.",
+        "Erreurs poids" => "Poids absent, nul ou supérieur au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs poids ÷ (total convoyé − sans lecture) × 100.",
+        "Erreurs dimensionneur" => "Au moins une dimension absente, nulle ou supérieure au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs dimensions ÷ (total convoyé − sans lecture) × 100.",
+        _ => "Nombre de colis de cette catégorie ÷ total convoyé × 100."
+    };
 
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
     private static string FormatPercentage(long count, long total) =>

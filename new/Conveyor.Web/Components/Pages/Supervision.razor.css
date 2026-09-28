@@ -27,6 +27,9 @@
 .supervision-metric strong{display:block;color:#fff;font-size:1.75rem;line-height:1;font-variant-numeric:tabular-nums}
 .supervision-metric.volume-metric strong{font-size:2rem}
 .sorting-detail{display:block;margin-top:.35rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
+.supervision-metric{position:relative}
+.metric-help{position:absolute;top:.4rem;right:.45rem;display:grid;place-items:center;width:1rem;height:1rem;border:1px solid var(--muted);border-radius:50%;color:var(--muted);font-size:.65rem;font-weight:600;line-height:1;cursor:help}
+.metric-help:hover{color:var(--ink);border-color:var(--ink)}
 .supervision-metric .metric-count{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count::after{content:" colis"}
 .supervision-metric .metric-label{display:block;margin-top:.15rem;color:#9eb8d7;font-size:.72rem}
