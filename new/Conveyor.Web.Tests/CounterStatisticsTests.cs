@@ -10,6 +10,21 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void SmallParcelMeasurementsSurvivePersistenceAndHistoryLimit()
+    {
+        var counters = new LineCounters();
+        var parcel = new ParcelContext("123", DateTimeOffset.UtcNow, new(4, 3, 2), null, 1.25m, null);
+        counters.RecordSmallParcel(parcel);
+        var snapshot = counters.Copy();
+        for (var i = 0; i < 501; i++) counters.RecordSmallParcel(parcel with { CameraTimestamp = parcel.CameraTimestamp.AddSeconds(i + 1) });
+        Assert.Single(snapshot.SmallParcelDetails);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<LineCounters>(System.Text.Json.JsonSerializer.Serialize(counters))!;
+        Assert.Equal(500, restored.SmallParcelDetails.Count);
+        Assert.Equal(parcel.CameraTimestamp.AddSeconds(2), restored.SmallParcelDetails[0].ReceivedAt);
+        Assert.Equal(parcel.Dimension, restored.SmallParcelDetails[^1].Dimension);
+        Assert.Equal(1.25m, restored.SmallParcelDetails[^1].Weight);
+    }
+    [Fact]
     public void ChuteCountersAreCopiedAndPersistedIndependently()
     {
         var counters = new LineCounters { ChuteDispatchCounts = new() { [23] = 5 } };

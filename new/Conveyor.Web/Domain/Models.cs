@@ -46,6 +46,7 @@ public sealed record MissingShipmentCustomerCount(string Customers, string Prefi
 
 public sealed record UnconfiguredRouteParcel(string Waybill, string? PostalCode, int? RouteId, DateTimeOffset ReceivedAt);
 public sealed record MultipleBarcodeParcel(string CameraData, DateTimeOffset ReceivedAt);
+public sealed record SmallParcelDetail(decimal Weight, Dimension Dimension, DateTimeOffset ReceivedAt);
 
 public sealed class LineCounters
 {
@@ -54,6 +55,7 @@ public sealed class LineCounters
         var copy = (LineCounters)MemberwiseClone();
         copy.UnconfiguredRouteParcels = UnconfiguredRouteParcels.ToArray();
         copy.MultipleBarcodeParcels = MultipleBarcodeParcels.ToArray();
+        copy.SmallParcelDetails = SmallParcelDetails.ToArray();
         copy.MissingShipmentCustomers = MissingShipmentCustomers.ToArray();
         copy.ChuteDispatchCounts = new Dictionary<int, long>(ChuteDispatchCounts);
         return copy;
@@ -74,6 +76,12 @@ public sealed class LineCounters
         MissingShipmentCustomers = rows.ToArray();
     }
     public IReadOnlyList<MultipleBarcodeParcel> MultipleBarcodeParcels { get; set; } = [];
+    public IReadOnlyList<SmallParcelDetail> SmallParcelDetails { get; set; } = [];
+    public void RecordSmallParcel(ParcelContext parcel)
+    {
+        SmallParcelDetails = SmallParcelDetails.TakeLast(499)
+            .Append(new SmallParcelDetail(parcel.Weight, parcel.Dimension, parcel.CameraTimestamp)).ToArray();
+    }
     public void RecordMultipleBarcodes(ParcelContext parcel)
     {
         MultipleBarcodeParcels = MultipleBarcodeParcels.TakeLast(499)

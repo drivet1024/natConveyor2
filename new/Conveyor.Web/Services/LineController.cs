@@ -435,7 +435,11 @@ internal sealed class LineController
             lock (_gate)
             {
                 if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide) &&
-                    IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
+                    IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight))
+                {
+                    parcelCounters.SmallParcels++;
+                    parcelCounters.RecordSmallParcel(parcel);
+                }
                 if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
                 if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
                 if (decision.CountShipmentNotFound)

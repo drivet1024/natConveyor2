@@ -106,6 +106,17 @@ public sealed class SortEngineTests
         {
             await controller.SimulateAsync("12345678901", new(side, 4, 3), weight);
             Assert.Equal(expected, controller.Snapshot().Counters.SmallParcels);
+            var snapshot = controller.Snapshot();
+            Assert.Equal(expected, snapshot.Counters.SmallParcelDetails.Count);
+            if (expected > 0)
+            {
+                var detail = Assert.Single(snapshot.Counters.SmallParcelDetails);
+                Assert.Equal(weight, detail.Weight);
+                Assert.Equal(new Dimension(side, 4, 3), detail.Dimension);
+                Assert.Equal(snapshot.LastDecision!.Timestamp, detail.ReceivedAt);
+            }
+            controller.ResetCounters();
+            Assert.Empty(controller.Snapshot().Counters.SmallParcelDetails);
         }
         finally { await controller.StopAsync(); }
     }
