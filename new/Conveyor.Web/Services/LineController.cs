@@ -363,6 +363,7 @@ internal sealed class LineController
             parcelMaintenance = _maintenance;
             parcelId = ++_parcelSequenceSinceReset;
             parcelCounters.CameraReads++;
+            parcelCounters.RecordSortingTime(timestamp);
             parcelCounters.TotalParcels++;
             if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
         }

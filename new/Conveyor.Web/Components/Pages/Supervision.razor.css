@@ -25,6 +25,7 @@
 .supervision-metric:nth-child(3n){border-right:0}
 .supervision-metric strong{display:block;color:#fff;font-size:1.75rem;line-height:1;font-variant-numeric:tabular-nums}
 .supervision-metric.volume-metric strong{font-size:2.5rem}
+.sorting-detail{display:block;margin-top:.35rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count{display:inline-block;margin-top:.45rem;color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums}
 .supervision-metric .metric-count::after{content:" colis"}
 .supervision-metric .metric-label{display:block;margin-top:.15rem;color:#9eb8d7;font-size:.72rem}

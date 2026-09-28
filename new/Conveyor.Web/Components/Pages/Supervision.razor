@@ -65,7 +65,7 @@
 
         <div class="supervision-summary">
             @Metric("Triés sans problème", counters.SortedWithoutIssue, counters.TotalParcels, "Colis avec une route connue, des mesures valides et sans détournement ÷ total des colis", false)
-            @VolumeMetric("Colis convoyés", counters.TotalParcels, "Total des colis reçus par la caméra")
+            @VolumeMetric(counters)
             @Metric("Petits colis", counters.SmallParcels, counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger ÷ total des colis", false)
         </div>
 
@@ -269,9 +269,11 @@
         <span class="metric-label">@label</span>
     </div>;
 
-    private RenderFragment VolumeMetric(string label, long count, string title) => @<div class="supervision-metric volume-metric" title="@title">
-        <strong>@count.ToString("N0")</strong>
-        <span class="metric-label">@label</span>
+    private RenderFragment VolumeMetric(LineCounters counters) => @<div class="supervision-metric volume-metric" title="Total des colis reçus par la caméra">
+        <strong>@counters.TotalParcels.ToString("N0")</strong>
+        <span class="metric-label">Colis convoyés</span>
+        <span class="sorting-detail" title="Du premier au dernier colis, pauses incluses. Disponible après une remise à zéro pour les anciens compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
+        <span class="sorting-detail" title="Total des colis convoyés ÷ durée de tri en heures">@(counters.ParcelsPerHour?.ToString("N0") ?? "—") colis/heure</span>
     </div>;
 
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
