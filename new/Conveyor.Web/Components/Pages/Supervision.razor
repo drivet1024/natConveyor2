@@ -231,6 +231,7 @@
     protected override void OnInitialized()
     {
         Supervisor.Changed += OnChanged;
+        _refreshTimer = new System.Threading.Timer(_ => OnChanged(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         Refresh();
     }
 
@@ -279,7 +280,7 @@
     private RenderFragment VolumeMetric(LineCounters counters) => @<div class="supervision-metric volume-metric" title="Total des colis reçus par la caméra">
         <strong>@counters.TotalParcels.ToString("N0")</strong>
         <span class="metric-label">Colis convoyés</span>
-        <span class="sorting-detail" title="Du premier au dernier colis, pauses incluses. Disponible après une remise à zéro pour les anciens compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
+        <span class="sorting-detail" title="Temps cumulé où le convoyeur est en marche, depuis la remise à zéro des compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
         <span class="sorting-detail" title="Total des colis convoyés ÷ durée de tri en heures">@(counters.ParcelsPerHour?.ToString("N0") ?? "—") colis/heure</span>
     </div>;
 
@@ -302,5 +303,10 @@
     };
     private string LineStateCss(LineSnapshot line) => ConveyorState(line) switch { true => "on", false => "off", _ => "unavailable" };
 
-    public void Dispose() => Supervisor.Changed -= OnChanged;
+    private System.Threading.Timer? _refreshTimer;
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        Supervisor.Changed -= OnChanged;
+    }
 }

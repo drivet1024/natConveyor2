@@ -165,6 +165,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             {
                 if (state != false) ConveyorStopCause = null;
                 ConveyorRunning = state;
+                foreach (var line in _lines.Values) line.SetConveyorRunning(state);
                 Changed?.Invoke();
             }
         }
@@ -275,6 +276,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             _logger.LogWarning("Redémarrage RSLinx demandé ; interruption temporaire des échanges automate");
             await _plc.DisconnectAsync();
             ConveyorRunning = null;
+            foreach (var line in _lines.Values) line.SetConveyorRunning(null);
             ConveyorStopCause = null;
             FullChutesCount = null;
             Code42Count = null;

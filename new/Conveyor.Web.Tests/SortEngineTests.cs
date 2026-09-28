@@ -68,14 +68,14 @@ public sealed class SortEngineTests
             await controller.SimulateAsync("12345678901", new(4, 4, 4), 1);
             var first = controller.Snapshot();
             Assert.Equal(first.CameraInput!.ReceivedAt, first.LastParcelReceivedAt);
-            Assert.Equal(first.LastDecision!.Timestamp, first.Counters.SortingStartedAt);
+            Assert.Equal(0, first.Counters.SortingRunSeconds);
             Assert.Equal(TimeSpan.Zero, first.Counters.SortingDuration);
             controller.ResetCounters();
-            Assert.Null(controller.Snapshot().Counters.SortingStartedAt);
+            Assert.Equal(0, controller.Snapshot().Counters.SortingRunSeconds);
             Assert.Equal(first.LastParcelReceivedAt, controller.Snapshot().LastParcelReceivedAt);
             await controller.SimulateAsync("?", new(4, 4, 4), 1);
             var second = controller.Snapshot();
-            Assert.Equal(second.LastDecision!.Timestamp, second.Counters.SortingStartedAt);
+            Assert.Equal(0, second.Counters.SortingRunSeconds);
             Assert.Equal(second.CameraInput!.ReceivedAt, second.LastParcelReceivedAt);
             Assert.True(second.LastParcelReceivedAt >= first.LastParcelReceivedAt);
         }

@@ -1,42 +1,48 @@
 using System.Text.Json;
 using Conveyor.Web.Domain;
+using Conveyor.Web.Infrastructure;
+using Conveyor.Web.Options;
+using Conveyor.Web.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Conveyor.Web.Tests;
 
 public sealed class SortingTimeTests
 {
     [Fact]
-    public void DurationAndRateUseFullElapsedTimeAndSurviveRestart()
+    public void RunningTimeExcludesStopsAndResetStartsFresh()
     {
-        var start = DateTimeOffset.Parse("2026-09-28T08:00:00-04:00");
-        var counters = new LineCounters();
-        counters.RecordSortingTime(start);
-        counters.TotalParcels++;
-        Assert.Equal(TimeSpan.Zero, counters.SortingDuration);
-        Assert.Null(counters.ParcelsPerHour);
-        counters.RecordSortingTime(start.AddHours(2));
-        counters.TotalParcels = 1200;
+        var repo = new SimulationConveyorRepository();
+        var controller = new LineController(new LineOptions(), true, repo,
+            new SimulationPlcGateway(NullLogger<SimulationPlcGateway>.Instance), false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        var start = DateTimeOffset.UtcNow.AddHours(-4);
+        controller.RestoreCounters(new LineCounters { TotalParcels = 1200 }, new());
+        controller.SetConveyorRunning(true, start);
+        controller.SetConveyorRunning(false, start.AddHours(1));
+        Assert.Equal(TimeSpan.FromHours(1), controller.Snapshot().Counters.SortingDuration);
+        Assert.Equal(1200d, controller.Snapshot().Counters.ParcelsPerHour);
+        controller.SetConveyorRunning(true, start.AddHours(2));
+        controller.SetConveyorRunning(false, start.AddHours(3));
+        var counters = controller.Snapshot().Counters;
         Assert.Equal(TimeSpan.FromHours(2), counters.SortingDuration);
         Assert.Equal(600d, counters.ParcelsPerHour);
-
         var restored = JsonSerializer.Deserialize<LineCounters>(JsonSerializer.Serialize(counters))!;
-        restored.RecordSortingTime(start.AddHours(3));
-        restored.TotalParcels = 1800;
-        Assert.Equal(TimeSpan.FromHours(3), restored.SortingDuration);
-        Assert.Equal(600d, restored.ParcelsPerHour);
-        Assert.Equal(TimeSpan.FromHours(2), counters.SortingDuration);
+        Assert.Equal(counters.SortingDuration, restored.SortingDuration);
+        controller.ResetCounters();
+        Assert.Equal(TimeSpan.Zero, controller.Snapshot().Counters.SortingDuration);
+        Assert.Equal(0d, controller.Snapshot().Counters.ParcelsPerHour);
+        controller.SetConveyorRunning(true, start);
+        controller.ResetCounters();
+        controller.SetConveyorRunning(false);
+        Assert.InRange(controller.Snapshot().Counters.SortingRunSeconds, 0, 2);
     }
 
     [Fact]
-    public void LegacyCountsHaveNoInventedDurationOrRate()
+    public void LegacyCountersStartWithZeroDurationInsteadOfUnavailable()
     {
-        var counters = JsonSerializer.Deserialize<LineCounters>("{\"TotalParcels\":1200}")!;
-        Assert.Null(counters.SortingDuration);
-        counters.RecordSortingTime(DateTimeOffset.UtcNow);
-        counters.TotalParcels++;
-        counters.RecordSortingTime(DateTimeOffset.UtcNow.AddHours(1));
-        Assert.Null(counters.SortingDuration);
-        Assert.Null(counters.ParcelsPerHour);
-        Assert.Equal(TimeSpan.Zero, new LineCounters().SortingDuration);
+        var counters = JsonSerializer.Deserialize<LineCounters>("{\"TotalParcels\":1200,\"SortingTimingIncomplete\":true}")!;
+        Assert.Equal(TimeSpan.Zero, counters.SortingDuration);
+        Assert.Equal(0d, counters.ParcelsPerHour);
     }
 }

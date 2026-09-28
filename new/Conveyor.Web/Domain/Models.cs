@@ -89,25 +89,9 @@ public sealed class LineCounters
     public long DimensionReads { get; set; }
     public long ScaleReads { get; set; }
     public long TotalParcels { get; set; }
-    public DateTimeOffset? SortingStartedAt { get; set; }
-    public DateTimeOffset? SortingLastParcelAt { get; set; }
-    // Legacy counters have no start time; do not invent a rate for that period.
-    public bool SortingTimingIncomplete { get; set; }
-    public void RecordSortingTime(DateTimeOffset timestamp)
-    {
-        if (SortingStartedAt is null)
-        {
-            SortingTimingIncomplete = TotalParcels > 0;
-            SortingStartedAt = timestamp;
-        }
-        if (timestamp < SortingStartedAt) SortingStartedAt = timestamp;
-        if (SortingLastParcelAt is null || timestamp > SortingLastParcelAt) SortingLastParcelAt = timestamp;
-    }
-    public TimeSpan? SortingDuration => SortingTimingIncomplete ? null :
-        SortingStartedAt is { } start && SortingLastParcelAt is { } end && end >= start
-            ? end - start : TotalParcels == 0 ? TimeSpan.Zero : null;
-    public double? ParcelsPerHour => SortingDuration is { TotalSeconds: > 0 } duration
-        ? TotalParcels / duration.TotalHours : null;
+    public double SortingRunSeconds { get; set; }
+    public TimeSpan? SortingDuration => TimeSpan.FromSeconds(Math.Max(0, SortingRunSeconds));
+    public double? ParcelsPerHour => SortingRunSeconds > 0 ? TotalParcels * 3600d / SortingRunSeconds : 0;
     // Kept only for counter state written before rejection causes were tracked.
     public long Rejected { get; set; }
     public long RejectedShipmentNotFound { get; set; }

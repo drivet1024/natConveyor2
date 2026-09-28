@@ -94,6 +94,24 @@ internal sealed class LineController
     private LineCounters _productionCounters = new();
     private LineCounters _maintenanceCounters = new();
     private bool _maintenance;
+    private bool _conveyorRunning;
+    private DateTimeOffset? _sortingTick;
+    private void AccumulateSortingTime(DateTimeOffset now)
+    {
+        if (_conveyorRunning && _sortingTick is { } previous)
+            _counters.SortingRunSeconds += Math.Max(0, (now - previous).TotalSeconds);
+        _sortingTick = _conveyorRunning ? now : null;
+    }
+    internal void SetConveyorRunning(bool? running, DateTimeOffset? timestamp = null)
+    {
+        lock (_gate)
+        {
+            var now = timestamp ?? DateTimeOffset.UtcNow;
+            AccumulateSortingTime(now);
+            _conveyorRunning = running == true;
+            _sortingTick = _conveyorRunning ? now : null;
+        }
+    }
     private LineCounters _counters
     {
         get => _maintenance ? _maintenanceCounters : _productionCounters;
@@ -104,6 +122,7 @@ internal sealed class LineController
     {
         lock (_gate)
         {
+            AccumulateSortingTime(DateTimeOffset.UtcNow);
             _maintenance = maintenance;
             _lastDecision = null;
             _consecutiveParcelsWithoutScale = 0;
@@ -239,6 +258,7 @@ internal sealed class LineController
         {
             _productionCounters = production.Copy();
             _maintenanceCounters = maintenance.Copy();
+            _sortingTick = _conveyorRunning ? DateTimeOffset.UtcNow : null;
             _parcelSequenceSinceReset = Math.Max(0, production.TotalParcels) + Math.Max(0, maintenance.TotalParcels);
             _consecutiveParcelsWithoutScale = 0;
         }
@@ -250,6 +270,7 @@ internal sealed class LineController
         lock (_gate)
         {
             _counters = new LineCounters();
+            _sortingTick = _conveyorRunning ? DateTimeOffset.UtcNow : null;
             _lastDecision = null;
             _plcInput = null;
             _cameraInput = null;
@@ -363,7 +384,6 @@ internal sealed class LineController
             parcelMaintenance = _maintenance;
             parcelId = ++_parcelSequenceSinceReset;
             parcelCounters.CameraReads++;
-            parcelCounters.RecordSortingTime(timestamp);
             parcelCounters.TotalParcels++;
             if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
         }
@@ -731,6 +751,7 @@ internal sealed class LineController
     {
         lock (_gate)
         {
+            AccumulateSortingTime(DateTimeOffset.UtcNow);
             var counters = _counters.Copy();
             var connections = _simulation
                 ? new ConnectionState(false, false, false, _databaseConnected, false, true, _repository.IsSimulation)
