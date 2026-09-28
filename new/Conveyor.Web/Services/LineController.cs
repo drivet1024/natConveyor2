@@ -458,6 +458,7 @@ internal sealed class LineController
                 {
                     parcelCounters.CountRejection(routingReason);
                     if (routingReason == "Route de l'expédition non configurée") parcelCounters.RecordUnconfiguredRoute(decision);
+                    if (routingReason == "Plusieurs expéditions détectées") parcelCounters.RecordMultipleBarcodes(parcel);
                 }
             }
             if (!parcelMaintenance)

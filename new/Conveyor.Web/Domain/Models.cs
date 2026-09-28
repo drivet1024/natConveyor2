@@ -40,6 +40,7 @@ public sealed record SortDecision(
     string? Waybill = null);
 
 public sealed record UnconfiguredRouteParcel(string Waybill, string? PostalCode, int? RouteId, DateTimeOffset ReceivedAt);
+public sealed record MultipleBarcodeParcel(string CameraData, DateTimeOffset ReceivedAt);
 
 public sealed class LineCounters
 {
@@ -47,9 +48,16 @@ public sealed class LineCounters
     {
         var copy = (LineCounters)MemberwiseClone();
         copy.UnconfiguredRouteParcels = UnconfiguredRouteParcels.ToArray();
+        copy.MultipleBarcodeParcels = MultipleBarcodeParcels.ToArray();
         return copy;
     }
     public IReadOnlyList<UnconfiguredRouteParcel> UnconfiguredRouteParcels { get; set; } = [];
+    public IReadOnlyList<MultipleBarcodeParcel> MultipleBarcodeParcels { get; set; } = [];
+    public void RecordMultipleBarcodes(ParcelContext parcel)
+    {
+        MultipleBarcodeParcels = MultipleBarcodeParcels.TakeLast(499)
+            .Append(new MultipleBarcodeParcel(parcel.CameraData, parcel.CameraTimestamp)).ToArray();
+    }
     public void RecordUnconfiguredRoute(SortDecision decision)
     {
         UnconfiguredRouteParcels = UnconfiguredRouteParcels.TakeLast(499)

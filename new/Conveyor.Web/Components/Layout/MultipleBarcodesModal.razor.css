@@ -1,0 +1,5 @@
+.route-dialog{width:min(760px,calc(100vw - 2rem));max-height:85dvh;padding:1.2rem;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+.route-dialog::backdrop{background:#0009}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem}h2{font-size:1.15rem;margin:0}p{color:var(--muted);font-size:.85rem}
+.route-table{overflow:auto;max-height:60dvh}table{width:100%;border-collapse:collapse;font-size:.85rem;text-align:left}th,td{padding:.7rem;border-bottom:1px solid var(--line);white-space:nowrap}th{position:sticky;top:0;background:var(--panel)}.details-note{font-size:.75rem}
+td.camera-data{white-space:pre-wrap;overflow-wrap:anywhere;font-family:monospace}

@@ -5,6 +5,11 @@
 
 <PageTitle>Supervision des convoyeurs</PageTitle>
 
+@if (_multipleBarcodeLineId is { } multipleLineId && _lines.FirstOrDefault(line => line.LineId == multipleLineId) is { } multipleLine)
+{
+    <MultipleBarcodesModal Line="multipleLine" OnClose="() => _multipleBarcodeLineId = null" />
+}
+
 @if (_routeLineId is { } routeLineId && _lines.FirstOrDefault(line => line.LineId == routeLineId) is { } routeLine)
 {
     <UnconfiguredRoutesModal Line="routeLine" OnClose="() => _routeLineId = null" />
@@ -67,11 +72,11 @@
         <div class="supervision-metrics rejection-metrics">
             @foreach (var cause in counters.RejectionCauses())
             {
-                @if (cause.Label == "Route non configurée")
+                @if (cause.Label is "Route non configurée" or "Plusieurs code-barres")
                 {
                     <button type="button" class="supervision-metric metric-button @SeverityCss(cause.Count, counters.TotalParcels, true)"
-                            aria-haspopup="dialog" aria-label="@($"Afficher les colis avec route non configurée — ligne {line.LineId + 1}")"
-                            @onclick="() => _routeLineId = line.LineId">
+                            aria-haspopup="dialog" aria-label="@($"Afficher les colis : {cause.Label} — ligne {line.LineId + 1}")"
+                            @onclick="() => OpenParcelDetails(line.LineId, cause.Label)">
                         <strong>@FormatPercentage(cause.Count, counters.TotalParcels) %</strong>
                         <span class="metric-count">@cause.Count.ToString("N0")</span>
                         <span class="metric-label">@cause.Label</span>
@@ -150,6 +155,12 @@
 
 @code {
     private int? _routeLineId;
+    private int? _multipleBarcodeLineId;
+    private void OpenParcelDetails(int lineId, string cause)
+    {
+        if (cause == "Plusieurs code-barres") _multipleBarcodeLineId = lineId;
+        else _routeLineId = lineId;
+    }
     private IReadOnlyList<LineSnapshot> _lines = [];
     private string SharedTagCount(int? count)
     {

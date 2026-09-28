@@ -10,6 +10,28 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void MultipleBarcodeDetailsSurvivePersistenceAndKeepSnapshotsIndependent()
+    {
+        var counters = new LineCounters();
+        var time = DateTimeOffset.UtcNow;
+        var parcel = new ParcelContext("12345678901,12345678902,H2X1Y4", time,
+            Dimension.Missing, null, 0, null);
+        counters.RecordMultipleBarcodes(parcel);
+        var snapshot = counters.Copy();
+        for (var i = 0; i < 501; i++)
+            counters.RecordMultipleBarcodes(parcel with { CameraData = i.ToString() });
+        var restored = System.Text.Json.JsonSerializer.Deserialize<LineCounters>(
+            System.Text.Json.JsonSerializer.Serialize(snapshot))!;
+        var detail = Assert.Single(restored.MultipleBarcodeParcels);
+        Assert.Equal(parcel.CameraData, detail.CameraData);
+        Assert.Equal(time, detail.ReceivedAt);
+        Assert.Equal(500, counters.MultipleBarcodeParcels.Count);
+        Assert.Equal("1", counters.MultipleBarcodeParcels[0].CameraData);
+        Assert.Equal("500", counters.MultipleBarcodeParcels[^1].CameraData);
+        Assert.Empty(System.Text.Json.JsonSerializer.Deserialize<LineCounters>("{}")!.MultipleBarcodeParcels);
+    }
+
+    [Fact]
     public void RouteDetailsSurvivePersistenceAndRemainBoundedWithoutChangingSnapshots()
     {
         var counters = new LineCounters();
