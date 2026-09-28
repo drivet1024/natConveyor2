@@ -26,6 +26,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly string _code42Tag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
+    public int? ConveyorId => _configuration.General?.ConveyorId;
     public string? ConveyorStopCause { get; private set; }
     public int? FullChutesCount { get; private set; }
     public int? Code42Count { get; private set; }

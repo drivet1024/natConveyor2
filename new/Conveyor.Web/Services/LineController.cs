@@ -404,6 +404,7 @@ internal sealed class LineController
         var stage = "calcul de la chute";
         var recirculationCounted = false;
         var code98Sent = false;
+        int? finalDispatchedChute = null;
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
@@ -455,6 +456,7 @@ internal sealed class LineController
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
             await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, fallback: false, token);
+            finalDispatchedChute = decision.PlcChute;
             _plcConnected = true;
             code98Sent = decision.PlcChute == 98;
             if (code98Sent && !string.IsNullOrWhiteSpace(decision.Barcode))
@@ -530,12 +532,15 @@ internal sealed class LineController
                 {
                     var fallbackChute = ResolveClosedChute(_options.RejectedChute);
                     await SendParcelToPlcAsync(fallbackChute, 1, parcel, fallback: true, token);
+                    finalDispatchedChute = fallbackChute;
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
                 }
             }
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }
+        if (finalDispatchedChute is { } sentChute)
+            lock (_gate) parcelCounters.ChuteDispatchCounts[sentChute] = parcelCounters.ChuteDispatchCounts.GetValueOrDefault(sentChute) + 1;
         _changed();
     }
 

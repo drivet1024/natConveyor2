@@ -9,7 +9,7 @@
 <div class="map-page">
 <header class="map-header">
     <div><span class="eyebrow">PLAN DU CONVOYEUR · ST-HUBERT</span><h1>Convoyeur du haut</h1></div>
-    <span class="map-status">Plan statique · suivi des colis à venir</span>
+    <span class="map-status">Convoyeur ID 1 · @LiveStatus</span>
 </header>
 
 <section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
@@ -34,14 +34,30 @@
         }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" /></div>
+        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" /></div>
     </div>
     <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 11, 13, 16 et 21 à 41.</p>
+    <p class="map-note">Compteurs : dernière destination envoyée avec succès à l’automate pour chaque colis, sans confirmation de chute physique. Compteurs liés à la remise à zéro des lignes et au mode production/maintenance.</p>
 </section>
 
 </div>
 
 @code {
+    private bool _running;
+    private IReadOnlyDictionary<int, long> _counts = new Dictionary<int, long>();
+    private DateTimeOffset? _station1, _station2;
+    private string LiveStatus => Supervisor.ConveyorId != 1 ? "Suivi indisponible sur ce convoyeur" : _running ? "EN MARCHE" : Supervisor.ConveyorRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU";
+    private void RefreshLive()
+    {
+        if (Supervisor.ConveyorId != 1) return;
+        var lines = Supervisor.GetSnapshots();
+        _running = Supervisor.ConveyorRunning == true && lines.Any(line => line.Connections.Plc && line.Running);
+        _counts = lines.SelectMany(line => line.Counters.ChuteDispatchCounts).GroupBy(pair => pair.Key)
+            .ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
+        _station1 = lines.FirstOrDefault(line => line.LineId == 0)?.LastPlcDispatch?.SentAt;
+        _station2 = lines.FirstOrDefault(line => line.LineId == 1)?.LastPlcDispatch?.SentAt;
+    }
+    private void OnLiveChanged() => _ = InvokeAsync(() => { if (_disposed) return; RefreshLive(); StateHasChanged(); });
     private IReadOnlyDictionary<int, string> _destinations = new Dictionary<int, string>();
     private string? _destinationStatus = "Chargement des destinations…";
     private readonly CancellationTokenSource _stopping = new();
@@ -57,6 +73,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Supervisor.Changed += OnLiveChanged;
+        RefreshLive();
         _displayShift = Supervisor.CurrentShiftId;
         await LoadShifts();
         await LoadDestinations();
@@ -136,6 +154,7 @@
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        Supervisor.Changed -= OnLiveChanged;
         await _stopping.CancelAsync();
         if (_refreshTask is not null) await _refreshTask;
         _stopping.Dispose();

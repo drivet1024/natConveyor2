@@ -55,6 +55,7 @@ public sealed class LineCounters
         copy.UnconfiguredRouteParcels = UnconfiguredRouteParcels.ToArray();
         copy.MultipleBarcodeParcels = MultipleBarcodeParcels.ToArray();
         copy.MissingShipmentCustomers = MissingShipmentCustomers.ToArray();
+        copy.ChuteDispatchCounts = new Dictionary<int, long>(ChuteDispatchCounts);
         return copy;
     }
     public IReadOnlyList<UnconfiguredRouteParcel> UnconfiguredRouteParcels { get; set; } = [];
@@ -89,6 +90,7 @@ public sealed class LineCounters
     public long DimensionReads { get; set; }
     public long ScaleReads { get; set; }
     public long TotalParcels { get; set; }
+    public Dictionary<int, long> ChuteDispatchCounts { get; set; } = new();
     public double SortingRunSeconds { get; set; }
     public TimeSpan? SortingDuration => TimeSpan.FromSeconds(Math.Max(0, SortingRunSeconds));
     public double? ParcelsPerHour => SortingRunSeconds > 0 ? TotalParcels * 3600d / SortingRunSeconds : 0;

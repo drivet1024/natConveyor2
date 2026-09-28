@@ -1,0 +1,7 @@
+.conveyor-running #conveyor-belts path[stroke-dasharray]{stroke:#70d9a1;animation:belt-motion 1s linear infinite}
+@keyframes belt-motion{to{stroke-dashoffset:-22}}
+.station-flash rect{animation:station-pulse .75s ease-out}
+.count-flash rect{animation:count-pulse .9s ease-out}
+@keyframes station-pulse{0%,45%{fill:#ffb53e;fill-opacity:1;stroke:#fff}100%{fill-opacity:.14}}
+@keyframes count-pulse{0%,45%{fill:#bd6c13;stroke:#fff}100%{fill:#192a33;stroke:#73909f}}
+@media(prefers-reduced-motion:reduce){.conveyor-running #conveyor-belts path[stroke-dasharray]{animation:none}}

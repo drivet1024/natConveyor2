@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 830" role="img" aria-label="St-Hubert — convoyeur du haut" aria-describedby="conveyor-map-description">
-<desc id="conveyor-map-description">Schéma simplifié du plan fourni. Tri de droite à gauche, deux voies de retour vers la merge, deux stations de lecture sur les voies du bas au niveau de la sortie 37, avant la merge située vers la sortie 40. Aucun suivi de colis en direct.</desc>
+<svg class="@(Running ? "conveyor-running" : null)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 830" role="img" aria-label="St-Hubert — convoyeur du haut" aria-describedby="conveyor-map-description">
+<desc id="conveyor-map-description">Schéma simplifié du convoyeur. Animation de marche, stations de lecture et compteurs des destinations envoyées à l’automate.</desc>
 <defs>
  <pattern id="belt-rollers" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 0V8" stroke="#334650" stroke-width="2"/></pattern>
  <marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#a7bcc8"/></marker>
@@ -61,12 +61,12 @@
  <path d="M300 550H350"/><path d="M740 550H800"/><path d="M1080 550H1140"/>
  <path d="M1470 535H1520"/><path d="M1580 425V375"/>
 </g>
-<g id="reading-station-1" data-lane="1">
+<g id="reading-station-1" data-lane="1" @key="(1, Station1Dispatch)" class="@(_flash1 ? "station-flash" : null)">
  <title>Station de lecture 1 — voie du haut, vers la chute 37, avant la merge</title>
  <rect x="1228" y="493" width="40" height="34" rx="5" fill="#e9a238" fill-opacity=".14" stroke="#f6ad45" stroke-width="2"/>
  <path d="M1237 498V522 M1243 498V522 M1250 498V522 M1259 498V522" stroke="#ffc568" stroke-width="2"/>
 </g>
-<g id="reading-station-2" data-lane="2">
+<g id="reading-station-2" data-lane="2" @key="(2, Station2Dispatch)" class="@(_flash2 ? "station-flash" : null)">
  <title>Station de lecture 2 — voie du bas, vers la chute 37, avant la merge</title>
  <rect x="1228" y="533" width="40" height="34" rx="5" fill="#e9a238" fill-opacity=".14" stroke="#f6ad45" stroke-width="2"/>
  <path d="M1237 538V562 M1243 538V562 M1250 538V562 M1259 538V562" stroke="#ffc568" stroke-width="2"/>
@@ -109,9 +109,51 @@
  <g transform="translate(1420 355)"><title>@ChuteTitle(40)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">40</text></g>
  <g transform="translate(1480 355)"><title>@ChuteTitle(41)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">41</text></g>
 </g>
+<g id="chute-counters" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#fff">
+@foreach (var point in CounterPositions)
+{
+    var count = Counts.GetValueOrDefault(point.Chute);
+    <g @key="(point.Chute, count)" transform="@($"translate({point.X} {point.Y})")" class="@(_changedChutes.Contains(point.Chute) ? "count-flash" : null)">
+        <title>Chute @point.Chute : @count colis — destination envoyée</title>
+        <rect x="-22" y="-12" width="44" height="24" rx="4" fill="#192a33" stroke="#73909f" />
+        <text y="5">@count</text>
+    </g>
+}
+</g>
 </svg>
 
 @code {
+    [Parameter] public bool Running { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, long> Counts { get; set; } = new Dictionary<int, long>();
+    [Parameter] public DateTimeOffset? Station1Dispatch { get; set; }
+    [Parameter] public DateTimeOffset? Station2Dispatch { get; set; }
+    private bool _initialized, _flash1, _flash2;
+    private DateTimeOffset? _previous1, _previous2;
+    private Dictionary<int, long> _previousCounts = new();
+    private HashSet<int> _changedChutes = new();
+    protected override void OnParametersSet()
+    {
+        if (Station1Dispatch != _previous1) _flash1 = _initialized && Station1Dispatch is not null;
+        if (Station2Dispatch != _previous2) _flash2 = _initialized && Station2Dispatch is not null;
+        if (_initialized)
+            foreach (var pair in Counts)
+                if (pair.Value > _previousCounts.GetValueOrDefault(pair.Key)) _changedChutes.Add(pair.Key);
+        _changedChutes.RemoveWhere(chute => Counts.GetValueOrDefault(chute) == 0);
+        _previous1 = Station1Dispatch;
+        _previous2 = Station2Dispatch;
+        _previousCounts = new(Counts);
+        _initialized = true;
+    }
+    private static readonly (int Chute, int X, int Y)[] CounterPositions =
+    [
+        (1,1420,130),(2,1320,130),(3,1248,130),(4,1152,130),(5,1056,130),
+        (6,960,130),(7,864,130),(8,768,130),(9,672,130),(10,576,130),
+        (11,529,130),(13,372,130),(16,305,215),
+        (21,432,445),(22,480,445),(23,528,445),(24,624,445),(25,672,445),
+        (26,720,445),(27,768,445),(28,816,445),(29,864,445),(30,912,445),
+        (31,960,445),(32,1008,445),(33,1056,445),(34,1104,445),(35,1152,476),
+        (36,1200,501),(37,1248,630),(38,1296,684),(39,1344,794),(40,1420,490),(41,1530,330)
+    ];
     [Parameter] public IReadOnlyDictionary<int, string> Destinations { get; set; } = new Dictionary<int, string>();
     [Parameter] public string? DestinationStatus { get; set; }
 

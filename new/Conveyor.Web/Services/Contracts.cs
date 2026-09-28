@@ -67,6 +67,7 @@ public interface IConveyorSupervisor
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }
     bool? ConveyorRunning { get; }
+    int? ConveyorId => null;
     string? ConveyorStopCause => null;
     int? FullChutesCount { get; }
     int? Code42Count { get; }

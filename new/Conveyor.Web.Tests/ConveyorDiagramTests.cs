@@ -13,6 +13,23 @@ namespace Conveyor.Web.Tests;
 public sealed class ConveyorDiagramTests
 {
     [Fact]
+    public async Task DiagramDisplaysLiveCountsWithoutFlashingHistoricalValues()
+    {
+        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>());
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<ConveyorDiagram>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(ConveyorDiagram.Running)] = true,
+                [nameof(ConveyorDiagram.Counts)] = new Dictionary<int, long> { [23] = 123 },
+                [nameof(ConveyorDiagram.Station1Dispatch)] = DateTimeOffset.UtcNow
+            }))).ToHtmlString());
+        Assert.Contains("conveyor-running", html);
+        Assert.Contains("Chute 23 : 123 colis", System.Net.WebUtility.HtmlDecode(html));
+        Assert.DoesNotContain("station-flash", html);
+        Assert.DoesNotContain("count-flash", html);
+    }
+    [Fact]
     public async Task MapPagePassesLoadedDepotCodeInsteadOfLiteralStatusVariable()
     {
         using var services = new ServiceCollection().AddLogging()
@@ -31,6 +48,8 @@ public sealed class ConveyorDiagramTests
         public List<int> RequestedShifts { get; } = [];
         protected override object? Invoke(MethodInfo? method, object?[]? args) => method?.Name switch
         {
+            "get_ConveyorId" => 2,
+            "add_Changed" or "remove_Changed" => null,
             "get_CurrentShiftId" => 1,
             "get_IsSimulation" => false,
             "GetShiftsAsync" => Task.FromResult<IReadOnlyList<ConveyorShift>>([new(1, "Jour"), new(2, "Soir")]),
@@ -93,7 +112,7 @@ public sealed class ConveyorDiagramTests
             }));
             return output.ToHtmlString();
         });
-        var svg = XDocument.Parse(html);
+        var svg = XDocument.Parse(System.Text.RegularExpressions.Regex.Replace(html, @"\s(b-[a-z0-9]+)(?=[\s>])", " $1=\"\""));
         XNamespace ns = "http://www.w3.org/2000/svg";
         var titles = svg.Descendants(ns + "title").Select(element => element.Value).ToArray();
         Assert.Equal(2, titles.Count(title => title == "Chute 38 — QC / STH & <Haut>"));

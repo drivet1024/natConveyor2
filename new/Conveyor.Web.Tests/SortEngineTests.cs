@@ -908,6 +908,8 @@ public sealed class SortEngineTests
             Assert.Equal(rejectedChute, snapshot.LastPlcDispatch!.Chute);
             Assert.Equal(rejectedChute, snapshot.LastDecision!.Chute);
             Assert.Equal(rejectedChute, Assert.Single(repo.SavedDecisions).PlcChute);
+            Assert.Equal(1, snapshot.Counters.ChuteDispatchCounts[rejectedChute]);
+            Assert.Equal(1, snapshot.Counters.ChuteDispatchCounts.Values.Sum());
             Assert.Equal("Plusieurs expéditions détectées", snapshot.LastDecision.Reason);
             Assert.Equal(1, snapshot.Counters.RejectedMultipleShipments);
             var detail = Assert.Single(snapshot.Counters.MultipleBarcodeParcels);
@@ -1143,6 +1145,8 @@ public sealed class SortEngineTests
             Assert.Equal(counters.RejectedMultipleShipments, counters.MultipleBarcodeParcels.Count);
             Assert.Equal(rejectedChute == 4 && !failSave ? 1 : 0, counters.RejectedConfiguredRoute);
             if (failSave) Assert.Equal(rejectedChute, supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute);
+            Assert.Equal(1, counters.ChuteDispatchCounts.Values.Sum());
+            Assert.Equal(1, counters.ChuteDispatchCounts[supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute]);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
             var sortedWithoutIssue = !failSave && barcode.StartsWith("12345678901", StringComparison.Ordinal) &&
                                      !barcode.Contains(',') && rejectedChute != 4 ? 1 : 0;

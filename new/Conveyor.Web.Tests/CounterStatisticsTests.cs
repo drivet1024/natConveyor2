@@ -10,6 +10,17 @@ namespace Conveyor.Web.Tests;
 public sealed class CounterStatisticsTests
 {
     [Fact]
+    public void ChuteCountersAreCopiedAndPersistedIndependently()
+    {
+        var counters = new LineCounters { ChuteDispatchCounts = new() { [23] = 5 } };
+        var copy = counters.Copy();
+        counters.ChuteDispatchCounts[23]++;
+        Assert.Equal(5, copy.ChuteDispatchCounts[23]);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<LineCounters>(System.Text.Json.JsonSerializer.Serialize(counters))!;
+        Assert.Equal(6, restored.ChuteDispatchCounts[23]);
+        Assert.Empty(new LineCounters().ChuteDispatchCounts);
+    }
+    [Fact]
     public void MissingCustomerCountsCombinePrefixesAndSurvivePersistence()
     {
         var counters = new LineCounters();
