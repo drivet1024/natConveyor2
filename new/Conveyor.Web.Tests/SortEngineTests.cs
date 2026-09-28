@@ -606,7 +606,7 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task LateScaleReceivedBeforePlcSendIsAppliedToTheCurrentParcel()
+    public async Task NewerScaleReceivedBeforePlcSendReplacesPreviouslyCapturedWeight()
     {
         var line = Line();
         var ports = GetAvailablePorts(3);
@@ -632,10 +632,11 @@ public sealed class SortEngineTests
             await scale.ConnectAsync(IPAddress.Loopback, line.ScalePort);
 
             await dimensioner.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u00020000008200620048\u0003"));
+            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002001.55LB\r\n"));
             await Task.Delay(75);
             await camera.GetStream().WriteAsync(Encoding.ASCII.GetBytes("12345678901\r"));
             await Task.Delay(75);
-            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002001.05LB\r\n"));
+            await scale.GetStream().WriteAsync(Encoding.ASCII.GetBytes("\u0002000.45LB\r\n"));
 
             SortDecision? decision = null;
             for (var attempt = 0; attempt < 120 && decision is null; attempt++)
@@ -645,7 +646,7 @@ public sealed class SortEngineTests
             }
 
             Assert.NotNull(decision);
-            Assert.Equal(1.05m, decision.Weight);
+            Assert.Equal(0.45m, decision.Weight);
             Assert.Equal(new Dimension(8.2m, 6.2m, 4.8m), decision.Dimension);
             Assert.Equal(4, decision.PlcChute);
             Assert.Equal(4, Assert.Single(plc.Commands).Value);

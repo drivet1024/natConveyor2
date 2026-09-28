@@ -386,28 +386,27 @@ internal sealed class LineController
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
-            if (!hasCorrelatedDimension || !hasCorrelatedWeight)
+            // Recheck both sensors immediately before the PLC command. A newer
+            // measurement may have arrived while the route was being resolved,
+            // even when an older in-window measurement was already captured.
+            var (lateDimension, lateWeight) = CaptureMeasurements(timestamp, window);
+            var lateDimensionCorrelated = lateDimension is not null && (timestamp - lateDimension.Timestamp).Duration() <= window;
+            var lateWeightCorrelated = lateWeight is not null && (timestamp - lateWeight.Timestamp).Duration() <= window;
+            if (lateDimensionCorrelated || lateWeightCorrelated)
             {
                 stage = "actualisation des mesures avant l'envoi automate";
-                var (lateDimension, lateWeight) = CaptureMeasurements(timestamp, window,
-                    captureDimension: !hasCorrelatedDimension, captureWeight: !hasCorrelatedWeight);
-                var lateDimensionCorrelated = lateDimension is not null && (timestamp - lateDimension.Timestamp).Duration() <= window;
-                var lateWeightCorrelated = lateWeight is not null && (timestamp - lateWeight.Timestamp).Duration() <= window;
-                if (lateDimensionCorrelated || lateWeightCorrelated)
+                hasCorrelatedDimension |= lateDimensionCorrelated;
+                hasCorrelatedWeight |= lateWeightCorrelated;
+                parcel = parcel with
                 {
-                    hasCorrelatedDimension |= lateDimensionCorrelated;
-                    hasCorrelatedWeight |= lateWeightCorrelated;
-                    parcel = parcel with
-                    {
-                        Dimension = lateDimensionCorrelated ? lateDimension!.Value : parcel.Dimension,
-                        DimensionTimestamp = lateDimensionCorrelated ? lateDimension!.Timestamp : parcel.DimensionTimestamp,
-                        Weight = lateWeightCorrelated
-                            ? NormalizeWeight(lateWeight!.Value, _options.UnderweightReplacementWeight)
-                            : parcel.Weight,
-                        WeightTimestamp = lateWeightCorrelated ? lateWeight!.Timestamp : parcel.WeightTimestamp
-                    };
-                    decision = await _sortEngine.DecideAsync(_options, parcel, token);
-                }
+                    Dimension = lateDimensionCorrelated ? lateDimension!.Value : parcel.Dimension,
+                    DimensionTimestamp = lateDimensionCorrelated ? lateDimension!.Timestamp : parcel.DimensionTimestamp,
+                    Weight = lateWeightCorrelated
+                        ? NormalizeWeight(lateWeight!.Value, _options.UnderweightReplacementWeight)
+                        : parcel.Weight,
+                    WeightTimestamp = lateWeightCorrelated ? lateWeight!.Timestamp : parcel.WeightTimestamp
+                };
+                decision = await _sortEngine.DecideAsync(_options, parcel, token);
             }
             var isNoRead = decision.CountNoRead;
             RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
