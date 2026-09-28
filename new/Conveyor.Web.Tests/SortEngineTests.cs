@@ -10,6 +10,37 @@ namespace Conveyor.Web.Tests;
 
 public sealed class SortEngineTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CounterResetClearsEveryPopupForCurrentMode(bool maintenance)
+    {
+        var repository = new FakeRepository();
+        var controller = new LineController(Line(), true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        var populated = new LineCounters
+        {
+            TotalParcels = 4, SmallParcels = 1, RejectedRouteNotConfigured = 1,
+            RejectedMultipleShipments = 1, RejectedShipmentNotFound = 1,
+            SmallParcelDetails = [new(1, new(4, 3, 2), DateTimeOffset.UtcNow)],
+            UnconfiguredRouteParcels = [new("123", "H2X1Y4", 10, DateTimeOffset.UtcNow)],
+            MultipleBarcodeParcels = [new("123,456", DateTimeOffset.UtcNow)],
+            MissingShipmentCustomers = [new("42", "987", 1)]
+        };
+        controller.RestoreCounters(populated, populated);
+        controller.SetMaintenance(maintenance);
+        Assert.Single(controller.Snapshot().Counters.SmallParcelDetails);
+        controller.ResetCounters();
+        var empty = controller.Snapshot().Counters;
+        Assert.Equal(0, empty.TotalParcels);
+        Assert.Empty(empty.SmallParcelDetails);
+        Assert.Empty(empty.UnconfiguredRouteParcels);
+        Assert.Empty(empty.MultipleBarcodeParcels);
+        Assert.Empty(empty.MissingShipmentCustomers);
+        controller.SetMaintenance(!maintenance);
+        Assert.Single(controller.Snapshot().Counters.SmallParcelDetails);
+    }
+
     [Fact]
     public async Task Plc_dispatch_log_contains_camera_scale_dimension_and_timestamps()
     {
