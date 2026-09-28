@@ -24,6 +24,8 @@ public interface IConveyorRepository
         }
         return shipments;
     }
+    Task<IReadOnlyList<string>> GetShipmentPrefixesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
     Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken cancellationToken);
     Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken cancellationToken);
     Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken cancellationToken);

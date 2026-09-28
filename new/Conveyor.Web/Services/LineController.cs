@@ -379,7 +379,7 @@ internal sealed class LineController
             hasCorrelatedWeight ? NormalizeWeight(weight!.Value, _options.UnderweightReplacementWeight) : -1,
             weight?.Timestamp,
             parcelId);
-        var isNoRead = parcel.CameraData.Contains('?');
+
         var stage = "calcul de la chute";
         var recirculationCounted = false;
         var code98Sent = false;
@@ -409,6 +409,7 @@ internal sealed class LineController
                     decision = await _sortEngine.DecideAsync(_options, parcel, token);
                 }
             }
+            var isNoRead = decision.CountNoRead;
             RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
             lock (_gate)
             {
@@ -416,6 +417,8 @@ internal sealed class LineController
                     IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.SmallParcels++;
                 if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
                 if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
+                if (decision.CountShipmentNotFound) parcelCounters.RejectedShipmentNotFound++;
+                if (isNoRead) parcelCounters.NoReads++;
             }
             var routingReason = decision.Reason;
             var effectiveChute = ResolveClosedChute(decision.PlcChute);
@@ -465,10 +468,9 @@ internal sealed class LineController
                 _lastError = null;
                 if (!parcelMaintenance) parcelCounters.DatabaseInserts++;
                 if (decision.Chute == 98) parcelCounters.Code98++;
-                if (isNoRead) parcelCounters.NoReads++;
-                else
+                if (!isNoRead && routingReason != "Plusieurs expéditions détectées")
                 {
-                    // Measurement error rates use read parcels only, excluding no-reads.
+                    // No-read and multiple-barcode parcels are counted in their own categories.
                     if (!parcel.Dimension.IsValid(_options.MaximumDimension)) parcelCounters.DimensionErrors++;
                     if (parcel.Weight <= 0 || parcel.Weight > _options.MaximumWeight) parcelCounters.ScaleErrors++;
                 }

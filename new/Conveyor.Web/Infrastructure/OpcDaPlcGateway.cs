@@ -12,6 +12,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
     private readonly ILogger<OpcDaPlcGateway> _logger;
     private readonly Func<IOpcDaConnection> _factory;
     private readonly TimeProvider _time;
+    private readonly OpcDaDiagnostics _diagnostics;
     private readonly Dictionary<string, DateTimeOffset> _lastReceived;
     private readonly HashSet<string> _badTags = new(StringComparer.OrdinalIgnoreCase);
     private IOpcDaConnection? _client;
@@ -35,6 +36,8 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
         _time = time;
         var monitored = tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         _lastReceived = monitored.ToDictionary(tag => tag, _ => DateTimeOffset.MinValue, StringComparer.OrdinalIgnoreCase);
+        var polled = OpcDaConnection.PolledItemIds(options.OpcTopic, monitored, subscriptionOnlyTags);
+        _diagnostics = new(logger, time, monitored.Where(tag => polled.Contains(OpcDaConnection.ItemId(options.OpcTopic, tag))), monitored);
         _factory = factory ?? (() => new OpcDaConnection(options, monitored, subscriptionOnlyTags, logger));
     }
 
@@ -56,11 +59,12 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
         token.ThrowIfCancellationRequested();
         var client = _factory();
         lock (_readGate) _client = client;
-        _handler = values => Receive(client, values);
+        _handler = values => Receive(client, values, "subscription");
         client.ValuesChanged += _handler;
         try
         {
             await Task.Run(client.Connect, token);
+            _diagnostics.Start();
             _logger.LogInformation("Automate OPC DA connecté : {Host} / {ProgId}, sujet {Topic}",
                 string.IsNullOrWhiteSpace(_options.OpcHost) ? "local" : _options.OpcHost, _options.OpcProgId, _options.OpcTopic);
             await ReadAsync(client, token);
@@ -70,20 +74,35 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
 
     private async Task ReadAsync(IOpcDaConnection client, CancellationToken token)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(TimeSpan.FromSeconds(3));
-        var values = await Task.Run(() => client.ReadAsync(timeout.Token), token);
-        Receive(client, values);
+        var started = _time.GetUtcNow();
+        _diagnostics.Operation("lecture de contrôle");
+        _logger.LogDebug("Diagnostic OPC début du contrôle à {StartedAt}", started);
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(3));
+            var values = await Task.Run(() => client.ReadAsync(timeout.Token), token);
+            _diagnostics.ControlCompleted(started, values.Count);
+            Receive(client, values, "control-read");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception, "Diagnostic OPC contrôle échoué ou annulé après {DurationMs} ms", (_time.GetUtcNow() - started).TotalMilliseconds);
+            throw;
+        }
+        finally { _diagnostics.Operation(null); }
     }
 
-    private void Receive(IOpcDaConnection client, IReadOnlyList<OpcDaReading> values)
+    private void Receive(IOpcDaConnection client, IReadOnlyList<OpcDaReading> values, string source)
     {
         lock (_readGate)
         {
             if (!ReferenceEquals(client, _client)) return;
             foreach (var reading in values)
             {
-                if (!_lastReceived.TryGetValue(reading.Tag, out var previous) || reading.Timestamp < previous) continue;
+                if (!_lastReceived.TryGetValue(reading.Tag, out var previous)) continue;
+                _diagnostics.Received(reading, source, previous, reading.Timestamp >= previous && reading.Good && reading.Value is not null and not Array);
+                if (reading.Timestamp < previous) continue;
                 _lastReceived[reading.Tag] = reading.Timestamp;
                 if (!reading.Good || reading.Value is null or Array)
                 {
@@ -104,7 +123,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
 
     public async Task<bool> PingAsync(CancellationToken token)
     {
-        if (!await _gate.WaitAsync(0, token)) return ReadsHealthy;
+        if (!await _gate.WaitAsync(0, token)) { _diagnostics.Skipped(); return ReadsHealthy; }
         try
         {
             if (!_requested || _disposed) return false;
@@ -132,6 +151,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
         await _gate.WaitAsync(token);
         try
         {
+            _diagnostics.Operation($"écriture {tag}");
             var client = _client;
             if (client?.IsConnected != true) throw new InvalidOperationException("La connexion OPC DA n’est pas disponible pour l’envoi.");
             for (var index = 0; index < Math.Clamp(repeat, 1, 3); index++)
@@ -143,7 +163,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
                 _logger.LogInformation("Valeur {Value} envoyée par OPC DA au tag {Tag}", chute, tag);
             }
         }
-        finally { _gate.Release(); }
+        finally { _diagnostics.Operation(null); _gate.Release(); }
     }
 
     public async Task DisconnectAsync()
@@ -160,6 +180,7 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
 
     private void DisposeClient()
     {
+        _diagnostics.Stop();
         IOpcDaConnection? client;
         lock (_readGate)
         {

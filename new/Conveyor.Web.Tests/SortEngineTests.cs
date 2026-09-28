@@ -867,13 +867,50 @@ public sealed class SortEngineTests
     }
 
     [Fact]
-    public async Task Multiple_known_waybills_use_safety_chute_99_and_plc_reject()
+    public async Task Multiple_known_waybills_use_configured_reject_in_decision_and_plc()
     {
         var engine = new SortEngine(new FakeRepository(), NullLogger<SortEngine>.Instance);
         var result = await engine.DecideAsync(Line(), Parcel("12345678901,12345678902"), CancellationToken.None);
-        Assert.Equal(99, result.Chute);
+        Assert.Equal(16, result.Chute);
         Assert.Equal(16, result.PlcChute);
         Assert.False(result.ShipmentNotFound);
+    }
+
+    [Theory]
+    [InlineData(16, 0)]
+    [InlineData(16, 1)]
+    [InlineData(1, 1)]
+    [InlineData(16, 2)]
+    [InlineData(16, 3)]
+    [InlineData(16, 4)]
+    public async Task MultipleBarcodesRejectWithoutCountingMeasurementErrors(int rejectedChute, int measurementCase)
+    {
+        var repo = new FakeRepository();
+        var plc = new MotionPlc();
+        var line = Line();
+        line.RejectedChute = rejectedChute;
+        line.CorrelationDelayMs = 0;
+        line.ValidateDimensionsAndWeight = true;
+        line.EnableCode86 = true;
+        var controller = new LineController(line, true, repo, plc, false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901,12345678902,H2X1Y4",
+                measurementCase == 1 ? Dimension.Missing : measurementCase is 3 or 4 ? new(line.MaximumDimension + 1, 8, 5) : new(12, 8, 5),
+                measurementCase == 1 ? -1 : measurementCase is 2 or 4 ? line.MaximumWeight + 1 : 4.75m);
+            var snapshot = controller.Snapshot();
+            Assert.Equal(rejectedChute, snapshot.LastPlcDispatch!.Chute);
+            Assert.Equal(rejectedChute, snapshot.LastDecision!.Chute);
+            Assert.Equal(rejectedChute, Assert.Single(repo.SavedDecisions).PlcChute);
+            Assert.Equal("Plusieurs expéditions détectées", snapshot.LastDecision.Reason);
+            Assert.Equal(1, snapshot.Counters.RejectedMultipleShipments);
+            Assert.Equal(0, snapshot.Counters.ScaleErrors);
+            Assert.Equal(0, snapshot.Counters.DimensionErrors);
+            Assert.Equal(0, snapshot.Counters.Code98);
+            Assert.Equal(0, snapshot.Counters.NoReads);
+        }
+        finally { await controller.StopAsync(); }
     }
 
     [Fact]
@@ -975,7 +1012,7 @@ public sealed class SortEngineTests
     [InlineData(false, "99999999999,H2X1Y4", 0, 0, 7)]
     [InlineData(false, "?", 0, 0, 16)]
     [InlineData(true, "12345678901", 5, 12, 4)]
-    [InlineData(true, "12345678901,12345678902", 0, 0, 99)]
+    [InlineData(true, "12345678901,12345678902", 0, 0, 16)]
     public async Task Code98_switch_preserves_original_route_when_disabled(bool enabled, string camera, int weight, int length, int expected)
     {
         var line = Line();
@@ -1082,8 +1119,10 @@ public sealed class SortEngineTests
             Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = rejectedChute }] };
         config.ApplyGlobalSorting();
         var repo = new FakeRepository { FailSave = failSave };
+        using var prefixes = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await prefixes.RefreshAsync(default);
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
-            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+            new SortEngine(repo, NullLogger<SortEngine>.Instance, prefixes), NullLoggerFactory.Instance, new TestConfigurationEditor());
         try
         {
             await supervisor.SimulateParcelAsync(0, barcode, new Dimension(12, 8, 5), 4.75m);
@@ -1104,22 +1143,39 @@ public sealed class SortEngineTests
     }
 
     [Theory]
-    [InlineData("98765432101", 1)]
-    [InlineData("98765432101,H2X1Y4", 0)]
-    public async Task PasDansLeSystemeCountsOnlyUnknownParcelsSentToReject(string cameraData, long expected)
+    [InlineData("98765432101", 1, 0)]
+    [InlineData("987654321012", 1, 0)]
+    [InlineData("9876543210", 0, 1)]
+    [InlineData("9876543210123", 0, 1)]
+    [InlineData("51865432101", 0, 1)]
+    [InlineData("88865432101", 0, 1)]
+    [InlineData("88865432101,98765432101", 1, 0)]
+    [InlineData("98765432101,987654321012", 1, 0)]
+    [InlineData("98765432101,H2X1Y4", 1, 0)]
+    [InlineData("88865432101,H2X1Y4", 0, 1)]
+    [InlineData("??", 0, 1)]
+    [InlineData("98765432101,??", 0, 1)]
+    [InlineData("98765432101,12345678901", 0, 0)]
+    [InlineData("12345678901", 0, 0)]
+    [InlineData("", 0, 1)]
+    public async Task CameraClassificationCountsIndependentlyOfDestination(string cameraData, long expected, long noReads)
     {
         var config = new ConveyorOptions { Simulation = true,
             Lines = [new() { Id = 0, CorrelationDelayMs = 0, RejectedChute = 16 }] };
         config.ApplyGlobalSorting();
         var repo = new FakeRepository();
+        using var prefixes = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await prefixes.RefreshAsync(default);
         using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
-            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+            new SortEngine(repo, NullLogger<SortEngine>.Instance, prefixes), NullLoggerFactory.Instance, new TestConfigurationEditor());
         try
         {
             await supervisor.SimulateParcelAsync(0, cameraData, new Dimension(12, 8, 5), 4.75m);
             var counters = supervisor.GetSnapshots()[0].Counters;
             Assert.Equal(expected, counters.RejectedShipmentNotFound);
+            Assert.Equal(noReads, counters.NoReads);
             Assert.Equal(expected, counters.RejectionCauses().Single(cause => cause.Label == "Pas dans le système").Count);
+            Assert.Equal(1, repo.PrefixReads);
         }
         finally { await supervisor.StopLineAsync(0); }
     }
@@ -1315,8 +1371,105 @@ public sealed class SortEngineTests
         }
     }
 
+    [Theory]
+    [InlineData("??", true, false)]
+    [InlineData("??", false, true)]
+    [InlineData("??", true, true)]
+    [InlineData("88865432101", true, false)]
+    [InlineData("88865432101", false, true)]
+    [InlineData("88865432101", true, true)]
+    public async Task NoReadCountsOnceWithoutScaleOrDimensionErrors(string frame, bool badScale, bool badDimensions)
+    {
+        var repo = new FakeRepository();
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await cache.RefreshAsync(default);
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.ValidateDimensionsAndWeight = true;
+        var controller = new LineController(line, true, repo, new MotionPlc(), false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance, cache), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync(frame, badDimensions ? Dimension.Missing : new(12, 8, 5), badScale ? -1 : 4.75m);
+            var counters = controller.Snapshot().Counters;
+            Assert.Equal(1, counters.TotalParcels);
+            Assert.Equal(1, counters.DatabaseInserts);
+            Assert.Equal(1, counters.NoReads);
+            Assert.Equal(0, counters.ScaleErrors);
+            Assert.Equal(0, counters.DimensionErrors);
+            Assert.Equal(0, counters.RejectedShipmentNotFound);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task PrefixRefreshReplacesListAndRetainsLastSuccessOnFailure()
+    {
+        var repo = new FakeRepository();
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        Assert.False(cache.Matches("98765432101"));
+        await cache.RefreshAsync(default);
+        Assert.True(cache.Matches("98765432101"));
+        repo.Prefixes = ["777"];
+        await cache.RefreshAsync(default);
+        Assert.False(cache.Matches("98765432101"));
+        Assert.True(cache.Matches("77765432101"));
+        repo.FailPrefixes = true;
+        await cache.RefreshAsync(default);
+        Assert.True(cache.Matches("77765432101"));
+        Assert.Equal(3, repo.PrefixReads);
+    }
+
+    [Theory]
+    [InlineData("98765432101", 1, 0)]
+    [InlineData("88865432101", 0, 1)]
+    [InlineData("??", 0, 1)]
+    public async Task CameraCountersDoNotDependOnMeasurementsOrScanInsert(string frame, int missing, int noReads)
+    {
+        var repo = new FakeRepository { FailSave = true };
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await cache.RefreshAsync(default);
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        line.ValidateDimensionsAndWeight = true;
+        var controller = new LineController(line, true, repo, new MotionPlc(), false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance, cache), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync(frame, Dimension.Missing, -1);
+            var counters = controller.Snapshot().Counters;
+            Assert.Equal(missing, counters.RejectedShipmentNotFound);
+            Assert.Equal(noReads, counters.NoReads);
+            Assert.Equal(0, counters.DatabaseInserts);
+            Assert.Equal(1, counters.TotalParcels);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task PrefixLoadFailureDoesNotChangeRoutingOrCountUnknownPrefix()
+    {
+        var repo = new FakeRepository { FailPrefixes = true };
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await cache.RefreshAsync(default);
+        var engine = new SortEngine(repo, NullLogger<SortEngine>.Instance, cache);
+        var decision = await engine.DecideAsync(Line(), new("98765432101", DateTimeOffset.Now, new(12, 8, 5), null, 4.75m, null), default);
+        Assert.True(decision.ShipmentNotFound);
+        Assert.False(decision.CountShipmentNotFound);
+        Assert.Equal(Line().RejectedChute, decision.PlcChute);
+    }
+
     private sealed class FakeRepository : IConveyorRepository
     {
+        public IReadOnlyList<string> Prefixes { get; set; } = ["987"];
+        public bool FailPrefixes { get; set; }
+        public int PrefixReads { get; private set; }
+        public Task<IReadOnlyList<string>> GetShipmentPrefixesAsync(CancellationToken token)
+        {
+            PrefixReads++;
+            if (FailPrefixes) throw new IOException("Prefix database unavailable");
+            return Task.FromResult(Prefixes);
+        }
         public bool? RecentShipmentUpdates { get; set; }
         public bool FailShipmentSync { get; set; }
         public Task<bool?> HasRecentShipmentUpdatesAsync(CancellationToken token) => FailShipmentSync

@@ -71,6 +71,8 @@ builder.Services.AddSingleton<IConveyorRepository>(services =>
     string.IsNullOrWhiteSpace(services.GetRequiredService<IOptions<ConveyorOptions>>().Value.Database.ConnectionString)
         ? new SimulationConveyorRepository()
         : ActivatorUtilities.CreateInstance<MySqlConveyorRepository>(services));
+builder.Services.AddSingleton<ShipmentPrefixCache>();
+builder.Services.AddHostedService(services => services.GetRequiredService<ShipmentPrefixCache>());
 builder.Services.AddSingleton<SortEngine>();
 builder.Services.AddHttpClient("TwilioSms").RemoveAllLoggers()
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });

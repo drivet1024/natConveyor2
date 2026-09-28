@@ -34,7 +34,9 @@ public sealed record SortDecision(
     int? RouteId = null,
     bool? DisableCode98 = null,
     bool ShipmentNotFound = false,
-    int? Code98PassCount = null);
+    int? Code98PassCount = null,
+    bool CountShipmentNotFound = false,
+    bool CountNoRead = false);
 
 public sealed class LineCounters
 {
@@ -58,7 +60,8 @@ public sealed class LineCounters
     {
         switch (reason)
         {
-            case "Pas dans le système": RejectedShipmentNotFound++; break;
+            // Counted independently of the destination by the camera classification.
+            case "Pas dans le système": break;
             case "Route de l'expédition non configurée": RejectedRouteNotConfigured++; break;
             case "Limite de reprises code 86": RejectedCode86RetryLimit++; break;
             case "Plusieurs expéditions détectées": RejectedMultipleShipments++; break;

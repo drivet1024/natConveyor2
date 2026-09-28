@@ -216,6 +216,26 @@ public sealed class MySqlConveyorRepository : IConveyorRepository
         return names.ToDictionary(pair => pair.Key, pair => string.Join(" / ", pair.Value));
     }
 
+    public async Task<IReadOnlyList<string>> GetShipmentPrefixesAsync(CancellationToken token)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(token);
+        const string sql = """
+            select CUSTOMER_ID, left(SHIPPING_ID, 3) as prefixe, count(*)
+            from conveyor_shipment
+            where INSERT_DATE > @since and left(SHIPPING_ID, 3) <> '518'
+              and SHIPPING_ID > 105000000
+            group by CUSTOMER_ID, left(SHIPPING_ID, 3)
+            """;
+        await using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@since", new DateTime(2026, 9, 20));
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var prefixes = new HashSet<string>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(token))
+            if (!reader.IsDBNull(1)) prefixes.Add(reader.GetString(1));
+        return prefixes.ToArray();
+    }
+
     public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) =>
         ScalarIntAsync("select chute_no from conveyor_shift_route where shift_id=@shift and new_route_id=@route limit 1",
             [("@shift", shiftId), ("@route", routeId)], token);

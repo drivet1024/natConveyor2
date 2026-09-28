@@ -4,7 +4,7 @@ using Conveyor.Web.Options;
 
 namespace Conveyor.Web.Services;
 
-public sealed partial class SortEngine(IConveyorRepository repository, ILogger<SortEngine> logger)
+public sealed partial class SortEngine(IConveyorRepository repository, ILogger<SortEngine> logger, ShipmentPrefixCache? prefixes = null)
 {
     [GeneratedRegex("^[A-Z][0-9][A-Z] ?[0-9][A-Z][0-9]$", RegexOptions.IgnoreCase)]
     private static partial Regex PostalCodeRegex();
@@ -32,7 +32,7 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             logger.LogInformation("Ligne {Line}, colis #{ParcelId}: sans lecture -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]",
                 line.Id + 1, parcel.ParcelId, line.RejectedChute, reason, string.Join(", ", candidates));
             return new SortDecision("", "", line.RejectedChute, line.RejectedChute, reason,
-                parcel.Dimension, parcel.Weight, parcel.CameraTimestamp, ShipmentNotFound: false);
+                parcel.Dimension, parcel.Weight, parcel.CameraTimestamp, ShipmentNotFound: false, CountNoRead: true);
         }
 
         var lookupCandidates = candidates.Select(RenameBentley).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -103,12 +103,13 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
 
         if (goodBarcodes.Count > 1)
         {
-            chute = 99;
+            chute = line.RejectedChute;
             reason = "Plusieurs expéditions détectées";
         }
 
         var plcChute = chute == 99 ? line.RejectedChute : chute;
         var shipmentNotFound = goodBarcodes.Count == 0;
+        var countShipmentNotFound = shipmentNotFound && candidates.Any(candidate => prefixes?.Matches(candidate) == true);
         logger.LogInformation("Ligne {Line}, colis #{ParcelId}: {Barcode} -> chute {Chute} ({Reason}); codes-barres lus [{ReadBarcodes}]; codes-barres reconnus [{RecognizedBarcodes}]",
             line.Id + 1, parcel.ParcelId, barcode, chute, reason, string.Join(", ", candidates), string.Join(", ", goodBarcodes));
         return new SortDecision(barcode, postalCodes.FirstOrDefault() ?? "", chute, plcChute, reason,
@@ -116,7 +117,8 @@ public sealed partial class SortEngine(IConveyorRepository repository, ILogger<S
             goodBarcodes.Count == 1 ? matchedShipment?.DestinationPostalCode : null,
             goodBarcodes.Count == 1 ? matchedShipment?.RouteId : null,
             goodBarcodes.Count == 1 ? matchedShipment?.DisableCode98 : null,
-            shipmentNotFound);
+            shipmentNotFound, CountShipmentNotFound: countShipmentNotFound,
+            CountNoRead: shipmentNotFound && !countShipmentNotFound);
     }
 
     private static string RenameBentley(string value) =>
