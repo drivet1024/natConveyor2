@@ -287,7 +287,12 @@
     }
     private bool? ConveyorState(LineSnapshot line) => line.Running && line.Connections.Plc && !line.Connections.Simulated
         ? Supervisor.ConveyorRunning : null;
-    private string LineStateLabel(LineSnapshot line) => ConveyorState(line) switch { true => "EN MARCHE", false => "ARRÊTÉ", _ => "ÉTAT INCONNU" };
+    private string LineStateLabel(LineSnapshot line) => ConveyorState(line) switch
+    {
+        true => "EN MARCHE",
+        false => Supervisor.ConveyorStopCause is { } cause ? $"ARRÊTÉ · {cause}" : "ARRÊTÉ",
+        _ => "ÉTAT INCONNU"
+    };
     private string LineStateCss(LineSnapshot line) => ConveyorState(line) switch { true => "on", false => "off", _ => "unavailable" };
 
     public void Dispose() => Supervisor.Changed -= OnChanged;

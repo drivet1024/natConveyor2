@@ -86,6 +86,36 @@ public sealed class MaintenanceTests
         finally { await supervisor.StopLineAsync(0); }
     }
 
+    [Theory]
+    [InlineData(0, "PAUSE")]
+    [InlineData(1, "JAM")]
+    [InlineData(2, "DOWN")]
+    public async Task StopCauseFollowsSuccessfulCommandAndClearsOnRestart(int cause, string label)
+    {
+        var config = new ConveyorOptions { General = new() { ConveyorId = 7 }, Lines = [new() { Id = 0 }] };
+        config.ApplyGlobalSorting();
+        var repository = new SimulationConveyorRepository();
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repository,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetConveyorMotionAsync(false, cause));
+        Assert.Null(supervisor.ConveyorStopCause);
+        await supervisor.StartLineAsync(0);
+        try
+        {
+            supervisor.RecordPlcTagChange(config.General!.ConveyorStartTag, "1");
+            await supervisor.SetConveyorMotionAsync(false, cause);
+            supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "0");
+            Assert.Equal(label, supervisor.ConveyorStopCause);
+            supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "0");
+            Assert.Equal(label, supervisor.ConveyorStopCause);
+            supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "1");
+            Assert.Null(supervisor.ConveyorStopCause);
+            supervisor.RecordPlcTagChange(config.General.ConveyorStartTag, "0");
+            Assert.Null(supervisor.ConveyorStopCause);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
     private sealed class BlockingPlc : IPlcGateway
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

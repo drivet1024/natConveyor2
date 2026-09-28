@@ -26,6 +26,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly string _code42Tag;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
+    public string? ConveyorStopCause { get; private set; }
     public int? FullChutesCount { get; private set; }
     public int? Code42Count { get; private set; }
     public bool Maintenance => _configuration.General?.Maintenance == true;
@@ -47,6 +48,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var result = await ConveyorMotion.ExecuteAsync(_plc, _repository, _configuration.General?.ConveyorId,
                 _configuration.Simulation, start, cause, _logger, _motionTag, async () =>
                 {
+                    ConveyorStopCause = start ? null : cause switch { 0 => "PAUSE", 1 => "JAM", 2 => "DOWN", _ => null };
                     if (!start) return;
                     _configuration.General!.Maintenance = maintenance;
                     HasStartedOperatingMode = true;
@@ -161,6 +163,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var state = value.Trim() switch { "1" => true, "0" => false, _ => (bool?)null };
             if (state != ConveyorRunning)
             {
+                if (state != false) ConveyorStopCause = null;
                 ConveyorRunning = state;
                 Changed?.Invoke();
             }
@@ -272,6 +275,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             _logger.LogWarning("Redémarrage RSLinx demandé ; interruption temporaire des échanges automate");
             await _plc.DisconnectAsync();
             ConveyorRunning = null;
+            ConveyorStopCause = null;
             FullChutesCount = null;
             Code42Count = null;
             Changed?.Invoke();
