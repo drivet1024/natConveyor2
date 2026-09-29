@@ -1,20 +1,20 @@
-@page "/plan-convoyeur"
+@page "/plan-convoyeur-sol"
 @implements IAsyncDisposable
 @inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
-@inject ILogger<ConveyorMap> Logger
+@inject ILogger<GroundConveyorMap> Logger
 
-<PageTitle>St-Hubert — Convoyeur du haut</PageTitle>
+<PageTitle>St-Hubert — Convoyeur au sol</PageTitle>
 
 <div class="map-page">
 <header class="map-header">
-    <div><span class="eyebrow">PLAN DU CONVOYEUR · ST-HUBERT</span><h1>Convoyeur du haut</h1></div>
-    <span class="map-status">Convoyeur ID 1 · @LiveStatus</span>
+    <div><span class="eyebrow">PLAN DU CONVOYEUR · ST-HUBERT</span><h1>Convoyeur au sol</h1></div>
+    <span class="map-status">Convoyeur ID 2 · @LiveStatus</span>
 </header>
 
-<section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
+<section class="map-panel" aria-label="Schéma du convoyeur au sol de St-Hubert">
     <div class="map-toolbar">
-        <a class="btn" href="plan-convoyeur-sol">Voir le convoyeur au sol</a>
+        <a class="btn" href="plan-convoyeur">Voir le convoyeur du haut</a>
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
         <label class="map-shift">Shift d’affichage
             <select @bind:get="_displayShift" @bind:set="ChangeDisplayShift" disabled="@(_shifts.Count == 0)" title="Consulter les destinations sans modifier le shift du tri">
@@ -35,9 +35,9 @@
         }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" /></div>
+        <div class="map-canvas"><GroundConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" /></div>
     </div>
-    <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 11, 13, 16 et 21 à 41.</p>
+    <p class="map-note">St-Hubert — convoyeur au sol uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 48 et rejet, selon le tracé rouge du plan Rev. 12C.</p>
     <p class="map-note">Compteurs : dernière destination envoyée avec succès à l’automate pour chaque colis, sans confirmation de chute physique. Compteurs liés à la remise à zéro des lignes et au mode production/maintenance.</p>
 </section>
 
@@ -47,10 +47,10 @@
     private bool _running;
     private IReadOnlyDictionary<int, long> _counts = new Dictionary<int, long>();
     private DateTimeOffset? _station1, _station2;
-    private string LiveStatus => Supervisor.ConveyorId != 1 ? "Suivi indisponible sur ce convoyeur" : _running ? "EN MARCHE" : Supervisor.ConveyorRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU";
+    private string LiveStatus => Supervisor.ConveyorId != 2 ? "Suivi indisponible sur ce convoyeur" : _running ? "EN MARCHE" : Supervisor.ConveyorRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU";
     private void RefreshLive()
     {
-        if (Supervisor.ConveyorId != 1) return;
+        if (Supervisor.ConveyorId != 2) return;
         var lines = Supervisor.GetSnapshots();
         _running = Supervisor.ConveyorRunning == true && lines.Any(line => line.Connections.Plc && line.Running);
         _counts = lines.SelectMany(line => line.Counters.ChuteDispatchCounts).GroupBy(pair => pair.Key)

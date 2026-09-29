@@ -1,0 +1,90 @@
+<svg class="@(Running ? "conveyor-running" : null)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1780 820" role="img" aria-label="St-Hubert — convoyeur au sol" aria-describedby="ground-plan-description">
+    <desc id="ground-plan-description">Plan simplifié du tracé rouge : alimentation en haut à gauche, virage vers la droite, 48 sorties avec les impaires en haut et les paires en bas, puis rejet à droite.</desc>
+    <defs>
+        <marker id="ground-flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#a7bcc8" /></marker>
+    </defs>
+    <rect width="1780" height="820" rx="14" fill="#10191e" />
+    <g id="ground-chutes" fill="none" stroke-linejoin="round">
+        @for (var pair = 0; pair < 24; pair++)
+        {
+            var x = 250 + pair * 55;
+            var odd = pair * 2 + 1;
+            var top = odd == 1 ? 210 : odd == 39 ? 365 : odd >= 41 ? 320 : 280;
+            <g data-chute="@odd"><title>@ChuteTitle(odd)</title>
+                <path d="@($"M{x} 450 V{top}")" stroke="#526774" stroke-width="16" />
+                <path d="@($"M{x} 450 V{top}")" stroke="#24343e" stroke-width="12" />
+            </g>
+            <g data-chute="@(odd + 1)"><title>@ChuteTitle(odd + 1)</title>
+                <path d="@($"M{x} 450 V650")" stroke="#526774" stroke-width="16" />
+                <path d="@($"M{x} 450 V650")" stroke="#24343e" stroke-width="12" />
+            </g>
+        }
+    </g>
+    <g id="ground-main-belt" fill="none" stroke-linejoin="round">
+        <path d="M130 100 V385 Q130 450 195 450 H1580 Q1640 450 1640 510 V650" stroke="#73949f" stroke-width="25" />
+        <path d="M130 100 V385 Q130 450 195 450 H1580 Q1640 450 1640 510 V650" stroke="#263941" stroke-width="20" />
+        <path d="M130 100 V385 Q130 450 195 450 H1580 Q1640 450 1640 510 V650" stroke="#465d65" stroke-width="2" stroke-dasharray="2 9" />
+    </g>
+    <g fill="none" stroke="#a7bcc8" stroke-width="2" marker-end="url(#ground-flow-arrow)">
+        <path d="M130 180V235" /><path d="M330 450H390" /><path d="M660 450H720" />
+        <path d="M990 450H1050" /><path d="M1320 450H1380" /><path d="M1640 550V610" />
+    </g>
+    <g id="ground-reading-station" @key="LastDispatch" class="@(_flashReading ? "station-flash" : null)">
+        <title>Station de lecture — alimentation avant le virage</title>
+        <rect x="112" y="310" width="36" height="44" rx="5" fill="#e9a238" fill-opacity=".14" stroke="#f6ad45" stroke-width="2" />
+        <path d="M117 319H143 M117 326H143 M117 334H143 M117 345H143" stroke="#ffc568" stroke-width="2" />
+    </g>
+    <g font-family="system-ui,sans-serif" font-size="16" font-weight="700" text-anchor="middle">
+        @for (var pair = 0; pair < 24; pair++)
+        {
+            var x = 250 + pair * 55;
+            var odd = pair * 2 + 1;
+            var top = odd == 1 ? 210 : odd == 39 ? 365 : odd >= 41 ? 320 : 280;
+            <g transform="@($"translate({x} {top + 30})")"><title>@ChuteTitle(odd)</title>
+                <rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f" /><text y="6" fill="#edf5f8">@odd</text>
+            </g>
+            <g transform="@($"translate({x} 610)")"><title>@ChuteTitle(odd + 1)</title>
+                <rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f" /><text y="6" fill="#edf5f8">@(odd + 1)</text>
+            </g>
+            @Counter(odd, x, top - 25)
+            @Counter(odd + 1, x, 682)
+        }
+        <g transform="translate(1640 682)"><text fill="#edf5f8">REJET</text></g>
+    </g>
+    <g fill="#8fa9ba" font-family="system-ui,sans-serif" font-size="13" letter-spacing="2">
+        <text x="80" y="75">ALIMENTATION</text>
+        <text x="175" y="340" fill="#ffc568">LECTURE</text>
+    </g>
+</svg>
+
+@code {
+    [Parameter] public IReadOnlyDictionary<int, string> Destinations { get; set; } = new Dictionary<int, string>();
+    [Parameter] public string? DestinationStatus { get; set; }
+    [Parameter] public bool Running { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, long> Counts { get; set; } = new Dictionary<int, long>();
+    [Parameter] public DateTimeOffset? Station1Dispatch { get; set; }
+    [Parameter] public DateTimeOffset? Station2Dispatch { get; set; }
+    private DateTimeOffset? LastDispatch => Station1Dispatch > Station2Dispatch ? Station1Dispatch : Station2Dispatch ?? Station1Dispatch;
+    private DateTimeOffset? _previousDispatch;
+    private bool _initialized, _flashReading;
+    private Dictionary<int, long> _previousCounts = new();
+    private readonly HashSet<int> _changedChutes = new();
+    protected override void OnParametersSet()
+    {
+        if (LastDispatch != _previousDispatch) _flashReading = _initialized && LastDispatch is not null;
+        if (_initialized)
+            foreach (var pair in Counts)
+                if (pair.Value > _previousCounts.GetValueOrDefault(pair.Key)) _changedChutes.Add(pair.Key);
+        _changedChutes.RemoveWhere(chute => Counts.GetValueOrDefault(chute) == 0);
+        _previousDispatch = LastDispatch;
+        _previousCounts = new(Counts);
+        _initialized = true;
+    }
+    private string ChuteTitle(int chute) => $"Chute {chute} — " + (DestinationStatus ??
+        (Destinations.TryGetValue(chute, out var depot) ? depot : "Aucun dépôt de destination associé pour ce shift"));
+    private RenderFragment Counter(int chute, int x, int y) => @<g @key="(chute, Counts.GetValueOrDefault(chute))" transform="@($"translate({x} {y})")" class="@(_changedChutes.Contains(chute) ? "count-flash" : null)">
+        <title>@ChuteTitle(chute) — @Counts.GetValueOrDefault(chute) colis envoyés</title>
+        <rect x="-23" y="-12" width="46" height="24" rx="4" fill="#192a33" stroke="#73909f" />
+        <text y="5" fill="#edf5f8" font-size="14">@Counts.GetValueOrDefault(chute)</text>
+    </g>;
+}

@@ -13,6 +13,26 @@ namespace Conveyor.Web.Tests;
 public sealed class ConveyorDiagramTests
 {
     [Fact]
+    public async Task GroundDiagramContainsAll48ChutesAndLiveDestinationCounts()
+    {
+        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>());
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<GroundConveyorDiagram>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(GroundConveyorDiagram.Running)] = true,
+                [nameof(GroundConveyorDiagram.Counts)] = new Dictionary<int, long> { [48] = 123 },
+                [nameof(GroundConveyorDiagram.Destinations)] = new Dictionary<int, string> { [48] = "BLV" }
+            }))).ToHtmlString());
+        var xml = System.Text.RegularExpressions.Regex.Replace(html, @"\s(b-[a-z0-9]+)(?=[\s>])", " $1=\"\"");
+        var svg = XDocument.Parse(xml);
+        Assert.Equal(Enumerable.Range(1, 48), svg.Descendants().Where(node => node.Attribute("data-chute") is not null)
+            .Select(node => int.Parse(node.Attribute("data-chute")!.Value)).Order());
+        Assert.Contains("Chute 48 — BLV — 123 colis", System.Net.WebUtility.HtmlDecode(html));
+        Assert.Contains("REJET", html);
+        Assert.Contains("conveyor-running", html);
+    }
+    [Fact]
     public async Task DiagramDisplaysLiveCountsWithoutFlashingHistoricalValues()
     {
         using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
