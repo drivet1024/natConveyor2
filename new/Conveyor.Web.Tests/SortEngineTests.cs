@@ -913,6 +913,33 @@ public sealed class SortEngineTests
         Assert.True(result.ShipmentNotFound);
     }
 
+    [Theory]
+    [InlineData(false, false, 1, 0)]
+    [InlineData(true, false, 0, 1)]
+    [InlineData(false, true, 0, 1)]
+    public async Task PostalSuccessCountsAsSortedUnlessSaveFailsOrRouteIsDiverted(bool failSave, bool diverted, long sorted, long missing)
+    {
+        var repo = new FakeRepository { FailSave = failSave, PostalChute = diverted ? 39 : 7 };
+        using var cache = new ShipmentPrefixCache(repo, NullLogger<ShipmentPrefixCache>.Instance);
+        await cache.RefreshAsync(default);
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repo, new MotionPlc(), false,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance, cache), NullLogger.Instance, () => { });
+        try
+        {
+            controller.SetChute39Closed(diverted);
+            await controller.SimulateAsync("98765432101,H2X1Y4", new(12, 8, 5), 4.75m);
+            var counters = controller.Snapshot().Counters;
+            Assert.Equal(sorted, counters.SortedWithoutIssue);
+            Assert.Equal(missing, counters.RejectedShipmentNotFound);
+            Assert.Equal(missing, counters.MissingShipmentCustomers.Sum(row => row.Count));
+            Assert.Equal(0, counters.NoReads);
+            Assert.Equal(1, counters.TotalParcels);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
     [Fact]
     public async Task Multiple_known_waybills_use_configured_reject_in_decision_and_plc()
     {
@@ -1206,8 +1233,8 @@ public sealed class SortEngineTests
     [InlineData("88865432101", 0, 1)]
     [InlineData("88865432101,98765432101", 1, 0)]
     [InlineData("98765432101,987654321012", 1, 0)]
-    [InlineData("98765432101,H2X1Y4", 1, 0)]
-    [InlineData("88865432101,H2X1Y4", 0, 1)]
+    [InlineData("98765432101,H2X1Y4", 0, 0)]
+    [InlineData("88865432101,H2X1Y4", 0, 0)]
     [InlineData("??", 0, 1)]
     [InlineData("98765432101,??", 0, 1)]
     [InlineData("98765432101,12345678901", 0, 0)]
@@ -1615,7 +1642,8 @@ public sealed class SortEngineTests
             return shipments;
         }
         public Task<int?> FindChuteForRouteAsync(int shiftId, int routeId, CancellationToken token) => Task.FromResult(RouteChute);
-        public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult<int?>(7);
+        public int? PostalChute { get; set; } = 7;
+        public Task<int?> FindChuteForPostalCodeAsync(int shiftId, string postalCode, CancellationToken token) => Task.FromResult(PostalChute);
         public Task<bool> ShouldUseExceptionChuteAsync(string codeType, string barcode, int retryLimit, CancellationToken token) => Task.FromResult(Code86Allowed);
         public Task<int> RecordExceptionPassAsync(string codeType, string barcode, CancellationToken token)
         {

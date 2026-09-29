@@ -304,12 +304,12 @@
     private static string CalculationDescription(string label) => label switch
     {
         "Colis convoyés" => "Nombre de passages reçus par la caméra, y compris les ??? et les rejets. Cadence : total convoyé ÷ temps de marche cumulé en heures. Remis à zéro avec les compteurs.",
-        "Triés sans problème" => "Colis présents en base, avec une route connue, sans rejet ni détournement, et des mesures valides si leur validation est activée. Envoi automate réussi et scan enregistré en production. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Triés sans problème" => "Colis avec une route connue par expédition ou par code postal, même si le colis est absent de la base, sans rejet ni détournement, et des mesures valides si leur validation est activée. Envoi automate réussi et scan enregistré en production. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Petits colis" => "Colis dont toutes les dimensions sont positives et dont la plus grande dimension est inférieure ou égale au seuil petit colis, avec un poids positif inférieur au seuil colis léger. Pourcentage = petits colis ÷ total convoyé × 100.",
-        "Pas dans le système" => "Colis absent de la base avec au moins un code-barres de 11 ou 12 caractères commençant par un préfixe autorisé. Compté une fois, quelle que soit la chute. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Pas dans le système" => "Colis absent de la base avec au moins un code-barres de 11 ou 12 caractères commençant par un préfixe autorisé. Compté une fois, sauf si le colis est trié avec succès par code postal. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Route non configurée" => "Colis envoyé au rejet parce que la route de son expédition ne possède pas de chute configurée. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Plusieurs code-barres" => "Colis avec plusieurs codes-barres reconnus, envoyé au rejet. Pourcentage = ces colis ÷ total convoyé × 100.",
-        "Sans lecture" => "Lecture contenant un ? ou colis absent sans code-barres admissible au compteur Pas dans le système. Compté une seule fois par passage. Pourcentage = sans lecture ÷ total convoyé × 100.",
+        "Sans lecture" => "Lecture contenant un ? ou colis absent sans code-barres admissible au compteur Pas dans le système, sauf tri réussi par code postal. Compté une seule fois par passage. Pourcentage = sans lecture ÷ total convoyé × 100.",
         "Erreurs poids" => "Poids absent, nul ou supérieur au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs poids ÷ (total convoyé − sans lecture) × 100.",
         "Erreurs dimensionneur" => "Au moins une dimension absente, nulle ou supérieure au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs dimensions ÷ (total convoyé − sans lecture) × 100.",
         _ => "Nombre de colis de cette catégorie ÷ total convoyé × 100."

@@ -405,6 +405,8 @@ internal sealed class LineController
         var recirculationCounted = false;
         var code98Sent = false;
         int? finalDispatchedChute = null;
+        SortDecision? classifiedDecision = null;
+        var successfullySortedByPostalCode = false;
         try
         {
             var decision = await _sortEngine.DecideAsync(_options, parcel, token);
@@ -430,7 +432,9 @@ internal sealed class LineController
                 };
                 decision = await _sortEngine.DecideAsync(_options, parcel, token);
             }
-            var isNoRead = decision.CountNoRead;
+            classifiedDecision = decision;
+            var postalRoute = decision.Reason == "Route du code postal" && decision.PlcChute != _options.RejectedChute;
+            var isNoRead = decision.CountNoRead && !postalRoute;
             RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
             lock (_gate)
             {
@@ -442,12 +446,6 @@ internal sealed class LineController
                 }
                 if (IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight)) parcelCounters.LightParcels++;
                 if (IsInverseLengthParcel(parcel.Dimension)) parcelCounters.InverseLengthParcels++;
-                if (decision.CountShipmentNotFound)
-                {
-                    parcelCounters.RejectedShipmentNotFound++;
-                    parcelCounters.RecordMissingShipmentCustomer(decision.MissingShipmentCustomer);
-                }
-                if (isNoRead) parcelCounters.NoReads++;
             }
             var routingReason = decision.Reason;
             var effectiveChute = ResolveClosedChute(decision.PlcChute);
@@ -514,9 +512,13 @@ internal sealed class LineController
                 var routed = routingReason is "Route de l'expédition" or "Route du code postal";
                 var measurementsValid = parcel.Dimension.IsValid(_options.MaximumDimension) &&
                                         parcel.Weight > 0 && parcel.Weight <= _options.MaximumWeight;
-                if (routed && (!_options.ValidateDimensionsAndWeight || measurementsValid) && !decision.ShipmentNotFound &&
-                    effectiveChute == decision.PlcChute && decision.PlcChute != _options.RejectedChute)
+                if (routed && (!_options.ValidateDimensionsAndWeight || measurementsValid) &&
+                    (!decision.ShipmentNotFound || postalRoute) && decision.Reason == routingReason &&
+                    decision.PlcChute != _options.RejectedChute)
+                {
                     parcelCounters.SortedWithoutIssue++;
+                    successfullySortedByPostalCode = postalRoute;
+                }
                 _lastDimension = null;
                 _lastWeight = null;
             }
@@ -545,6 +547,16 @@ internal sealed class LineController
         }
         if (finalDispatchedChute is { } sentChute)
             lock (_gate) parcelCounters.ChuteDispatchCounts[sentChute] = parcelCounters.ChuteDispatchCounts.GetValueOrDefault(sentChute) + 1;
+        if (!successfullySortedByPostalCode && classifiedDecision is { } classification)
+            lock (_gate)
+            {
+                if (classification.CountShipmentNotFound)
+                {
+                    parcelCounters.RejectedShipmentNotFound++;
+                    parcelCounters.RecordMissingShipmentCustomer(classification.MissingShipmentCustomer);
+                }
+                if (classification.CountNoRead) parcelCounters.NoReads++;
+            }
         _changed();
     }
 
