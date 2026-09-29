@@ -30,6 +30,18 @@
 .database-local-status .registered-total strong { font-size: .8rem; }
 .database-local-status .registered-total.overdue strong { color: var(--red); }
 .metrics .metric .metric-percentage { color: var(--muted); }
+.metrics .metric.metric-tone-success strong,
+.metrics .metric .metric-tone-success strong,
+.metrics .metric.metric-tone-success .metric-percentage,
+.metrics .metric .metric-tone-success .metric-percentage { color: #50d98b; }
+.metrics .metric.metric-tone-warning strong,
+.metrics .metric .metric-tone-warning strong,
+.metrics .metric.metric-tone-warning .metric-percentage,
+.metrics .metric .metric-tone-warning .metric-percentage { color: #ffd15c; }
+.metrics .metric.metric-tone-critical strong,
+.metrics .metric .metric-tone-critical strong,
+.metrics .metric.metric-tone-critical .metric-percentage,
+.metrics .metric .metric-tone-critical .metric-percentage { color: #ff6c79; }
 .metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }

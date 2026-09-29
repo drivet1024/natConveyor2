@@ -117,7 +117,7 @@
         <div class="metrics desktop-only"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
         </div>
-            <div class="metric" title="Total des colis convoyés ÷ temps de marche cumulé en heures">
+            <div class="metric @MetricTone(KpiThresholds.CadenceTone(line.Counters.ParcelsPerHour))" title="Total des colis convoyés ÷ temps de marche cumulé en heures">
                 <strong>@(line.Counters.ParcelsPerHour?.ToString("N0") ?? "—")</strong>
                 <span>Cadence · colis/heure</span>
             </div>
@@ -265,17 +265,19 @@
         PercentageMetric(label, errors, counters.TotalParcels - counters.NoReads,
             "Erreurs parmi les colis lus : erreurs ÷ (colis − sans lecture) × 100");
     private RenderFragment ScaleErrorMetric(LineCounters counters) => @<div class="metric metric-scale" title="Erreurs de poids et nombre d'impulsions de faute balance">
-        <div>
+        <div class="@MetricTone(KpiThresholds.RateTone(counters.ScaleErrors, counters.TotalParcels - counters.NoReads))">
             <div class="metric-value-row"><FlashingValue Value="@(counters.ScaleErrors.ToString("N0"))"><strong>@counters.ScaleErrors.ToString("N0")</strong></FlashingValue><span class="metric-percentage">@Percentage(counters.ScaleErrors, counters.TotalParcels - counters.NoReads).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
             <span>Erreurs poids</span>
         </div>
         <div class="scale-fault-total"><FlashingValue Value="@(counters.ScaleFaults.ToString("N0"))"><strong>@counters.ScaleFaults.ToString("N0")</strong></FlashingValue><span>Fautes balance</span></div>
     </div>;
-    private RenderFragment PercentageMetric(string label, long count, long total, string title) => @<div class="metric" title="@title">
+    private RenderFragment PercentageMetric(string label, long count, long total, string title) => @<div class="metric @MetricTone(KpiThresholds.RateTone(count, total))" title="@title">
         <div class="metric-value-row"><FlashingValue Value="@(count.ToString("N0"))"><strong>@count.ToString("N0")</strong></FlashingValue><span class="metric-percentage">@Percentage(count, total).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</span></div>
         <span>@label</span>
     </div>;
     private static decimal Percentage(long count, long total) => total > 0 ? count * 100m / total : 0;
+    private OperatorKpiOptions KpiThresholds => Options.Value.OperatorKpis;
+    private static string MetricTone(string tone) => string.IsNullOrWhiteSpace(tone) ? "" : $"metric-tone-{tone}";
     private RenderFragment MobileMetric(string label, long count, long total, bool emphasizeHigh = true) => @<div
         class="mobile-counter @(emphasizeHigh ? Percentage(count, total) > 3 ? "counter-critical" : Percentage(count, total) > 1 ? "counter-warning" : null : null)"
         title="@($"{label} : {count:N0} ÷ {total:N0} × 100")">
