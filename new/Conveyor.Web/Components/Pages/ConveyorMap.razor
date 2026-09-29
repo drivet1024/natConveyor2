@@ -34,10 +34,11 @@
         }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" /></div>
+        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" Station1Parcels="_parcels1" Station2Parcels="_parcels2" /></div>
     </div>
     <p class="map-note">St-Hubert — convoyeur du haut uniquement. Schéma simplifié, non à l’échelle. Sorties 1 à 11, 13, 16 et 21 à 41.</p>
     <p class="map-note">Compteurs : dernière destination envoyée avec succès à l’automate pour chaque colis, sans confirmation de chute physique. Compteurs liés à la remise à zéro des lignes et au mode production/maintenance.</p>
+    <p class="map-note">Position des colis estimée après envoi confirmé : boucle ≈ 800 pieds, vitesse ≈ 240 pieds/minute. Animation suspendue à l’arrêt ou si l’état est inconnu. Destination 98 : disparition dans la branche de recirculation.</p>
 </section>
 
 </div>
@@ -46,6 +47,7 @@
     private bool _running;
     private IReadOnlyDictionary<int, long> _counts = new Dictionary<int, long>();
     private DateTimeOffset? _station1, _station2;
+    private IReadOnlyList<PlcDispatch> _parcels1 = [], _parcels2 = [];
     private string LiveStatus => Supervisor.ConveyorId != 1 ? "Suivi indisponible sur ce convoyeur" : _running ? "EN MARCHE" : Supervisor.ConveyorRunning == false ? "ARRÊTÉ" : "ÉTAT INCONNU";
     private void RefreshLive()
     {
@@ -56,6 +58,8 @@
             .ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
         _station1 = lines.FirstOrDefault(line => line.LineId == 0)?.LastPlcDispatch?.SentAt;
         _station2 = lines.FirstOrDefault(line => line.LineId == 1)?.LastPlcDispatch?.SentAt;
+        _parcels1 = lines.FirstOrDefault(line => line.LineId == 0)?.RecentPlcDispatches ?? [];
+        _parcels2 = lines.FirstOrDefault(line => line.LineId == 1)?.RecentPlcDispatches ?? [];
     }
     private void OnLiveChanged() => _ = InvokeAsync(() => { if (_disposed) return; RefreshLive(); StateHasChanged(); });
     private IReadOnlyDictionary<int, string> _destinations = new Dictionary<int, string>();

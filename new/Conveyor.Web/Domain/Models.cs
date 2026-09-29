@@ -155,7 +155,10 @@ public sealed record ConnectionState(bool Camera, bool Dimensioner, bool Scale, 
 
 public sealed record DeviceReception(string Raw, DateTimeOffset ReceivedAt, long Sequence, bool Truncated = false);
 
-public sealed record PlcDispatch(DateTimeOffset SentAt, int Chute, long ElapsedMs, long Sequence);
+public sealed record PlcDispatch(DateTimeOffset SentAt, int Chute, long ElapsedMs, long Sequence)
+{
+    public string? ParcelKey { get; init; }
+}
 
 public sealed record DatabaseReferenceCounts(long Parcels, long PostalCodes, long Scans, bool Connected, bool Simulated, DateTimeOffset UpdatedAt, bool HasOverdueScans = false, DateTimeOffset? LastShipmentUpdate = null, bool? HasRecentShipmentUpdates = null);
 
@@ -183,4 +186,5 @@ public sealed record LineSnapshot(
     LineCounters? ProductionCounters = null,
     LineCounters? MaintenanceCounters = null,
     bool? ScaleFaultActive = null,
-    DateTimeOffset? LastParcelReceivedAt = null);
+    DateTimeOffset? LastParcelReceivedAt = null,
+    IReadOnlyList<PlcDispatch>? RecentPlcDispatches = null);

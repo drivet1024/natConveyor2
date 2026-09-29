@@ -1,4 +1,7 @@
-<svg class="@(Running ? "conveyor-running" : null)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 830" role="img" aria-label="St-Hubert — convoyeur du haut" aria-describedby="conveyor-map-description">
+@implements IAsyncDisposable
+@inject IServiceProvider Services
+
+<svg @ref="_svg" class="@(Running ? "conveyor-running" : null)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 830" role="img" aria-label="St-Hubert — convoyeur du haut" aria-describedby="conveyor-map-description">
 <desc id="conveyor-map-description">Schéma simplifié du convoyeur. Animation de marche, stations de lecture et compteurs des destinations envoyées à l’automate.</desc>
 <defs>
  <pattern id="belt-rollers" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 0V8" stroke="#334650" stroke-width="2"/></pattern>
@@ -120,9 +123,54 @@
     </g>
 }
 </g>
+<g data-parcel-layer="true" aria-hidden="true" pointer-events="none"></g>
 </svg>
 
 @code {
+    [Parameter] public IReadOnlyList<PlcDispatch> Station1Parcels { get; set; } = [];
+    [Parameter] public IReadOnlyList<PlcDispatch> Station2Parcels { get; set; } = [];
+    private ElementReference _svg;
+    private IJSObjectReference? _animation;
+    private readonly SemaphoreSlim _animationGate = new(1, 1);
+    private bool _disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await _animationGate.WaitAsync();
+        try
+        {
+            if (_disposed) return;
+            if (_animation is null)
+            {
+                var js = Services.GetRequiredService<IJSRuntime>();
+                var module = await js.InvokeAsync<IJSObjectReference>("import", "./Components/Layout/ConveyorDiagram.razor.js");
+                try
+                {
+                    if (_disposed) return;
+                    _animation = await module.InvokeAsync<IJSObjectReference>("create", _svg);
+                }
+                finally { await module.DisposeAsync(); }
+            }
+            if (!_disposed)
+                await _animation.InvokeVoidAsync("update", Running, Station1Parcels, Station2Parcels);
+        }
+        catch (JSDisconnectedException) { }
+        finally { _animationGate.Release(); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await _animationGate.WaitAsync();
+        try
+        {
+            if (_animation is null) return;
+            await _animation.InvokeVoidAsync("dispose");
+            await _animation.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        finally { _animationGate.Release(); }
+    }
     [Parameter] public bool Running { get; set; }
     [Parameter] public IReadOnlyDictionary<int, long> Counts { get; set; } = new Dictionary<int, long>();
     [Parameter] public DateTimeOffset? Station1Dispatch { get; set; }

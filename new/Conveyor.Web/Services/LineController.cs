@@ -71,6 +71,8 @@ internal sealed class LineController
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
     private PlcDispatch? _lastPlcDispatch;
+    private readonly Queue<PlcDispatch> _recentPlcDispatches = new();
+    private long _dispatchSequence;
     private int _consecutiveParcelsWithoutScale;
     private Channel<bool> _scaleFaultRequests = Channel.CreateUnbounded<bool>();
     private readonly SemaphoreSlim _scaleFaultPulseGate = new(1, 1);
@@ -277,6 +279,7 @@ internal sealed class LineController
             _dimensionInput = null;
             _scaleInput = null;
             _lastPlcDispatch = null;
+            _recentPlcDispatches.Clear();
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
             _parcelSequenceSinceReset = 0;
@@ -569,7 +572,10 @@ internal sealed class LineController
         {
             _lastPlcDispatch = new(sentAt, chute,
                 Math.Max(0, (long)(sentAt - parcel.CameraTimestamp).TotalMilliseconds),
-                (_lastPlcDispatch?.Sequence ?? 0) + 1);
+                ++_dispatchSequence)
+            { ParcelKey = $"{parcel.CameraTimestamp.UtcTicks}:{parcel.ParcelId}" };
+            _recentPlcDispatches.Enqueue(_lastPlcDispatch);
+            while (_recentPlcDispatches.Count > 256) _recentPlcDispatches.Dequeue();
         }
         _logger.LogInformation(
             "Ligne {Line}, colis #{ParcelId}: envoi automate {Mode} confirmé à {SentAt}; {Tag}={Chute}, répétitions={Repeat}; " +
@@ -784,7 +790,8 @@ internal sealed class LineController
                 _options.ValidateDimensionsAndWeight, _cameraInput, _dimensionInput, _scaleInput, _plcInput,
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
                 _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy(),
-                connections.Plc && !connections.Simulated ? _scaleFaultActive : null, _lastParcelReceivedAt);
+                connections.Plc && !connections.Simulated ? _scaleFaultActive : null, _lastParcelReceivedAt,
+                _recentPlcDispatches.ToArray());
         }
     }
 }

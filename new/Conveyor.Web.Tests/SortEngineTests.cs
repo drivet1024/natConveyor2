@@ -344,6 +344,48 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task ConfirmedDispatchJournalPreservesBurstsAndResetDoesNotReuseSequences()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            for (var i = 0; i < 3; i++)
+                await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            var snapshot = controller.Snapshot();
+            Assert.Equal(new long[] { 1, 2, 3 }, snapshot.RecentPlcDispatches!.Select(d => d.Sequence));
+            Assert.Equal(3, snapshot.RecentPlcDispatches!.Select(d => d.ParcelKey).Distinct().Count());
+            Assert.All(snapshot.RecentPlcDispatches!, d => Assert.Equal(4, d.Chute));
+            controller.ResetCounters();
+            Assert.Empty(controller.Snapshot().RecentPlcDispatches!);
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            Assert.Equal(4, Assert.Single(controller.Snapshot().RecentPlcDispatches!).Sequence);
+            Assert.Equal(3, snapshot.RecentPlcDispatches!.Count); // Snapshot is detached from the live queue.
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task FailedPlcWritesDoNotCreateAnimatedDispatches()
+    {
+        var repository = new FakeRepository { RouteChute = 4 };
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc { FailWrite = true }, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            Assert.Null(controller.Snapshot().LastPlcDispatch);
+            Assert.Empty(controller.Snapshot().RecentPlcDispatches!);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task PlcDispatchIsTimestampedAfterTheConfiguredCorrelationDelay()
     {
         var repository = new FakeRepository { RouteChute = 4 };
@@ -1213,7 +1255,13 @@ public sealed class SortEngineTests
             Assert.Equal(barcode.Contains(',') ? 1 : 0, counters.RejectedMultipleShipments);
             Assert.Equal(counters.RejectedMultipleShipments, counters.MultipleBarcodeParcels.Count);
             Assert.Equal(rejectedChute == 4 && !failSave ? 1 : 0, counters.RejectedConfiguredRoute);
-            if (failSave) Assert.Equal(rejectedChute, supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute);
+            if (failSave)
+            {
+                var snapshot = supervisor.GetSnapshots()[0];
+                Assert.Equal(rejectedChute, snapshot.LastPlcDispatch!.Chute);
+                Assert.Equal(2, snapshot.RecentPlcDispatches!.Count);
+                Assert.Single(snapshot.RecentPlcDispatches.Select(d => d.ParcelKey).Distinct());
+            }
             Assert.Equal(1, counters.ChuteDispatchCounts.Values.Sum());
             Assert.Equal(1, counters.ChuteDispatchCounts[supervisor.GetSnapshots()[0].LastPlcDispatch!.Chute]);
             Assert.Equal(failSave ? 0 : 1, counters.DatabaseInserts);
