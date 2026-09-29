@@ -18,6 +18,16 @@
     </main>
 </div>
 
+@if (Supervisor.Chute4AlarmActive)
+{
+    <div class="chute-full-backdrop" role="presentation">
+        <section class="chute-full-alert" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="chute-full-title">
+            <div class="chute-full-symbol" aria-hidden="true">!</div>
+            <h2 id="chute-full-title">CHUTE PLEINE !</h2>
+        </section>
+    </div>
+}
+
 @code {
     private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainLayout).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
@@ -27,7 +37,12 @@
     private string? _automaticPlan;
     private bool _disposed;
     private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Supervisor.Changed += OnSupervisorChanged;
+    }
+    private void OnSupervisorChanged() => _ = InvokeAsync(StateHasChanged);
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
         if (_automaticPlan is not null && CurrentPath != _automaticPlan) _automaticPlan = null;
@@ -67,6 +82,7 @@
     {
         _disposed = true;
         Navigation.LocationChanged -= OnLocationChanged;
+        Supervisor.Changed -= OnSupervisorChanged;
         try
         {
             if (_orientation is not null)

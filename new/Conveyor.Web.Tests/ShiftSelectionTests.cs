@@ -92,21 +92,29 @@ public sealed class ShiftSelectionTests
         using var supervisor = CreateSupervisor(options, gateway);
 
         gateway.Emit("STOP_AND_GO", "0");
+        Assert.False(supervisor.Chute4AlarmActive);
         gateway.Emit("CHUTE_4_FULL", "1");
+        Assert.True(supervisor.Chute4AlarmActive);
         await Task.Delay(300);
         gateway.Emit("CHUTE_4_FULL", "0");
+        Assert.False(supervisor.Chute4AlarmActive);
         await Task.Delay(900);
         Assert.Empty(gateway.Writes);
 
         gateway.Emit("CHUTE_4_FULL", "1");
+        Assert.True(supervisor.Chute4AlarmActive);
         await Task.Delay(600);
         gateway.Emit("CHUTE_4_FULL", "1");
         await Task.Delay(600);
         Assert.Equal(("STOP_AND_GO", 1), Assert.Single(gateway.Writes));
 
+        gateway.Emit("STOP_AND_GO", "1");
         gateway.Emit("CHUTE_4_FULL", "0");
         await Task.Delay(1_200);
         Assert.Equal([1, 0], gateway.Writes.Select(write => write.Value).ToArray());
+        Assert.True(supervisor.Chute4AlarmActive);
+        gateway.Emit("STOP_AND_GO", "0");
+        Assert.False(supervisor.Chute4AlarmActive);
     }
 
     [Theory]

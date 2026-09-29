@@ -38,6 +38,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public string? ConveyorStopCause { get; private set; }
     public int? FullChutesCount { get; private set; }
     public int? Code42Count { get; private set; }
+    public bool Chute4AlarmActive { get; private set; }
     public bool Maintenance => _configuration.General?.Maintenance == true;
     public bool HasStartedOperatingMode { get; private set; }
     private volatile bool _rslinxRestartInProgress;
@@ -203,37 +204,58 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private void RecordStopAndGoState(bool state)
     {
         bool? desired = null;
+        bool alarmChanged;
         lock (_stopAndGoGate)
         {
             _stopAndGoState = state;
+            alarmChanged = UpdateChute4AlarmLocked();
             if (_chute4FullState == state)
             {
                 _stopAndGoPending?.Cancel();
-                return;
+                desired = null;
             }
-            if (_stopAndGoPending is null) desired = _chute4FullState;
+            else if (_stopAndGoPending is null) desired = _chute4FullState;
         }
+        if (alarmChanged) Changed?.Invoke();
         if (desired.HasValue) ScheduleStopAndGo(desired.Value);
     }
 
     private void ScheduleStopAndGo(bool state)
     {
-        CancellationTokenSource pending;
+        CancellationTokenSource? pending = null;
+        bool alarmChanged;
         lock (_stopAndGoGate)
         {
             if (_stopAndGoStopping) return;
-            if (_chute4FullState == state && _stopAndGoPending is not null) return;
+            var sameInput = _chute4FullState == state;
             _chute4FullState = state;
-            _stopAndGoPending?.Cancel();
-            if (_stopAndGoState == state)
+            alarmChanged = UpdateChute4AlarmLocked();
+            if (!(sameInput && _stopAndGoPending is not null))
             {
-                _stopAndGoPending = null;
-                return;
+                _stopAndGoPending?.Cancel();
+                if (_stopAndGoState == state)
+                    _stopAndGoPending = null;
+                else
+                {
+                    pending = new CancellationTokenSource();
+                    _stopAndGoPending = pending;
+                }
             }
-            pending = new CancellationTokenSource();
-            _stopAndGoPending = pending;
         }
-        _ = ApplyStopAndGoAfterDelayAsync(state, pending);
+        if (alarmChanged) Changed?.Invoke();
+        if (pending is not null) _ = ApplyStopAndGoAfterDelayAsync(state, pending);
+    }
+
+    private bool UpdateChute4AlarmLocked()
+    {
+        // L'alarme s'ouvre immédiatement sur le signal d'entrée. Une fois ouverte,
+        // elle reste verrouillée jusqu'au retour OPC confirmé des deux tags à zéro.
+        var active = Chute4AlarmActive
+            ? _chute4FullState != false || _stopAndGoState != false
+            : _chute4FullState == true;
+        if (active == Chute4AlarmActive) return false;
+        Chute4AlarmActive = active;
+        return true;
     }
 
     private async Task ApplyStopAndGoAfterDelayAsync(bool state, CancellationTokenSource pending)
@@ -247,7 +269,6 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                     return;
             }
             await _plc.SendChuteAsync(_stopAndGoTag, state ? 1 : 0, 1, pending.Token);
-            lock (_stopAndGoGate) _stopAndGoState = state;
             _logger.LogWarning("Automatisme chute 4 : {InputTag} stable à {InputState} pendant {DelaySeconds} s ; {OutputTag}={OutputState}",
                 _chute4FullTag, state ? 1 : 0, _stopAndGoDelay.TotalSeconds, _stopAndGoTag, state ? 1 : 0);
         }
