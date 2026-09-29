@@ -70,6 +70,9 @@ public sealed class GeneralOptions
     public const string DefaultConveyorStartTag = "DEPART_SYSTEMES";
     public string FullChutesTag { get; set; } = "SHARE_NB_CHUTEPLEINE";
     public string Code42Tag { get; set; } = "SHARE_NB_CODE42";
+    public string Chute4FullTag { get; set; } = "";
+    public string StopAndGoTag { get; set; } = "";
+    [Range(1, 3_600)] public int StopAndGoDelaySeconds { get; set; } = 5;
     public int? ConveyorId { get; set; }
     public bool Maintenance { get; set; }
     public string Name { get; set; } = "Convoyeur";
@@ -85,6 +88,19 @@ public sealed class GeneralOptions
     };
     public int ShiftId { get; set; }
     [Required] public string ConveyorStartTag { get; set; } = DefaultConveyorStartTag;
+
+    public string? StopAndGoValidationError()
+    {
+        var chuteConfigured = !string.IsNullOrWhiteSpace(Chute4FullTag);
+        var outputConfigured = !string.IsNullOrWhiteSpace(StopAndGoTag);
+        if (chuteConfigured != outputConfigured)
+            return "Les tags chute 4 pleine et STOP_AND_GO doivent être configurés ensemble.";
+        if (chuteConfigured && string.Equals(Chute4FullTag.Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase))
+            return "Les tags chute 4 pleine et STOP_AND_GO doivent être différents.";
+        if (StopAndGoDelaySeconds is < 1 or > 3_600)
+            return "Le délai STOP_AND_GO doit être compris entre 1 et 3600 secondes.";
+        return null;
+    }
 }
 
 public sealed class SortingOptions

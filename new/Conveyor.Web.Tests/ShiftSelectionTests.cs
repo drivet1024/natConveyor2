@@ -81,6 +81,45 @@ public sealed class ShiftSelectionTests
         Assert.False(supervisor.ConveyorRunning);
     }
 
+    [Fact]
+    public async Task Chute4FullStateMustRemainStableBeforeStopAndGoChanges()
+    {
+        var options = CreateOptions(1);
+        options.General!.Chute4FullTag = "CHUTE_4_FULL";
+        options.General.StopAndGoTag = "STOP_AND_GO";
+        options.General.StopAndGoDelaySeconds = 1;
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+
+        gateway.Emit("STOP_AND_GO", "0");
+        gateway.Emit("CHUTE_4_FULL", "1");
+        await Task.Delay(300);
+        gateway.Emit("CHUTE_4_FULL", "0");
+        await Task.Delay(900);
+        Assert.Empty(gateway.Writes);
+
+        gateway.Emit("CHUTE_4_FULL", "1");
+        await Task.Delay(600);
+        gateway.Emit("CHUTE_4_FULL", "1");
+        await Task.Delay(600);
+        Assert.Equal(("STOP_AND_GO", 1), Assert.Single(gateway.Writes));
+
+        gateway.Emit("CHUTE_4_FULL", "0");
+        await Task.Delay(1_200);
+        Assert.Equal([1, 0], gateway.Writes.Select(write => write.Value).ToArray());
+    }
+
+    [Theory]
+    [InlineData("FULL", "", 5)]
+    [InlineData("", "STOP", 5)]
+    [InlineData("SAME", "same", 5)]
+    [InlineData("FULL", "STOP", 0)]
+    public void StopAndGoSettingsRejectIncompleteOrUnsafeValues(string input, string output, int delay)
+    {
+        var settings = new GeneralOptions { Chute4FullTag = input, StopAndGoTag = output, StopAndGoDelaySeconds = delay };
+        Assert.NotNull(settings.StopAndGoValidationError());
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions
@@ -93,10 +132,28 @@ public sealed class ShiftSelectionTests
         return options;
     }
 
-    private static ConveyorSupervisor CreateSupervisor(ConveyorOptions options)
+    private static ConveyorSupervisor CreateSupervisor(ConveyorOptions options, IPlcGateway? gateway = null)
     {
         var repository = new SimulationConveyorRepository();
         return new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(options), repository,
-            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance,
+            new TestConfigurationEditor(), plcGateway: gateway);
+    }
+
+    private sealed class RecordingPlcGateway : IPlcGateway, IPlcReadback
+    {
+        public bool IsConnected => true;
+        public bool ReadsHealthy => true;
+        public event Action<string, string>? TagChanged;
+        public System.Collections.Concurrent.ConcurrentQueue<(string Tag, int Value)> Writes { get; } = new();
+        public void Emit(string tag, string value) => TagChanged?.Invoke(tag, value);
+        public Task ConnectAsync(CancellationToken token) => Task.CompletedTask;
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
+        public Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken token)
+        {
+            Writes.Enqueue((tag, chute));
+            return Task.CompletedTask;
+        }
     }
 }

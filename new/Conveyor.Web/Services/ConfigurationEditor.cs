@@ -95,6 +95,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
             throw new InvalidOperationException(kpiError);
         if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
         if (options.RslinxRestart.ValidationError() is { } rslinxError) throw new InvalidOperationException(rslinxError);
+        if (options.General?.StopAndGoValidationError() is { } stopAndGoError) throw new InvalidOperationException(stopAndGoError);
         if (options.Statistics.ValidationError(options.GetConfiguredLines()) is { } statisticsError)
             throw new InvalidOperationException(statisticsError);
         if (options.Lines.Count is < 1 or > 2) throw new InvalidOperationException("Une ou deux lignes doivent être configurées.");
@@ -103,6 +104,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         if (string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag))
             throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
         options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
+        options.General.Chute4FullTag = options.General.Chute4FullTag.Trim();
+        options.General.StopAndGoTag = options.General.StopAndGoTag.Trim();
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
         if (options.Sorting is null || options.Sorting.SmallParcelMaximumSide < 0 || options.Sorting.LightParcelMaximumWeight < 0)
             throw new InvalidOperationException("Les seuils petit colis et colis léger doivent être positifs ou nuls.");

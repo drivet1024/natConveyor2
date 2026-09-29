@@ -24,6 +24,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly string _motionTag;
     private readonly string _fullChutesTag;
     private readonly string _code42Tag;
+    private readonly string _chute4FullTag;
+    private readonly string _stopAndGoTag;
+    private readonly TimeSpan _stopAndGoDelay;
+    private readonly object _stopAndGoGate = new();
+    private CancellationTokenSource? _stopAndGoPending;
+    private bool? _chute4FullState;
+    private bool? _stopAndGoState;
+    private bool _stopAndGoStopping;
     public int CurrentShiftId => _configuration.General!.ShiftId;
     public bool? ConveyorRunning { get; private set; }
     public int? ConveyorId => _configuration.General?.ConveyorId;
@@ -90,7 +98,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
         SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null,
-        CounterStatisticsService? statistics = null, IRslinxRestarter? rslinxRestarter = null)
+        CounterStatisticsService? statistics = null, IRslinxRestarter? rslinxRestarter = null,
+        IPlcGateway? plcGateway = null)
     {
         var configuration = options.Value;
         _configuration = configuration;
@@ -110,20 +119,25 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var sharedTags = configuration.General ?? new GeneralOptions();
         _fullChutesTag = sharedTags.FullChutesTag.Trim();
         _code42Tag = sharedTags.Code42Tag.Trim();
+        _chute4FullTag = sharedTags.Chute4FullTag.Trim();
+        _stopAndGoTag = sharedTags.StopAndGoTag.Trim();
+        _stopAndGoDelay = TimeSpan.FromSeconds(Math.Clamp(sharedTags.StopAndGoDelaySeconds, 1, 3_600));
         PlcConfiguration.Validate(primaryLine.Plc);
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
+            .Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
+            .Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
-        _plc = configuration.Simulation
+        _plc = plcGateway ?? (configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
             : string.Equals(primaryLine.Plc.Protocol, "Tcp", StringComparison.OrdinalIgnoreCase)
                 ? new TcpPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<TcpPlcGateway>())
                 : string.Equals(primaryLine.Plc.Protocol, "OpcDa", StringComparison.OrdinalIgnoreCase)
                     ? new OpcDaPlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<OpcDaPlcGateway>(), monitoredTags, subscriptionOnlyTags)
-                    : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(), monitoredTags);
+                    : new DdePlcGateway(primaryLine.Plc, loggerFactory.CreateLogger<DdePlcGateway>(), monitoredTags));
         var logger = loggerFactory.CreateLogger<ConveyorSupervisor>();
         foreach (var line in activeLines.Where(line => !line.Enabled))
             logger.LogInformation("Ligne {Line} : démarrage automatique désactivé; appareils non connectés jusqu’au START", line.Id + 1);
@@ -142,6 +156,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     internal void RecordPlcTagChange(string tag, string value)
     {
+        var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        if (!string.IsNullOrWhiteSpace(_chute4FullTag) &&
+            string.Equals(tag, _chute4FullTag, StringComparison.OrdinalIgnoreCase) && binaryState.HasValue)
+            ScheduleStopAndGo(binaryState.Value);
+        if (!string.IsNullOrWhiteSpace(_stopAndGoTag) &&
+            string.Equals(tag, _stopAndGoTag, StringComparison.OrdinalIgnoreCase) && binaryState.HasValue)
+            RecordStopAndGoState(binaryState.Value);
+
         var fullChutes = !string.IsNullOrWhiteSpace(_fullChutesTag) &&
             string.Equals(tag, _fullChutesTag, StringComparison.OrdinalIgnoreCase);
         var code42 = !string.IsNullOrWhiteSpace(_code42Tag) &&
@@ -176,6 +198,80 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             Get(line.Id).RecordPlcTransferReception(value);
         foreach (var line in _configuration.GetConfiguredLines().Where(line => !string.IsNullOrWhiteSpace(line.Plc.ScaleFaultTag) && string.Equals(line.Plc.ScaleFaultTag, tag, StringComparison.OrdinalIgnoreCase)))
             Get(line.Id).RecordScaleFaultReception(value);
+    }
+
+    private void RecordStopAndGoState(bool state)
+    {
+        bool? desired = null;
+        lock (_stopAndGoGate)
+        {
+            _stopAndGoState = state;
+            if (_chute4FullState == state)
+            {
+                _stopAndGoPending?.Cancel();
+                return;
+            }
+            if (_stopAndGoPending is null) desired = _chute4FullState;
+        }
+        if (desired.HasValue) ScheduleStopAndGo(desired.Value);
+    }
+
+    private void ScheduleStopAndGo(bool state)
+    {
+        CancellationTokenSource pending;
+        lock (_stopAndGoGate)
+        {
+            if (_stopAndGoStopping) return;
+            if (_chute4FullState == state && _stopAndGoPending is not null) return;
+            _chute4FullState = state;
+            _stopAndGoPending?.Cancel();
+            if (_stopAndGoState == state)
+            {
+                _stopAndGoPending = null;
+                return;
+            }
+            pending = new CancellationTokenSource();
+            _stopAndGoPending = pending;
+        }
+        _ = ApplyStopAndGoAfterDelayAsync(state, pending);
+    }
+
+    private async Task ApplyStopAndGoAfterDelayAsync(bool state, CancellationTokenSource pending)
+    {
+        try
+        {
+            await Task.Delay(_stopAndGoDelay, pending.Token);
+            lock (_stopAndGoGate)
+            {
+                if (!ReferenceEquals(_stopAndGoPending, pending) || _chute4FullState != state || _stopAndGoState == state)
+                    return;
+            }
+            await _plc.SendChuteAsync(_stopAndGoTag, state ? 1 : 0, 1, pending.Token);
+            lock (_stopAndGoGate) _stopAndGoState = state;
+            _logger.LogWarning("Automatisme chute 4 : {InputTag} stable à {InputState} pendant {DelaySeconds} s ; {OutputTag}={OutputState}",
+                _chute4FullTag, state ? 1 : 0, _stopAndGoDelay.TotalSeconds, _stopAndGoTag, state ? 1 : 0);
+        }
+        catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Automatisme chute 4 : impossible d'écrire {State} dans {OutputTag}", state ? 1 : 0, _stopAndGoTag);
+        }
+        finally
+        {
+            lock (_stopAndGoGate)
+                if (ReferenceEquals(_stopAndGoPending, pending)) _stopAndGoPending = null;
+            pending.Dispose();
+        }
+    }
+
+    private void StopStopAndGoAutomation()
+    {
+        lock (_stopAndGoGate)
+        {
+            _stopAndGoStopping = true;
+            _stopAndGoPending?.Cancel();
+            _stopAndGoPending = null;
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -216,6 +312,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        StopStopAndGoAutomation();
         try
         {
             await Task.WhenAll(_lines.Values.Select(line => line.StopAsync()));
@@ -243,6 +340,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     public override void Dispose()
     {
+        StopStopAndGoAutomation();
         if (_plc is IPlcReadback readback) readback.TagChanged -= RecordPlcTagChange;
         (_plc as IDisposable)?.Dispose();
         base.Dispose();

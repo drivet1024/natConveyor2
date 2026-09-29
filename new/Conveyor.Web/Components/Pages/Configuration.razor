@@ -99,6 +99,9 @@ else
                 <label><span>Tag démarrage convoyeur</span><InputText @bind-Value="_general.ConveyorStartTag" /><small>Commun aux deux lignes : 1 démarre le convoyeur et 0 l’arrête.</small></label>
                 @TextField("Tag nombre de chutes pleines — convoyeur", _general.FullChutesTag, value => _general.FullChutesTag = value.Trim())
                 @TextField("Tag nombre de codes 42 — convoyeur", _general.Code42Tag, value => _general.Code42Tag = value.Trim())
+                @TextField("Tag chute 4 pleine", _general.Chute4FullTag, value => _general.Chute4FullTag = value.Trim())
+                @TextField("Tag STOP_AND_GO", _general.StopAndGoTag, value => _general.StopAndGoTag = value.Trim())
+                <label><span>Délai STOP_AND_GO (secondes)</span><InputNumber @bind-Value="_general.StopAndGoDelaySeconds" min="1" max="3600" /><small>Après cette durée continue à 1, STOP_AND_GO passe à 1. Après la même durée continue à 0, il repasse à 0.</small></label>
                 <label><span>Tag fermeture chute 39</span><InputText @bind-Value="_plc.CloseChute39Tag" /><small>Commun aux deux lignes : 1 détourne les colis de la chute 39 vers la recirculation 97 ; 0 rétablit la chute 39. Lu en DDE ou OPC DA.</small></label>
             </div>
         </div>
