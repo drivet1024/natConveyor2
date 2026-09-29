@@ -3,7 +3,7 @@
 @inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
 
-<PageTitle>Supervision des convoyeurs</PageTitle>
+<PageTitle>Opérateur</PageTitle>
 
 @if (_smallParcelLineId is { } smallLineId && _lines.FirstOrDefault(line => line.LineId == smallLineId) is { } smallLine)
 {
@@ -20,11 +20,6 @@
     <MultipleBarcodesModal Line="multipleLine" OnClose="() => _multipleBarcodeLineId = null" />
 }
 
-@if (_routeLineId is { } routeLineId && _lines.FirstOrDefault(line => line.LineId == routeLineId) is { } routeLine)
-{
-    <UnconfiguredRoutesModal Line="routeLine" OnClose="() => _routeLineId = null" />
-}
-
 @if (_converterLineId is { } converterLineId)
 {
     <ConverterResetModal LineId="converterLineId" OnClose="() => _converterLineId = null" />
@@ -38,9 +33,10 @@
 <header class="supervision-header">
     <div>
         <span class="eyebrow">TEMPS RÉEL</span>
-        <h1>Supervision</h1>
+        <h1>Opérateur</h1>
     </div>
     <div class="supervision-header-actions">
+        <label class="kpi-style-toggle"><input type="checkbox" role="switch" @bind="_modernKpis" /><span>Nouveau style</span></label>
         <div class="conveyor-rates" aria-label="Compteurs du convoyeur" title="Valeur brute reçue de l'automate">
             <div><strong>@SharedTagCount(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
             <div><strong>@SharedTagCount(Supervisor.Code42Count)</strong><span>Code 42</span></div>
@@ -54,7 +50,7 @@
     </div>
 </header>
 
-<section class="supervision-grid @(_lines.Count == 1 ? "single-line" : null)" aria-label="Supervision des lignes">
+<section class="supervision-grid @(_lines.Count == 1 ? "single-line" : null)" aria-label="Opérateur — suivi des lignes">
 @foreach (var line in _lines)
 {
     var counters = line.Counters;
@@ -74,6 +70,22 @@
             @Connection("Balance", line.Connections.Scale, line.Connections.Simulated)
         </div>
 
+        @if (_modernKpis)
+        {
+            <div class="operator-kpis" aria-label="Indicateurs de la ligne">
+                <OperatorKpi Label="Colis convoyés" Value="@counters.TotalParcels.ToString("N0")" Help="@CalculationDescription("Colis convoyés")" />
+                <OperatorKpi Label="Triés sans problème" Value="@(FormatPercentage(counters.SortedWithoutIssue, counters.TotalParcels) + " %")" Unit="@(counters.SortedWithoutIssue.ToString("N0") + " colis")" Tone="success" Icon="check" Help="@CalculationDescription("Triés sans problème")" />
+                <OperatorKpi Label="Cadence" Value="@(counters.ParcelsPerHour?.ToString("N0") ?? "—")" Unit="colis/heure" Icon="speed" Help="Total convoyé ÷ temps de marche cumulé en heures" />
+                @OperatorCount("Sans lecture", counters.NoReads, counters.TotalParcels, "alert")
+                @OperatorCount("Erreurs poids", counters.ScaleErrors, eligibleParcels, "alert", line.Code98Enabled)
+                @OperatorCount("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "dimensions", line.Code98Enabled)
+                <OperatorKpi Label="Pas dans le système" Value="@counters.RejectedShipmentNotFound.ToString("N0")" Rate="@(FormatPercentage(counters.RejectedShipmentNotFound, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.RejectedShipmentNotFound, counters.TotalParcels)" Icon="alert" Help="@CalculationDescription("Pas dans le système")" OnClick="() => _missingShipmentLineId = line.LineId" />
+                <OperatorKpi Label="Petits colis" Value="@counters.SmallParcels.ToString("N0")" Rate="@(FormatPercentage(counters.SmallParcels, counters.TotalParcels) + " %")" Help="@CalculationDescription("Petits colis")" OnClick="() => _smallParcelLineId = line.LineId" />
+                <OperatorKpi Label="Colis inversés" Value="@counters.InverseLengthParcels.ToString("N0")" Rate="@(FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) + " %")" Icon="rotate" Detail="2e mesure ≥ 1re mesure + 2 po" Help="@CalculationDescription("Dimensions inversées")" />
+            </div>
+        }
+        else
+        {
         <div class="supervision-summary">
             @Metric("Triés sans problème", counters.SortedWithoutIssue, counters.TotalParcels, "Colis avec une route connue, des mesures valides et sans détournement ÷ total des colis", false)
             @VolumeMetric(counters)
@@ -87,9 +99,9 @@
         </div>
 
         <div class="supervision-metrics rejection-metrics">
-            @foreach (var cause in counters.RejectionCauses())
+            @foreach (var cause in counters.RejectionCauses().Where(cause => cause.Label != "Route non configurée"))
             {
-                @if (cause.Label is "Route non configurée" or "Plusieurs code-barres" or "Pas dans le système")
+                @if (cause.Label is "Plusieurs code-barres" or "Pas dans le système")
                 {
                     <button type="button" class="supervision-metric metric-button @SeverityCss(cause.Count, counters.TotalParcels, true)"
                             aria-haspopup="dialog" aria-label="@($"Afficher les colis : {cause.Label} — ligne {line.LineId + 1}")"
@@ -105,6 +117,15 @@
                     @Metric(cause.Label, cause.Count, counters.TotalParcels, $"{cause.Label} ÷ total des colis")
                 }
             }
+            <div class="supervision-metric inverse-dimensions-metric">
+                @MetricHelp("Dimensions inversées")
+                <div class="inverse-dimensions-values">
+                    <strong>@counters.InverseLengthParcels.ToString("N0")</strong>
+                    <span>@FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) %</span>
+                </div>
+                <span class="metric-label">Dimensions inversées</span>
+                <span class="sorting-detail">2e mesure ≥ 1re mesure + 2 po</span>
+            </div>
         </div>
         <div class="supervision-metrics">
             @Metric("Sans lecture", counters.NoReads, counters.TotalParcels, "Sans lecture ÷ total des colis")
@@ -114,6 +135,8 @@
                 @Metric("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "Erreurs dimensions ÷ colis lus")
             }
         </div>
+
+        }
 
         <LastDecision Decision="line.LastDecision">
             <HeadingContent>
@@ -172,7 +195,17 @@
 </section>
 
 @code {
-    private int? _routeLineId;
+    private bool _modernKpis = true;
+    private static string OperatorTone(long count, long total) => SeverityCss(count, total, true) switch
+    {
+        "metric-critical" => "critical",
+        "metric-warning" => "warning",
+        _ => ""
+    };
+    private RenderFragment OperatorCount(string label, long count, long total, string icon, bool enabled = true) => @<OperatorKpi
+        Label="@label" Value="@(enabled ? count.ToString("N0") : "—")" Unit="@(enabled ? "colis" : "Code 98 désactivé")"
+        Rate="@(enabled ? FormatPercentage(count, total) + " %" : null)" Icon="@icon"
+        Tone="@(enabled ? OperatorTone(count, total) : "inactive")" Help="@CalculationDescription(label)" />;
     private int? _multipleBarcodeLineId;
     private int? _smallParcelLineId;
     private int? _missingShipmentLineId;
@@ -180,7 +213,6 @@
     {
         if (cause == "Pas dans le système") _missingShipmentLineId = lineId;
         else if (cause == "Plusieurs code-barres") _multipleBarcodeLineId = lineId;
-        else _routeLineId = lineId;
     }
     private IReadOnlyList<LineSnapshot> _lines = [];
     private string SharedTagCount(int? count)
@@ -307,8 +339,8 @@
         "Triés sans problème" => "Colis avec une route connue par expédition ou par code postal, même si le colis est absent de la base, sans rejet ni détournement, et des mesures valides si leur validation est activée. Envoi automate réussi et scan enregistré en production. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Petits colis" => "Colis dont toutes les dimensions sont positives et dont la plus grande dimension est inférieure ou égale au seuil petit colis, avec un poids positif inférieur au seuil colis léger. Pourcentage = petits colis ÷ total convoyé × 100.",
         "Pas dans le système" => "Colis absent de la base avec au moins un code-barres de 11 ou 12 caractères commençant par un préfixe autorisé. Compté une fois, sauf si le colis est trié avec succès par code postal. Pourcentage = ces colis ÷ total convoyé × 100.",
-        "Route non configurée" => "Colis envoyé au rejet parce que la route de son expédition ne possède pas de chute configurée. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Plusieurs code-barres" => "Colis avec plusieurs codes-barres reconnus, envoyé au rejet. Pourcentage = ces colis ÷ total convoyé × 100.",
+        "Dimensions inversées" => "Colis dont les deux premières mesures sont positives et dont la deuxième dépasse la première d’au moins 2 po. Pourcentage = ces colis ÷ total convoyé × 100.",
         "Sans lecture" => "Lecture contenant un ? ou colis absent sans code-barres admissible au compteur Pas dans le système, sauf tri réussi par code postal. Compté une seule fois par passage. Pourcentage = sans lecture ÷ total convoyé × 100.",
         "Erreurs poids" => "Poids absent, nul ou supérieur au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs poids ÷ (total convoyé − sans lecture) × 100.",
         "Erreurs dimensionneur" => "Au moins une dimension absente, nulle ou supérieure au maximum configuré. Exclut les sans lecture et les colis avec plusieurs codes-barres. Pourcentage = erreurs dimensions ÷ (total convoyé − sans lecture) × 100.",

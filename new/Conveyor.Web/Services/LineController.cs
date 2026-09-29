@@ -72,6 +72,7 @@ internal sealed class LineController
     private DeviceReception? _scaleInput;
     private PlcDispatch? _lastPlcDispatch;
     private readonly Queue<PlcDispatch> _recentPlcDispatches = new();
+    private readonly ChuteTrafficWindow _chuteTraffic = new();
     private long _dispatchSequence;
     private int _consecutiveParcelsWithoutScale;
     private Channel<bool> _scaleFaultRequests = Channel.CreateUnbounded<bool>();
@@ -575,6 +576,7 @@ internal sealed class LineController
                 ++_dispatchSequence)
             { ParcelKey = $"{parcel.CameraTimestamp.UtcTicks}:{parcel.ParcelId}" };
             _recentPlcDispatches.Enqueue(_lastPlcDispatch);
+            _chuteTraffic.Add(_lastPlcDispatch);
             while (_recentPlcDispatches.Count > 256) _recentPlcDispatches.Dequeue();
         }
         _logger.LogInformation(
@@ -791,7 +793,7 @@ internal sealed class LineController
                 _options.Plc.ChuteTag, _plc is IPlcReadback, _plcTransferInput, _options.Plc.TransferTag,
                 _plc is IPlcReadback && !string.IsNullOrWhiteSpace(_options.Plc.TransferTag), _lastPlcDispatch, _maintenance, _productionCounters.Copy(), _maintenanceCounters.Copy(),
                 connections.Plc && !connections.Simulated ? _scaleFaultActive : null, _lastParcelReceivedAt,
-                _recentPlcDispatches.ToArray());
+                _recentPlcDispatches.ToArray(), _chuteTraffic.Counts(DateTimeOffset.UtcNow));
         }
     }
 }

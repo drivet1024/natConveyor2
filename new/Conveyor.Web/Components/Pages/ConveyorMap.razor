@@ -34,14 +34,16 @@
         }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Station1Dispatch="_station1" Station2Dispatch="_station2" Station1Parcels="_parcels1" Station2Parcels="_parcels2" /></div>
+        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Traffic15Minutes="_traffic15Minutes" Station1Dispatch="_station1" Station2Dispatch="_station2" Station1Parcels="_parcels1" Station2Parcels="_parcels2" /></div>
     </div>
+    <p style="padding:0 1rem;color:var(--muted);font-size:.8rem"><span style="display:inline-block;width:5rem;height:.6rem;background:linear-gradient(to right,#ffe066,#f58220);border-radius:3px"></span> Trafic sur 15 min · jaune : faible · orange : élevé, par rapport à la chute la plus chargée · envois automate confirmés</p>
 </section>
 
 </div>
 
 @code {
     private bool _running;
+    private IReadOnlyDictionary<int, long> _traffic15Minutes = new Dictionary<int, long>();
     private IReadOnlyDictionary<int, long> _counts = new Dictionary<int, long>();
     private DateTimeOffset? _station1, _station2;
     private IReadOnlyList<PlcDispatch> _parcels1 = [], _parcels2 = [];
@@ -50,6 +52,8 @@
     {
         if (Supervisor.ConveyorId != 1) return;
         var lines = Supervisor.GetSnapshots();
+        _traffic15Minutes = lines.SelectMany(line => line.ChuteTraffic15Minutes ?? new Dictionary<int, long>())
+            .GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
         _running = Supervisor.ConveyorRunning == true && lines.Any(line => line.Connections.Plc && line.Running);
         _counts = lines.SelectMany(line => line.Counters.ChuteDispatchCounts).GroupBy(pair => pair.Key)
             .ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
@@ -141,6 +145,9 @@
             {
                 await InvokeAsync(async () =>
                 {
+                    if (_disposed) return;
+                    RefreshLive();
+                    StateHasChanged();
                     if (_loading || (_loadedShift == _displayShift && DateTimeOffset.UtcNow < _nextRefresh)) return;
                     var load = LoadDestinations();
                     StateHasChanged();

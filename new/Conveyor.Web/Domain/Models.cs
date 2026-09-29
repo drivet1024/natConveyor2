@@ -187,4 +187,5 @@ public sealed record LineSnapshot(
     LineCounters? MaintenanceCounters = null,
     bool? ScaleFaultActive = null,
     DateTimeOffset? LastParcelReceivedAt = null,
-    IReadOnlyList<PlcDispatch>? RecentPlcDispatches = null);
+    IReadOnlyList<PlcDispatch>? RecentPlcDispatches = null,
+    IReadOnlyDictionary<int, long>? ChuteTraffic15Minutes = null);

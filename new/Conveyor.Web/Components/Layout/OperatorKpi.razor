@@ -1,0 +1,52 @@
+@if (OnClick.HasDelegate)
+{
+    <button type="button" class="operator-kpi @Tone" aria-haspopup="dialog" aria-label="@($"Afficher : {Label}")" title="@Help" @onclick="OnClick">@Content</button>
+}
+else
+{
+    <div class="operator-kpi @Tone" title="@Help">@Content</div>
+}
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Unit { get; set; } = "colis";
+    [Parameter] public string? Rate { get; set; }
+    [Parameter] public string? Detail { get; set; }
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public string Tone { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "parcel";
+    [Parameter] public EventCallback OnClick { get; set; }
+    private RenderFragment Content => @<text>
+        <div class="kpi-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                @switch (Icon)
+                {
+                    case "check":
+                        <circle cx="12" cy="12" r="10" /><path d="m7 12 3 3 7-7" />
+                        break;
+                    case "speed":
+                        <path d="M3 18a10 10 0 1 1 18 0M12 13l5-6M5 13H3M7 6l1 2M12 3v2M19 13h2" /><circle cx="12" cy="14" r="1" />
+                        break;
+                    case "alert":
+                        <path d="M12 3 2 21h20ZM12 9v5M12 17v.5" />
+                        break;
+                    case "dimensions":
+                        <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l6 6M20 20l-6-6" />
+                        break;
+                    case "rotate":
+                        <path d="M3 8a9 9 0 0 1 16-3l2 3M21 3v5h-5M21 16A9 9 0 0 1 5 19l-2-3M3 21v-5h5" />
+                        break;
+                    default:
+                        <path d="m12 2 9 5v10l-9 5-9-5V7Zm0 10 9-5M12 12 3 7M12 12v10" />
+                        break;
+                }
+            </svg>
+            <span>@Label</span>
+        </div>
+        <strong class="kpi-value">@Value</strong>
+        <span class="kpi-unit">@Unit</span>
+        @if (Rate is not null) { <div class="kpi-footer"><span class="kpi-rate">@Rate</span></div> }
+        @if (Detail is not null) { <small class="kpi-detail">@Detail</small> }
+    </text>;
+}

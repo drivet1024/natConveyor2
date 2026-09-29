@@ -23,6 +23,8 @@
  <g id="chute-10" data-chute="10"><title>Sortie 10</title><path id="chute-10-path" d="M576 300 V155" stroke="#526774" stroke-width="16"/><path d="M576 300 V155" stroke="#24343e" stroke-width="12"/></g>
  <g id="chute-11" data-chute="11"><title>Sortie 11</title><path id="chute-11-path" d="M504 300 V180 Q504 155 529 155" stroke="#526774" stroke-width="16"/><path d="M504 300 V180 Q504 155 529 155" stroke="#24343e" stroke-width="12"/></g>
  <g id="chute-13" data-chute="13"><title>Sortie 13</title><path id="chute-13-path" d="M432 300 V185 Q432 155 402 155 H372" stroke="#526774" stroke-width="16"/><path d="M432 300 V185 Q432 155 402 155 H372" stroke="#24343e" stroke-width="12"/></g>
+ <g id="chute-19" data-chute="19"><title>Sortie 19</title><path id="chute-19-path" d="M336 300 V420" stroke="#526774" stroke-width="16"/><path d="M336 300 V420" stroke="#24343e" stroke-width="12"/></g>
+ <g id="chute-20" data-chute="20"><title>Sortie 20</title><path id="chute-20-path" d="M384 300 V420" stroke="#526774" stroke-width="16"/><path d="M384 300 V420" stroke="#24343e" stroke-width="12"/></g>
  <g id="chute-21" data-chute="21"><title>Sortie 21</title><path id="chute-21-path" d="M432 300 V420" stroke="#526774" stroke-width="16"/><path d="M432 300 V420" stroke="#24343e" stroke-width="12"/></g>
  <g id="chute-22" data-chute="22"><title>Sortie 22</title><path id="chute-22-path" d="M480 300 V420" stroke="#526774" stroke-width="16"/><path d="M480 300 V420" stroke="#24343e" stroke-width="12"/></g>
  <g id="chute-23" data-chute="23"><title>Sortie 23</title><path id="chute-23-path" d="M528 300 V420" stroke="#526774" stroke-width="16"/><path d="M528 300 V420" stroke="#24343e" stroke-width="12"/></g>
@@ -89,6 +91,8 @@
  <g transform="translate(576 190)"><title>@ChuteTitle(10)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">10</text></g>
  <g transform="translate(504 205)"><title>@ChuteTitle(11)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">11</text></g>
  <g transform="translate(432 205)"><title>@ChuteTitle(13)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">13</text></g>
+ <g transform="translate(336 355)"><title>@ChuteTitle(19)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">19</text></g>
+ <g transform="translate(384 355)"><title>@ChuteTitle(20)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">20</text></g>
  <g transform="translate(432 355)"><title>@ChuteTitle(21)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">21</text></g>
  <g transform="translate(480 355)"><title>@ChuteTitle(22)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">22</text></g>
  <g transform="translate(528 355)"><title>@ChuteTitle(23)</title><rect x="-18" y="-14" width="36" height="28" rx="5" fill="#192a33" stroke="#73909f"/><text y="6" fill="#edf5f8">23</text></g>
@@ -129,6 +133,7 @@
 
 @code {
     [Parameter] public IReadOnlyList<PlcDispatch> Station1Parcels { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<int, long> Traffic15Minutes { get; set; } = new Dictionary<int, long>();
     [Parameter] public IReadOnlyList<PlcDispatch> Station2Parcels { get; set; } = [];
     private ElementReference _svg;
     private IJSObjectReference? _animation;
@@ -153,7 +158,7 @@
                 finally { await module.DisposeAsync(); }
             }
             if (!_disposed)
-                await _animation.InvokeVoidAsync("update", Running, Station1Parcels, Station2Parcels);
+                await _animation.InvokeVoidAsync("update", Running, Station1Parcels, Station2Parcels, Traffic15Minutes);
         }
         catch (JSDisconnectedException) { }
         finally { _animationGate.Release(); }
@@ -198,7 +203,7 @@
         (1,1420,130),(2,1320,130),(3,1248,130),(4,1152,130),(5,1056,130),
         (6,960,130),(7,864,130),(8,768,130),(9,672,130),(10,576,130),
         (11,529,130),(13,372,130),(16,305,215),
-        (21,432,445),(22,480,445),(23,528,445),(24,624,445),(25,672,445),
+        (19,336,445),(20,384,445),(21,432,445),(22,480,445),(23,528,445),(24,624,445),(25,672,445),
         (26,720,445),(27,768,445),(28,816,445),(29,864,445),(30,912,445),
         (31,960,445),(32,1008,445),(33,1056,445),(34,1104,445),(35,1152,476),
         (36,1200,501),(37,1248,630),(38,1296,684),(39,1344,794),(40,1420,490),(41,1530,330)

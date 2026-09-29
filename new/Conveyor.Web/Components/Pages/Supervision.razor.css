@@ -13,6 +13,12 @@
 .supervision-conveyor-controls .btn{padding:.4rem .6rem;font-size:.7rem;white-space:nowrap}
 .supervision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .supervision-line{min-width:0}
+.operator-kpis{container-type:inline-size;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;padding:.85rem;border-bottom:1px solid var(--line)}
+.kpi-style-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.8rem;cursor:pointer;white-space:nowrap}
+.kpi-style-toggle input{appearance:none;position:relative;width:2.5rem;height:1.4rem;border:1px solid #50647a;border-radius:2rem;background:#24303d;cursor:pointer;transition:background .15s}
+.kpi-style-toggle input::after{content:"";position:absolute;top:3px;left:3px;width:.9rem;height:.9rem;border-radius:50%;background:#fff;transition:transform .15s}
+.kpi-style-toggle input:checked{background:#20734c;border-color:#43bb7c}.kpi-style-toggle input:checked::after{transform:translateX(1.05rem)}.kpi-style-toggle input:focus-visible{outline:2px solid #b3d9ff;outline-offset:3px}
+@media(max-width:450px){.operator-kpis{gap:.35rem;padding:.5rem}}
 .line-state-badges{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
 .sorting-time{color:var(--muted);font-size:.72rem;font-weight:400;letter-spacing:normal;white-space:nowrap;font-variant-numeric:tabular-nums}
 .line-title.compact-line-title{flex-wrap:wrap;gap:.5rem}
@@ -50,6 +56,8 @@
 .supervision-actions .gear-button{display:grid;place-items:center;min-width:46px;min-height:46px;padding:.6rem;font-size:1.05rem}
 .shift-error{color:#ff6677;font-size:.75rem}
 .supervision-metrics.rejection-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.inverse-dimensions-values{display:flex;align-items:baseline;gap:.45rem;flex-wrap:wrap}
+.inverse-dimensions-values>span{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
 .rejection-metrics .supervision-metric{border-right:1px solid var(--line)}
 .rejection-metrics .supervision-metric:last-child{border-right:0}
 .supervision-grid.single-line{grid-template-columns:minmax(0,720px);justify-content:center}

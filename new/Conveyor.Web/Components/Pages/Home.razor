@@ -94,6 +94,7 @@
             <div class="mobile-counter-summary">
                 <div class="mobile-counter"><strong>@line.Counters.TotalParcels.ToString("N0")</strong><span>Colis convoyés</span></div>
                 @MobileMetric("Triés sans problème", line.Counters.SortedWithoutIssue, line.Counters.TotalParcels, false)
+                <div class="mobile-counter" title="Total des colis convoyés ÷ temps de marche cumulé en heures"><strong>@(line.Counters.ParcelsPerHour?.ToString("N0") ?? "—")</strong><span>Cadence · colis/heure</span></div>
             </div>
             <div class="mobile-counter-rejections">
                 @foreach (var cause in line.Counters.RejectionCauses())
@@ -102,6 +103,7 @@
                 }
                 @MobileMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels)
                 @MobileMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, false)
+                @MobileMetric("Colis inversés", line.Counters.InverseLengthParcels, line.Counters.TotalParcels, false)
             </div>
             <div class="mobile-counter-quality">
                 @MobileMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels)
@@ -115,6 +117,10 @@
         <div class="metrics desktop-only"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
         </div>
+            <div class="metric" title="Total des colis convoyés ÷ temps de marche cumulé en heures">
+                <strong>@(line.Counters.ParcelsPerHour?.ToString("N0") ?? "—")</strong>
+                <span>Cadence · colis/heure</span>
+            </div>
             @foreach (var cause in line.Counters.RejectionCauses())
             {
                 @PercentageMetric(cause.Label, cause.Count, line.Counters.TotalParcels, $"{cause.Label} ÷ total des colis × 100")
@@ -122,6 +128,7 @@
             @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100")
             @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")
             @PercentageMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger ÷ total des colis × 100")
+            @PercentageMetric("Colis inversés", line.Counters.InverseLengthParcels, line.Counters.TotalParcels, "2e mesure ≥ 1re mesure + 2 po, avec deux mesures positives. Pourcentage = colis inversés ÷ total des colis × 100")
             @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters)
             @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100")
             @ScaleErrorMetric(line.Counters)
