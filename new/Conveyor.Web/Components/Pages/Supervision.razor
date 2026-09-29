@@ -63,8 +63,8 @@
         <div class="line-title compact-line-title">
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (line.Maintenance) { <span class="maintenance-mode"> - MAINTENANCE</span> }</h2>
             <div class="line-state-badges">
+                <span class="sorting-time" title="Temps cumulé où le convoyeur est en marche, depuis la remise à zéro des compteurs.">@(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
                 <span class="run-state @LineStateCss(line)">@LineStateLabel(line)</span>
-                <span class="sorting-time" title="Temps cumulé où le convoyeur est en marche, depuis la remise à zéro des compteurs.">Temps de tri : @(counters.SortingDuration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}" : "—")</span>
             </div>
         </div>
 
