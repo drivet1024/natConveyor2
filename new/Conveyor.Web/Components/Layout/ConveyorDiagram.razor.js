@@ -142,8 +142,8 @@ export function create(svg) {
                 }
                 const node = document.createElementNS(NS, 'g');
                 const box = document.createElementNS(NS, 'rect');
-                for (const [attribute, value] of Object.entries({x:-8, y:-6, width:16, height:12, rx:2,
-                    fill: lane === 0 ? '#ffcf78' : '#9edcff', stroke:'#fff', 'stroke-width':1.5}))
+                for (const [attribute, value] of Object.entries({x:-5, y:-4, width:10, height:8, rx:1.5,
+                    fill: lane === 0 ? '#ffcf78' : '#9edcff', stroke:'#fff', 'stroke-width':1}))
                     box.setAttribute(attribute, value);
                 const title = document.createElementNS(NS, 'title');
                 title.textContent = `Destination ${e.chute} — position estimée`;
