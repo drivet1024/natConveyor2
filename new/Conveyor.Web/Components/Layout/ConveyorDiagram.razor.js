@@ -2,7 +2,12 @@ const NS = "http://www.w3.org/2000/svg";
 
 export function trafficColor(count, maximum) {
     const ratio = maximum > 0 ? Math.max(0, Math.min(1, count / maximum)) : 0;
-    return `rgb(${Math.round(255 - 10 * ratio)}, ${Math.round(224 - 94 * ratio)}, ${Math.round(102 - 70 * ratio)})`;
+    // Keep the quietest chutes blue; blend through yellow before reaching orange.
+    const blue = [165, 221, 255], yellow = [255, 224, 102], orange = [245, 130, 32];
+    const start = ratio <= .6 ? blue : yellow;
+    const end = ratio <= .6 ? yellow : orange;
+    const blend = ratio <= .6 ? Math.max(0, (ratio - .2) / .4) : (ratio - .6) / .4;
+    return `rgb(${start.map((value, i) => Math.round(value + (end[i] - value) * blend)).join(', ')})`;
 }
 
 // Pure progression rule, shared with tests. Distance advances only while running.
@@ -78,7 +83,7 @@ export function create(svg) {
                 group.setAttribute('data-destination-chute', chute);
                 const glow = document.createElementNS(NS, 'path');
                 for (const [name, value] of Object.entries({d:branch.getAttribute('d'), fill:'none',
-                    stroke:'#ffe066', 'stroke-width':26, 'stroke-opacity':.35, 'stroke-linecap':'round', 'stroke-linejoin':'round'}))
+                    stroke:'#a5ddff', 'stroke-width':26, 'stroke-opacity':.25, 'stroke-linecap':'round', 'stroke-linejoin':'round'}))
                     glow.setAttribute(name, value);
                 const badge = document.createElementNS(NS, 'g');
                 const length = branch.getTotalLength();
@@ -99,9 +104,9 @@ export function create(svg) {
             }
             const color = trafficColor(recent, maximum);
             highlight.glow.setAttribute('stroke', color);
-            highlight.glow.setAttribute('stroke-opacity', recent > 0 ? .45 : 0);
+            highlight.glow.setAttribute('stroke-opacity', recent > 0 ? .25 + .2 * Math.min(1, recent / maximum) : 0);
             highlight.background.setAttribute('fill', color);
-            highlight.background.setAttribute('stroke', '#fff0b3');
+            highlight.background.setAttribute('stroke', color);
             highlight.group.setAttribute('data-traffic-15-minutes', recent);
             highlight.group.setAttribute('data-en-route-count', count);
             highlight.badge.style.display = count > 1 ? '' : 'none';

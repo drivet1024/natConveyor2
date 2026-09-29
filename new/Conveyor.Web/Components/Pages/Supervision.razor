@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IConveyorRepository Repository
 @inject IConveyorSupervisor Supervisor
+@inject IOptions<ConveyorOptions> Options
 
 <PageTitle>Opérateur</PageTitle>
 
@@ -55,7 +56,7 @@
 {
     var counters = line.Counters;
     var eligibleParcels = Math.Max(0, counters.TotalParcels - counters.NoReads);
-    <article class="line-card supervision-line">
+    <article class="line-card supervision-line @(_modernKpis ? "modern-line" : null)">
         <div class="line-title compact-line-title">
             <h2 class="line-number">LIGNE @(line.LineId + 1)@if (line.Maintenance) { <span class="maintenance-mode"> - MAINTENANCE</span> }</h2>
             <div class="line-state-badges">
@@ -73,15 +74,30 @@
         @if (_modernKpis)
         {
             <div class="operator-kpis" aria-label="Indicateurs de la ligne">
+                <fieldset class="kpi-category">
+                    <legend>Production</legend>
+                    <div class="kpi-category-grid">
                 <OperatorKpi Label="Colis convoyés" Value="@counters.TotalParcels.ToString("N0")" Help="@CalculationDescription("Colis convoyés")" />
-                <OperatorKpi Label="Triés sans problème" Value="@(FormatPercentage(counters.SortedWithoutIssue, counters.TotalParcels) + " %")" Unit="@(counters.SortedWithoutIssue.ToString("N0") + " colis")" Tone="success" Icon="check" Help="@CalculationDescription("Triés sans problème")" />
-                <OperatorKpi Label="Cadence" Value="@(counters.ParcelsPerHour?.ToString("N0") ?? "—")" Unit="colis/heure" Icon="speed" Help="Total convoyé ÷ temps de marche cumulé en heures" />
+                <OperatorKpi Label="Triés sans problème" Value="@(FormatPercentage(counters.SortedWithoutIssue, counters.TotalParcels) + " %")" Unit="@counters.SortedWithoutIssue.ToString("N0")" Tone="@KpiThresholds.SortedTone(counters.SortedWithoutIssue, counters.TotalParcels)" Icon="check" Help="@CalculationDescription("Triés sans problème")" />
+                <OperatorKpi Label="Cadence" Value="@(counters.ParcelsPerHour?.ToString("N0") ?? "—")" Unit="colis/heure" Tone="@KpiThresholds.CadenceTone(counters.ParcelsPerHour)" Icon="speed" Help="Total convoyé ÷ temps de marche cumulé en heures" />
+                    </div>
+                </fieldset>
+                <fieldset class="kpi-category">
+                    <legend>Lecture et mesures</legend>
+                    <div class="kpi-category-grid">
                 @OperatorCount("Sans lecture", counters.NoReads, counters.TotalParcels, "alert")
                 @OperatorCount("Erreurs poids", counters.ScaleErrors, eligibleParcels, "alert", line.Code98Enabled)
                 @OperatorCount("Erreurs dimensionneur", counters.DimensionErrors, eligibleParcels, "dimensions", line.Code98Enabled)
+                    </div>
+                </fieldset>
+                <fieldset class="kpi-category">
+                    <legend>Particularités des colis</legend>
+                    <div class="kpi-category-grid">
                 <OperatorKpi Label="Pas dans le système" Value="@counters.RejectedShipmentNotFound.ToString("N0")" Rate="@(FormatPercentage(counters.RejectedShipmentNotFound, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.RejectedShipmentNotFound, counters.TotalParcels)" Icon="alert" Help="@CalculationDescription("Pas dans le système")" OnClick="() => _missingShipmentLineId = line.LineId" />
-                <OperatorKpi Label="Petits colis" Value="@counters.SmallParcels.ToString("N0")" Rate="@(FormatPercentage(counters.SmallParcels, counters.TotalParcels) + " %")" Help="@CalculationDescription("Petits colis")" OnClick="() => _smallParcelLineId = line.LineId" />
-                <OperatorKpi Label="Colis inversés" Value="@counters.InverseLengthParcels.ToString("N0")" Rate="@(FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) + " %")" Icon="rotate" Detail="2e mesure ≥ 1re mesure + 2 po" Help="@CalculationDescription("Dimensions inversées")" />
+                <OperatorKpi Label="Petits colis" Value="@counters.SmallParcels.ToString("N0")" Rate="@(FormatPercentage(counters.SmallParcels, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.SmallParcels, counters.TotalParcels)" Help="@CalculationDescription("Petits colis")" OnClick="() => _smallParcelLineId = line.LineId" />
+                <OperatorKpi Label="Colis inversés" Value="@counters.InverseLengthParcels.ToString("N0")" Rate="@(FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.InverseLengthParcels, counters.TotalParcels)" Icon="rotate" Help="@CalculationDescription("Dimensions inversées")" />
+                    </div>
+                </fieldset>
             </div>
         }
         else
@@ -196,14 +212,10 @@
 
 @code {
     private bool _modernKpis = true;
-    private static string OperatorTone(long count, long total) => SeverityCss(count, total, true) switch
-    {
-        "metric-critical" => "critical",
-        "metric-warning" => "warning",
-        _ => ""
-    };
+    private OperatorKpiOptions KpiThresholds => Options.Value.OperatorKpis;
+    private string OperatorTone(long count, long total) => KpiThresholds.RateTone(count, total);
     private RenderFragment OperatorCount(string label, long count, long total, string icon, bool enabled = true) => @<OperatorKpi
-        Label="@label" Value="@(enabled ? count.ToString("N0") : "—")" Unit="@(enabled ? "colis" : "Code 98 désactivé")"
+        Label="@label" Value="@(enabled ? count.ToString("N0") : "—")" Unit="@(enabled ? "" : "Code 98 désactivé")"
         Rate="@(enabled ? FormatPercentage(count, total) + " %" : null)" Icon="@icon"
         Tone="@(enabled ? OperatorTone(count, total) : "inactive")" Help="@CalculationDescription(label)" />;
     private int? _multipleBarcodeLineId;

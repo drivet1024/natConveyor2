@@ -10,7 +10,7 @@ else
 @code {
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public string Value { get; set; } = "";
-    [Parameter] public string Unit { get; set; } = "colis";
+    [Parameter] public string Unit { get; set; } = "";
     [Parameter] public string? Rate { get; set; }
     [Parameter] public string? Detail { get; set; }
     [Parameter] public string? Help { get; set; }
@@ -44,9 +44,11 @@ else
             </svg>
             <span>@Label</span>
         </div>
-        <strong class="kpi-value">@Value</strong>
-        <span class="kpi-unit">@Unit</span>
-        @if (Rate is not null) { <div class="kpi-footer"><span class="kpi-rate">@Rate</span></div> }
+        <div class="kpi-values">
+            <strong class="kpi-value">@Value</strong>
+            @if (Rate is not null) { <span class="kpi-rate">@Rate</span> }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Unit)) { <span class="kpi-unit">@Unit</span> }
         @if (Detail is not null) { <small class="kpi-detail">@Detail</small> }
     </text>;
 }

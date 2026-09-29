@@ -45,6 +45,17 @@ else
 <EditForm Model="_model" OnValidSubmit="Save">
     <DataAnnotationsValidator />
     <ValidationSummary />
+    <section class="config-section">
+        <div class="config-section-title"><h2>Couleurs des KPI opérateur</h2></div>
+        <div class="config-grid">
+            <label><span>Cadence rouge jusqu’à (colis/h)</span><InputNumber @bind-Value="_model.OperatorKpis.CadenceRedThrough" min="0" step="1" /><small>Rouge à ce seuil ou en dessous.</small></label>
+            <label><span>Cadence verte au-dessus de (colis/h)</span><InputNumber @bind-Value="_model.OperatorKpis.CadenceGreenAbove" min="0" step="1" /><small>Jaune entre le seuil rouge et cette limite incluse.</small></label>
+            <label><span>Bien triés rouges sous (%)</span><InputNumber @bind-Value="_model.OperatorKpis.SortedRedBelow" min="0" max="100" step="0.1" /><small>Rouge strictement en dessous.</small></label>
+            <label><span>Bien triés verts à partir de (%)</span><InputNumber @bind-Value="_model.OperatorKpis.SortedGreenFrom" min="0" max="100" step="0.1" /><small>Jaune entre le seuil rouge inclus et ce seuil exclu.</small></label>
+            <label><span>Lectures et particularités : vert sous (%)</span><InputNumber @bind-Value="_model.OperatorKpis.RateGreenBelow" min="0" max="100" step="0.1" /><small>Commun à tous les KPI des catégories Lecture et mesures et Particularités des colis.</small></label>
+            <label><span>Jaune jusqu’à (%)</span><InputNumber @bind-Value="_model.OperatorKpis.RateYellowThrough" min="0" max="100" step="0.1" /><small>Rouge au-dessus. Sans données : gris. Enregistrer et redémarrer pour appliquer.</small></label>
+        </div>
+    </section>
 
     <section class="config-section">
         <div class="config-section-title"><div><span class="eyebrow">GÉNÉRAL</span><h2>Configuration globale</h2></div></div>

@@ -13,7 +13,15 @@
 .supervision-conveyor-controls .btn{padding:.4rem .6rem;font-size:.7rem;white-space:nowrap}
 .supervision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .supervision-line{min-width:0}
-.operator-kpis{container-type:inline-size;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;padding:.85rem;border-bottom:1px solid var(--line)}
+.operator-kpis{container-type:inline-size;display:grid;gap:.25rem;padding:.35rem .6rem .5rem;border-bottom:1px solid var(--line)}
+.kpi-category{min-width:0;margin:0;padding:.2rem .35rem .35rem;border:1px solid #50595e;border-radius:7px}
+.kpi-category legend{float:none;width:auto;margin:0 0 0 .3rem;padding:0 .4rem;color:#cbd0d3;font-size:.65rem;font-weight:700;line-height:1.2;letter-spacing:.04em;text-transform:uppercase}
+.kpi-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem}
+.modern-line .kpi-category{background:#1b2226}
+.modern-line ::deep .parcel-measures{border:0;background:transparent;padding:.4rem 0}
+.modern-line ::deep .measure-weight strong{color:#50d98b}
+.modern-line ::deep .measure-weight small{color:#b8bfc4}
+.modern-line ::deep .measure-dimensions{border-left:0}
 .kpi-style-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.8rem;cursor:pointer;white-space:nowrap}
 .kpi-style-toggle input{appearance:none;position:relative;width:2.5rem;height:1.4rem;border:1px solid #50647a;border-radius:2rem;background:#24303d;cursor:pointer;transition:background .15s}
 .kpi-style-toggle input::after{content:"";position:absolute;top:3px;left:3px;width:.9rem;height:.9rem;border-radius:50%;background:#fff;transition:transform .15s}

@@ -91,6 +91,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
 
     private static void Validate(ConveyorOptions options)
     {
+        if (options.OperatorKpis.ValidationError() is { } kpiError)
+            throw new InvalidOperationException(kpiError);
         if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
         if (options.RslinxRestart.ValidationError() is { } rslinxError) throw new InvalidOperationException(rslinxError);
         if (options.Statistics.ValidationError(options.GetConfiguredLines()) is { } statisticsError)

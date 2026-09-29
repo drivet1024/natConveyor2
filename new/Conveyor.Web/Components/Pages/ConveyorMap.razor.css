@@ -18,3 +18,15 @@
 @media(max-width:768px){.map-page{height:calc(100dvh - 3rem)}}
 @media(max-width:700px){.map-header{align-items:flex-start;flex-direction:column}.map-toolbar{gap:.75rem}}
 .map-page{height:calc(100dvh - 4rem);display:flex;flex-direction:column;min-width:0}
+.map-page{min-height:0}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:768px) {
+    .map-page{height:calc(100dvh - .7rem)}
+    .map-header{flex-direction:row;align-items:center;margin-bottom:.3rem;padding-bottom:.3rem;gap:.5rem}
+    .map-header .eyebrow{display:none}
+    .map-header h1{font-size:1rem;margin:0}
+    .map-status{padding:.2rem .4rem;font-size:.65rem}
+    .map-toolbar{padding:.25rem .5rem;gap:.4rem}
+    .map-legend,.map-shift small,.map-note{display:none}
+    .map-shift{font-size:.7rem}
+    .map-shift select{padding:.2rem .4rem}
+}

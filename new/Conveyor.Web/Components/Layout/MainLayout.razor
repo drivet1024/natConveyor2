@@ -1,6 +1,9 @@
 @inherits LayoutComponentBase
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject UserPresenceCircuit Presence
+@inject NavigationManager Navigation
+@inject IConveyorSupervisor Supervisor
 
 <div class="page">
     <div class="sidebar @(_menuCollapsed ? "sidebar-collapsed" : "")">
@@ -19,6 +22,33 @@
     private static string SoftwareVersion => "ver " + (System.Reflection.CustomAttributeExtensions
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainLayout).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
     private bool _menuCollapsed = true;
+    private IJSObjectReference? _orientation;
+    private DotNetObjectReference<MainLayout>? _orientationReference;
+    private string? _automaticPlan;
+    private bool _disposed;
+    private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        if (_automaticPlan is not null && CurrentPath != _automaticPlan) _automaticPlan = null;
+    }
+    [JSInvokable]
+    public Task SetPhoneLandscape(bool landscape) => InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        if (landscape && CurrentPath == "")
+        {
+            var plan = Supervisor.ConveyorId switch { 1 => "plan-convoyeur", 2 => "plan-convoyeur-sol", _ => null };
+            if (plan is null) return;
+            _automaticPlan = plan;
+            Navigation.NavigateTo(plan, replace: true);
+        }
+        else if (!landscape && _automaticPlan is not null && CurrentPath == _automaticPlan)
+        {
+            _automaticPlan = null;
+            Navigation.NavigateTo("", replace: true);
+        }
+    });
     private void ToggleMenu() => _menuCollapsed = !_menuCollapsed;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -27,8 +57,26 @@
         {
             await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./user-presence.js");
             Presence.Identify(await module.InvokeAsync<string>("browserId"));
+            await using var orientationModule = await JS.InvokeAsync<IJSObjectReference>("import", "./phone-orientation.js");
+            _orientationReference = DotNetObjectReference.Create(this);
+            _orientation = await orientationModule.InvokeAsync<IJSObjectReference>("watch", _orientationReference);
         }
         catch (JSDisconnectedException) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Navigation.LocationChanged -= OnLocationChanged;
+        try
+        {
+            if (_orientation is not null)
+            {
+                await _orientation.InvokeVoidAsync("dispose");
+                await _orientation.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        finally { _orientationReference?.Dispose(); }
     }
 }
 
