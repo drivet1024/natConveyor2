@@ -29,8 +29,8 @@ public sealed class MaintenanceTests
             Assert.Equal(1, state.ProductionCounters.DatabaseInserts);
             Assert.Equal(0, state.MaintenanceCounters!.DatabaseInserts);
             await controller.SimulateAsync("12345678901", new(12, 8, 5), 4);
-            Assert.Equal(0, controller.Snapshot().MaintenanceCounters!.DatabaseInserts);
-            Assert.Equal(1, repository.SavedScans);
+            Assert.Equal(1, controller.Snapshot().MaintenanceCounters!.DatabaseInserts);
+            Assert.Equal(2, repository.SavedScans);
             controller.SetMaintenance(false);
             Assert.Equal(1, controller.Snapshot().Counters.TotalParcels);
             controller.ResetCounters();

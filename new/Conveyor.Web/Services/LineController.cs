@@ -494,16 +494,15 @@ internal sealed class LineController
                     if (routingReason == "Plusieurs expéditions détectées") parcelCounters.RecordMultipleBarcodes(parcel);
                 }
             }
-            if (!parcelMaintenance)
-            {
-                stage = "insertion MySQL du scan";
-                await _repository.SaveScanAsync(_options.Id, _options.DatabaseLineId, parcel, decision, token);
-            }
+            stage = parcelMaintenance
+                ? "insertion MySQL du scan en maintenance"
+                : "insertion MySQL du scan";
+            await _repository.SaveScanAsync(_options.Id, _options.DatabaseLineId, parcel, decision, token);
             lock (_gate)
             {
                 _lastDecision = decision;
                 _lastError = null;
-                if (!parcelMaintenance) parcelCounters.DatabaseInserts++;
+                parcelCounters.DatabaseInserts++;
                 if (decision.Chute == 98) parcelCounters.Code98++;
                 if (!isNoRead && routingReason != "Plusieurs expéditions détectées")
                 {
