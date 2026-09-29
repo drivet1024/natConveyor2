@@ -1,3 +1,5 @@
+@inject IConveyorSupervisor Supervisor
+
 <div class="navigation @(Collapsed ? "collapsed" : "")">
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -27,17 +29,23 @@
             </NavLink>
         </div>
 
+        @if (Supervisor.ConveyorId == 1)
+        {
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="plan-convoyeur" title="Plan du convoyeur — St-Hubert, haut" aria-label="Plan du convoyeur — St-Hubert, haut">
                 <span class="bi bi-conveyor-track-nav-menu" aria-hidden="true"></span><span class="nav-label">Convoyeur du haut</span>
             </NavLink>
         </div>
 
+        }
+        @if (Supervisor.ConveyorId == 2)
+        {
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="plan-convoyeur-sol" title="Plan du convoyeur — St-Hubert, sol" aria-label="Plan du convoyeur — St-Hubert, sol">
                 <span class="bi bi-conveyor-track-nav-menu" aria-hidden="true"></span><span class="nav-label">Convoyeur au sol</span>
             </NavLink>
         </div>
+        }
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="logs" title="Journaux" aria-label="Journaux">

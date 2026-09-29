@@ -14,7 +14,6 @@
 
 <section class="map-panel" aria-label="Schéma du convoyeur au sol de St-Hubert">
     <div class="map-toolbar">
-        <a class="btn" href="plan-convoyeur">Voir le convoyeur du haut</a>
         <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
         <label class="map-shift">Shift d’affichage
             <select @bind:get="_displayShift" @bind:set="ChangeDisplayShift" disabled="@(_shifts.Count == 0)" title="Consulter les destinations sans modifier le shift du tri">
