@@ -71,6 +71,7 @@ internal sealed class LineController
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
     private PlcDispatch? _lastPlcDispatch;
+    private ParcelContext? _lastDispatchedParcel;
     private readonly Queue<PlcDispatch> _recentPlcDispatches = new();
     private readonly ChuteTrafficWindow _chuteTraffic = new();
     private long _dispatchSequence;
@@ -80,10 +81,11 @@ internal sealed class LineController
 
     private void RecordReception(string device, string frame)
     {
+        DeviceReception input;
         lock (_gate)
         {
             var previous = device switch { "camera" => _cameraInput, "dimension" => _dimensionInput, _ => _scaleInput };
-            var input = new DeviceReception(frame.Length > 4096 ? frame[..4096] : frame,
+            input = new DeviceReception(frame.Length > 4096 ? frame[..4096] : frame,
                 DateTimeOffset.Now, (previous?.Sequence ?? 0) + 1, frame.Length > 4096);
             switch (device)
             {
@@ -92,6 +94,9 @@ internal sealed class LineController
                 default: _scaleInput = input; break;
             }
         }
+        if (device == "camera")
+            _logger.LogInformation("TRACE CAMÉRA — ligne {Line}: caméra=[{CameraData}] reçue à {CameraAt}, séquence={CameraSequence}",
+                _options.Id + 1, FormatFrame(frame), FormatTimestamp(input.ReceivedAt), input.Sequence);
         _changed();
     }
     private LineCounters _productionCounters = new();
@@ -280,6 +285,7 @@ internal sealed class LineController
             _dimensionInput = null;
             _scaleInput = null;
             _lastPlcDispatch = null;
+            _lastDispatchedParcel = null;
             _recentPlcDispatches.Clear();
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
@@ -291,10 +297,25 @@ internal sealed class LineController
     }
     public void RecordPlcTransferReception(string value)
     {
+        DeviceReception reception;
+        PlcDispatch? dispatch;
+        ParcelContext? parcel;
         lock (_gate)
         {
-            _plcTransferInput = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
+            reception = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
+            _plcTransferInput = reception;
+            dispatch = _lastPlcDispatch;
+            parcel = _lastDispatchedParcel;
         }
+        _logger.LogInformation(
+            "TRACE TRANSFERT — ligne {Line}: {TransferTag}=[{TransferValue}] reçu à {TransferAt}, séquence={TransferSequence}; " +
+            "dernier envoi connu: colis #{ParcelId}, caméra=[{CameraData}] reçue à {CameraAt}, " +
+            "{ChuteTag}={Chute} envoyé à {SentAt}; délai envoi-transfert={ElapsedMs} ms; " +
+            "association indicative: le tag TRANSFERT ne contient pas d'identifiant colis",
+            _options.Id + 1, _options.Plc.TransferTag, FormatFrame(value), FormatTimestamp(reception.ReceivedAt), reception.Sequence,
+            parcel?.ParcelId, parcel is null ? "absente" : FormatFrame(parcel.CameraData), FormatTimestamp(parcel?.CameraTimestamp),
+            _options.Plc.ChuteTag, dispatch?.Chute, FormatTimestamp(dispatch?.SentAt),
+            dispatch is null ? (long?)null : (long)(reception.ReceivedAt - dispatch.SentAt).TotalMilliseconds);
         _changed();
     }
 
@@ -621,6 +642,7 @@ internal sealed class LineController
                 Math.Max(0, (long)(sentAt - parcel.CameraTimestamp).TotalMilliseconds),
                 ++_dispatchSequence)
             { ParcelKey = $"{parcel.CameraTimestamp.UtcTicks}:{parcel.ParcelId}" };
+            _lastDispatchedParcel = parcel;
             _recentPlcDispatches.Enqueue(_lastPlcDispatch);
             _chuteTraffic.Add(_lastPlcDispatch);
             while (_recentPlcDispatches.Count > 256) _recentPlcDispatches.Dequeue();

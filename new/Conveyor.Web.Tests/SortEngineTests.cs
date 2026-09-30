@@ -637,6 +637,12 @@ public sealed class SortEngineTests
             var sentAt = controller.Snapshot().LastPlcDispatch!.SentAt.ToLocalTime()
                 .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture);
             Assert.Contains($"envoi automate confirmé à {sentAt}", message, StringComparison.Ordinal);
+            controller.RecordPlcTransferReception("4");
+            var transfer = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            Assert.Contains("TRANSFER_TEST=[4]", transfer, StringComparison.Ordinal);
+            Assert.Contains("colis #1, caméra=[12345678901]", transfer, StringComparison.Ordinal);
+            Assert.Contains($"envoyé à {sentAt}", transfer, StringComparison.Ordinal);
+            Assert.Contains("association indicative", transfer, StringComparison.Ordinal);
         }
         finally { await controller.StopAsync(); }
     }
