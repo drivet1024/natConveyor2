@@ -101,9 +101,6 @@ public sealed class GeneralOptions
     public string? StopAndGoValidationError()
     {
         var chuteConfigured = !string.IsNullOrWhiteSpace(Chute4FullTag);
-        var outputConfigured = !string.IsNullOrWhiteSpace(StopAndGoTag);
-        if (chuteConfigured != outputConfigured)
-            return "Les tags chute 4 pleine et STOP_AND_GO doivent être configurés ensemble.";
         if (chuteConfigured && string.Equals(Chute4FullTag.Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase))
             return "Les tags chute 4 pleine et STOP_AND_GO doivent être différents.";
         if (StopAndGoDelaySeconds is < 1 or > 3_600)

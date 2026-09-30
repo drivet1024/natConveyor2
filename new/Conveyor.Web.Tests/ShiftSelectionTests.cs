@@ -144,14 +144,37 @@ public sealed class ShiftSelectionTests
     }
 
     [Theory]
-    [InlineData("FULL", "", 5)]
-    [InlineData("", "STOP", 5)]
     [InlineData("SAME", "same", 5)]
     [InlineData("FULL", "STOP", 0)]
     public void StopAndGoSettingsRejectIncompleteOrUnsafeValues(string input, string output, int delay)
     {
         var settings = new GeneralOptions { Chute4FullTag = input, StopAndGoTag = output, StopAndGoDelaySeconds = delay };
         Assert.NotNull(settings.StopAndGoValidationError());
+    }
+
+    [Fact]
+    public void FullChuteAlarmsTrackConfiguredTagsIndependently()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(1, "FULL_1");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.SetFullChuteTag(2, " ");
+        options.General.SetFullChuteTag(4, "FULL_4");
+        Assert.Null(options.General.StopAndGoValidationError());
+        using var supervisor = CreateSupervisor(options);
+        supervisor.RecordPlcTagChange("", "1");
+        supervisor.RecordPlcTagChange("UNKNOWN", "1");
+        Assert.Empty(supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_1", "1");
+        supervisor.RecordPlcTagChange("FULL_48", "1");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(new[] { 1, 4, 48 }, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_1", "0");
+        supervisor.RecordPlcTagChange("FULL_48", "invalid");
+        Assert.Equal(new[] { 4, 48 }, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_48", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
     }
 
     private static ConveyorOptions CreateOptions(int depot)

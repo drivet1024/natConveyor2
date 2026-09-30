@@ -26,6 +26,16 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly string _fullChutesTag;
     private readonly string _code42Tag;
     private readonly string _chute4FullTag;
+    private readonly Dictionary<int, string> _fullChuteTags;
+    private readonly HashSet<int> _activeFullChutes = new();
+    public IReadOnlyList<int> FullChuteAlarms
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+                return _activeFullChutes.Concat(Chute4AlarmActive ? new[] { 4 } : Array.Empty<int>()).Order().ToArray();
+        }
+    }
     private readonly string _stopAndGoTag;
     private readonly TimeSpan _stopAndGoDelay;
     private readonly object _stopAndGoGate = new();
@@ -128,16 +138,19 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _fullChutesTag = sharedTags.FullChutesTag.Trim();
         _code42Tag = sharedTags.Code42Tag.Trim();
         _chute4FullTag = sharedTags.Chute4FullTag.Trim();
-        _stopAndGoTag = sharedTags.StopAndGoTag.Trim();
+        _fullChuteTags = Enumerable.Range(1, 48).Where(chute => chute != 4)
+            .Select(chute => (Chute: chute, Tag: sharedTags.GetFullChuteTag(chute).Trim()))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Tag)).ToDictionary(item => item.Chute, item => item.Tag);
+        _stopAndGoTag = string.IsNullOrWhiteSpace(_chute4FullTag) ? "" : sharedTags.StopAndGoTag.Trim();
         _stopAndGoDelay = TimeSpan.FromSeconds(Math.Clamp(sharedTags.StopAndGoDelaySeconds, 1, 3_600));
         PlcConfiguration.Validate(primaryLine.Plc);
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
-            .Append(_chute4FullTag).Append(_stopAndGoTag)
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
-            .Append(_chute4FullTag).Append(_stopAndGoTag)
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = plcGateway ?? (configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
@@ -165,6 +178,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     internal void RecordPlcTagChange(string tag, string value)
     {
         var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        if (binaryState.HasValue)
+        {
+            var changed = false;
+            lock (_stopAndGoGate)
+                foreach (var chute in _fullChuteTags.Where(pair => string.Equals(pair.Value, tag, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Key))
+                    changed |= binaryState.Value ? _activeFullChutes.Add(chute) : _activeFullChutes.Remove(chute);
+            if (changed) Changed?.Invoke();
+        }
         if (!string.IsNullOrWhiteSpace(_chute4FullTag) &&
             string.Equals(tag, _chute4FullTag, StringComparison.OrdinalIgnoreCase))
         {
@@ -246,7 +267,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var sameInput = _chute4FullState == state;
             _chute4FullState = state;
             alarmChanged = UpdateChute4AlarmLocked();
-            if (!(sameInput && _stopAndGoPending is not null))
+            if (!string.IsNullOrWhiteSpace(_stopAndGoTag) && !(sameInput && _stopAndGoPending is not null))
             {
                 _stopAndGoPending?.Cancel();
                 if (_stopAndGoState == state)
@@ -267,7 +288,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         // L'alarme s'ouvre immédiatement sur le signal d'entrée. Une fois ouverte,
         // elle reste verrouillée jusqu'au retour OPC confirmé des deux tags à zéro.
         var active = Chute4AlarmActive
-            ? _chute4FullState != false || _stopAndGoState != false
+            ? _chute4FullState != false || (!string.IsNullOrWhiteSpace(_stopAndGoTag) && _stopAndGoState != false)
             : _chute4FullState == true;
         if (active == Chute4AlarmActive) return false;
         Chute4AlarmActive = active;
