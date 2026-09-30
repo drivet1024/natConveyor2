@@ -307,15 +307,17 @@ internal sealed class LineController
             dispatch = _lastPlcDispatch;
             parcel = _lastDispatchedParcel;
         }
-        _logger.LogInformation(
-            "TRACE TRANSFERT — ligne {Line}: {TransferTag}=[{TransferValue}] reçu à {TransferAt}, séquence={TransferSequence}; " +
-            "dernier envoi connu: colis #{ParcelId}, caméra=[{CameraData}] reçue à {CameraAt}, " +
-            "{ChuteTag}={Chute} envoyé à {SentAt}; délai envoi-transfert={ElapsedMs} ms; " +
-            "association indicative: le tag TRANSFERT ne contient pas d'identifiant colis",
-            _options.Id + 1, _options.Plc.TransferTag, FormatFrame(value), FormatTimestamp(reception.ReceivedAt), reception.Sequence,
-            parcel?.ParcelId, parcel is null ? "absente" : FormatFrame(parcel.CameraData), FormatTimestamp(parcel?.CameraTimestamp),
-            _options.Plc.ChuteTag, dispatch?.Chute, FormatTimestamp(dispatch?.SentAt),
-            dispatch is null ? (long?)null : (long)(reception.ReceivedAt - dispatch.SentAt).TotalMilliseconds);
+        if (IsCode68(value))
+            _logger.LogInformation(
+                "TRACE TRANSFERT — dimensions={Dimensions}; ligne {Line}, dernier colis envoyé #{ParcelId}; " +
+                "caméra=[{CameraData}] reçue à {CameraAt}; caméra → envoi automate={CameraToSendMs} ms; " +
+                "envoi automate → transfert={SendToTransferMs} ms; {TransferTag}=68 reçu à {TransferAt}; association indicative",
+                parcel is null ? "absentes" : FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp),
+                _options.Id + 1, parcel?.ParcelId,
+                parcel is null ? "absente" : FormatFrame(parcel.CameraData), FormatTime(parcel?.CameraTimestamp),
+                dispatch is null || parcel is null ? (long?)null : (long)(dispatch.SentAt - parcel.CameraTimestamp).TotalMilliseconds,
+                dispatch is null ? (long?)null : (long)(reception.ReceivedAt - dispatch.SentAt).TotalMilliseconds,
+                _options.Plc.TransferTag, FormatTime(reception.ReceivedAt));
         _changed();
     }
 
@@ -661,6 +663,9 @@ internal sealed class LineController
 
     private static string FormatTimestamp(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
         .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
+
+    private static string FormatTime(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
+        .ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
 
     private static string FormatFrame(string value) => value.Replace("\r", "<CR>", StringComparison.Ordinal)
         .Replace("\n", "<LF>", StringComparison.Ordinal).Replace("\0", "<NUL>", StringComparison.Ordinal);

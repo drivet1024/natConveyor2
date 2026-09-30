@@ -638,10 +638,16 @@ public sealed class SortEngineTests
                 .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture);
             Assert.Contains($"envoi automate confirmé à {sentAt}", message, StringComparison.Ordinal);
             controller.RecordPlcTransferReception("4");
+            var traceCount = logger.Messages.Count(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            Assert.Equal(1, traceCount); // Only the initial 68; no trace for 4.
+            controller.RecordPlcTransferReception(" 68\0");
             var transfer = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
-            Assert.Contains("TRANSFER_TEST=[4]", transfer, StringComparison.Ordinal);
-            Assert.Contains("colis #1, caméra=[12345678901]", transfer, StringComparison.Ordinal);
-            Assert.Contains($"envoyé à {sentAt}", transfer, StringComparison.Ordinal);
+            Assert.Contains("TRACE TRANSFERT — dimensions=12 x 8 x 5", transfer, StringComparison.Ordinal);
+            Assert.Contains("TRANSFER_TEST=68", transfer, StringComparison.Ordinal);
+            Assert.Contains("caméra=[12345678901]", transfer, StringComparison.Ordinal);
+            Assert.Contains("caméra → envoi automate=", transfer, StringComparison.Ordinal);
+            Assert.Contains("envoi automate → transfert=", transfer, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentAt, transfer, StringComparison.Ordinal);
             Assert.Contains("association indicative", transfer, StringComparison.Ordinal);
         }
         finally { await controller.StopAsync(); }
