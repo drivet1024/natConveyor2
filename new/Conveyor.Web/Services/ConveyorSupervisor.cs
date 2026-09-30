@@ -19,6 +19,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly ISmsAlerts? _sms;
     private readonly CounterStatisticsService? _statistics;
     private readonly bool _coordinateStatistics;
+    public bool CountersReady => !_coordinateStatistics || _statistics!.Initialized;
     private readonly IRslinxRestarter? _rslinxRestarter;
     private readonly string _closeChute39Tag;
     private readonly string _motionTag;

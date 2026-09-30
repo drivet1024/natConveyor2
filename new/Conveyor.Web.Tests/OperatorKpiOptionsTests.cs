@@ -5,6 +5,33 @@ namespace Conveyor.Web.Tests;
 public class OperatorKpiOptionsTests
 {
     [Theory]
+    [InlineData(2000, 3000, true)]
+    [InlineData(0, 1000, true)]
+    [InlineData(-1, 3000, false)]
+    [InlineData(3000, 3000, false)]
+    [InlineData(4000, 3000, false)]
+    public void ChartThresholdsRequireNonNegativeAndOrderedValues(decimal yellow, decimal green, bool valid)
+    {
+        var options = new OperatorKpiOptions { ChartCadenceYellowFrom = yellow, ChartCadenceGreenAbove = green };
+        Assert.Equal(valid, options.ValidationError() is null);
+    }
+
+    [Fact]
+    public void ChartThresholdsSurviveSerializationAndOldSettingsKeepDefaults()
+    {
+        var defaults = System.Text.Json.JsonSerializer.Deserialize<OperatorKpiOptions>("{}")!;
+        Assert.Equal(2000m, defaults.ChartCadenceYellowFrom);
+        Assert.Equal(3000m, defaults.ChartCadenceGreenAbove);
+        defaults.ChartCadenceYellowFrom = 2500;
+        defaults.ChartCadenceGreenAbove = 4500;
+        var restored = System.Text.Json.JsonSerializer.Deserialize<OperatorKpiOptions>(System.Text.Json.JsonSerializer.Serialize(defaults))!;
+        Assert.Equal(2500m, restored.ChartCadenceYellowFrom);
+        Assert.Equal(4500m, restored.ChartCadenceGreenAbove);
+        Assert.Equal(1000m, restored.CadenceRedThrough);
+        Assert.Equal(1500m, restored.CadenceGreenAbove);
+    }
+
+    [Theory]
     [InlineData(0, "critical")]
     [InlineData(1000, "critical")]
     [InlineData(1000.1, "warning")]

@@ -63,6 +63,7 @@ public interface IPlcReadback
 
 public interface IConveyorSupervisor
 {
+    bool CountersReady => true;
     event Action? Changed;
     IReadOnlyList<LineSnapshot> GetSnapshots();
     int CurrentShiftId { get; }

@@ -1,5 +1,22 @@
 # Conveyor Control
 
+## Historique de cadence
+
+La cadence globale de production est calculée sur des intervalles de dix minutes,
+en colis par heure. La collecte attend la restauration des compteurs : les totaux
+restaurés servent uniquement de point de départ. Après chaque redémarrage, un nouvel
+intervalle complet est nécessaire avant de produire un nouveau point.
+
+Les points terminés des dernières 24 heures sont enregistrés dans
+`%LOCALAPPDATA%/Conveyor.Web/<identifiant de l’installation>/cadence-history.json`,
+sous le compte exécutant l’application, puis rechargés au démarrage. L’identifiant
+dépend du chemin d’installation. Conserver ce dossier et le même compte pour
+retrouver l’historique. L’écriture remplace le fichier après création d’un fichier
+temporaire ; les erreurs sont journalisées et réessayées toutes les cinq secondes.
+Les intervalles incomplets et les périodes d’arrêt de l’application ne sont pas
+reconstitués. Le graphique laisse une coupure entre les points espacés de plus de
+onze minutes. Les anciens points perdus avant cette sauvegarde ne sont pas récupérables.
+
 ## Redémarrage RSLinx depuis AUTOMATE
 
 Le déploiement GitHub propose l'architecture `win-x86` par défaut pour utiliser

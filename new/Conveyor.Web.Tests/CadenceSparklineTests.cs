@@ -4,6 +4,18 @@ namespace Conveyor.Web.Tests;
 
 public sealed class CadenceSparklineTests
 {
+    [Fact]
+    public void GraphDoesNotConnectPointsAcrossMissingIntervals()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var segments = CadenceSparkline.Segments([
+            new(now, 3000), new(now.AddMinutes(10), 2000),
+            new(now.AddMinutes(40), 2500)]).ToArray();
+        Assert.Equal(2, segments.Length);
+        Assert.Equal(2, segments[0].Count);
+        Assert.Single(segments[1]);
+    }
+
     [Theory]
     [InlineData(0, 28)]
     [InlineData(3, 28)]

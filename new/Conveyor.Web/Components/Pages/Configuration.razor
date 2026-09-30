@@ -46,6 +46,13 @@ else
     <DataAnnotationsValidator />
     <ValidationSummary />
     <section class="config-section">
+        <div class="config-section-title"><h2>Graphique de cadence — total des lignes</h2></div>
+        <div class="config-grid">
+            <label><span>Jaune à partir de (colis/h)</span><InputNumber @bind-Value="_model.OperatorKpis.ChartCadenceYellowFrom" min="0" step="1" /><small>Rouge en dessous. Valeur par défaut : 2 000.</small></label>
+            <label><span>Vert au-dessus de (colis/h)</span><InputNumber @bind-Value="_model.OperatorKpis.ChartCadenceGreenAbove" min="0" step="1" /><small>Jaune jusqu’à cette limite incluse. Valeur par défaut : 3 000. Enregistrer et redémarrer pour appliquer.</small></label>
+        </div>
+    </section>
+    <section class="config-section">
         <div class="config-section-title"><h2>Couleurs des KPI opérateur</h2></div>
         <div class="config-grid">
             <label><span>Cadence rouge jusqu’à (colis/h)</span><InputNumber @bind-Value="_model.OperatorKpis.CadenceRedThrough" min="0" step="1" /><small>Rouge à ce seuil ou en dessous.</small></label>
