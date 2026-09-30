@@ -19,3 +19,16 @@
 @media(min-width:1600px){.principal-kpis ::deep .kpi-value{font-size:clamp(3rem,8cqi,8rem)}}
 @media(max-width:1050px){.principal-lines{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:550px){.principal-heading{align-items:flex-start;flex-direction:column}.principal-kpis{gap:.5rem;padding:.5rem}.principal-kpis ::deep .operator-kpi{min-height:190px}.principal-kpis ::deep .kpi-value{font-size:clamp(1.8rem,8cqi,3rem)}.principal-line-heading{padding:1rem}}
+
+.principal-last-parcel{grid-column:1/-1;min-width:0;min-height:clamp(210px,30vh,340px);display:flex;background:#ffffff03;border:1px solid var(--line);border-radius:9px}
+.principal-last-parcel ::deep .parcel-panel{width:100%;box-sizing:border-box;border-bottom:0;padding:1.5rem;align-content:center;grid-template-columns:minmax(0,1fr) auto;column-gap:1.5rem}
+.principal-last-parcel ::deep .parcel-heading{font-size:clamp(.75rem,1.4cqi,1.1rem);flex-wrap:wrap}
+.principal-last-parcel ::deep .barcode-value{font-size:clamp(1.7rem,4.8cqi,4rem)}
+.principal-last-parcel ::deep .read-status{font-size:clamp(.7rem,1.3cqi,1rem)}
+.principal-last-parcel ::deep .parcel-right{align-items:center;gap:1rem}
+.principal-last-parcel ::deep .parcel-measures{font-size:clamp(1.2rem,2.8cqi,2.5rem);min-height:100px;flex-wrap:wrap}
+.principal-last-parcel ::deep .measure-caption,.principal-last-parcel ::deep .chute-block small{font-size:clamp(.7rem,1.2cqi,1rem)}
+.principal-last-parcel ::deep .chute-block strong{min-width:100px;height:100px;font-size:clamp(2.5rem,4.5cqi,4rem)}
+.principal-last-parcel ::deep .parcel-details{display:none}
+.principal-last-parcel ::deep .decision-empty{font-size:clamp(1.2rem,3cqi,2rem)}
+@container(max-width:800px){.principal-last-parcel ::deep .parcel-panel{grid-template-columns:minmax(0,1fr);gap:1rem}.principal-last-parcel ::deep .parcel-heading,.principal-last-parcel ::deep .barcode-block,.principal-last-parcel ::deep .parcel-right{grid-column:1}.principal-last-parcel ::deep .parcel-right{grid-row:3;margin:0;justify-content:space-between;width:100%}.principal-last-parcel ::deep .measure-block{text-align:left;min-width:0}.principal-last-parcel ::deep .parcel-measures{justify-content:flex-start;white-space:normal}.principal-last-parcel ::deep .measure-dimensions{white-space:normal}.principal-last-parcel ::deep .chute-block strong{min-width:72px;height:80px}.principal-last-parcel ::deep .parcel-measures{min-height:80px}}

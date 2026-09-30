@@ -24,13 +24,18 @@ else
             <article class="principal-line" @key="line.LineId" aria-label="@($"Ligne {line.LineId + 1}")">
                 <header class="principal-line-heading">
                     <h2>LIGNE @(line.LineId + 1)</h2>
-                    <span class="mode @(line.Maintenance ? "maintenance" : null)">@(line.Maintenance ? "MAINTENANCE" : "PRODUCTION")</span>
+                    <span class="mode @(line.Maintenance ? "maintenance" : null)">@(line.Maintenance ? "MAINTENANCE" : "EN MARCHE")</span>
                 </header>
                 <div class="principal-kpis">
                     <OperatorKpi Label="Colis convoyés" Value="@counters.TotalParcels.ToString("N0")" Help="Total des colis reçus par la caméra" />
                     <OperatorKpi Label="Triés sans problème" Value="@Percent(counters.SortedWithoutIssue, counters.TotalParcels)" Unit="@($"{counters.SortedWithoutIssue:N0} colis")" Tone="@Thresholds.SortedTone(counters.SortedWithoutIssue, counters.TotalParcels)" Icon="check" Help="Colis triés sans problème ÷ total des colis × 100" />
                     <OperatorKpi Label="Cadence" Value="@(counters.ParcelsPerHour?.ToString("N0") ?? "—")" Unit="colis/heure" Tone="@Thresholds.CadenceTone(counters.ParcelsPerHour)" Icon="speed" Help="Total convoyé ÷ temps de marche cumulé en heures" />
                     <OperatorKpi Label="Sans lecture" Value="@Percent(counters.NoReads, counters.TotalParcels)" Unit="@($"{counters.NoReads:N0} colis")" Tone="@Thresholds.RateTone(counters.NoReads, counters.TotalParcels)" Icon="alert" Help="Colis sans lecture ÷ total des colis × 100" />
+                    <div class="principal-last-parcel">
+                        <LastDecision Decision="line.LastDecision">
+                            <HeadingContent><LineIdleTime LastParcelAt="line.LastParcelReceivedAt" /></HeadingContent>
+                        </LastDecision>
+                    </div>
                 </div>
             </article>
         }
