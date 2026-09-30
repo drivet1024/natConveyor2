@@ -1,14 +1,13 @@
 @using System.Globalization
 
 <div class="cadence-chart">
-    <div class="chart-heading"><strong>Cadence · 10 min</strong><span>colis/h · total des lignes</span></div>
-    @if (Points.Count == 0)
+    <div class="chart-heading"><strong>Cadence horaire</strong><span>colis/h · total des lignes</span></div>
+    <small>Calculée toutes les 10 min · volume de l’intervalle ramené à une heure</small>
+    @if (_visiblePoints.Count == 0)
     {
-        <p>Premier point après 10 minutes de collecte.</p>
+        <p>Aucune cadence disponible pour cette période. Un point est calculé toutes les 10 minutes.</p>
     }
-    else
-    {
-        <svg viewBox="0 0 480 100" role="img" aria-label="Cadence moyenne par intervalle de dix minutes">
+        <svg viewBox="0 0 480 100" role="img" aria-label="Cadence en colis par heure, de 16 h à 3 h le lendemain, calculée toutes les dix minutes">
             <defs>
                 <linearGradient id="@_gradientId" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="8" y2="78">
                     <stop offset="0" stop-color="#50d98b" />
@@ -21,29 +20,47 @@
             </defs>
             @foreach (var threshold in new[] { 0, 2000, 3000 })
             {
-                <line x1="38" x2="470" y1="@F(Y(threshold))" y2="@F(Y(threshold))" class="grid-line" />
+                @if (threshold > 0)
+                {
+                    <line x1="38" x2="470" y1="@F(Y(threshold))" y2="@F(Y(threshold))" class="grid-line" />
+                }
                 <g><text x="32" y="@F(Y(threshold) + 3)" text-anchor="end">@threshold</text></g>
             }
-            <polyline points="@string.Join(" ", Points.Select(p => $"{F(X(p.At))},{F(Y(p.ParcelsPerHour))}"))" fill="none" stroke="@($"url(#{_gradientId})")" stroke-width="2" stroke-linejoin="round" />
-            @foreach (var point in Points)
+            <line x1="38" x2="470" y1="78" y2="78" class="grid-line" />
+            @for (var hour = 0; hour <= 11; hour++)
+            {
+                var x = F(38 + 432d * hour / 11);
+                <line x1="@x" x2="@x" y1="78" y2="82" class="grid-line" />
+                <g><text x="@x" y="96" text-anchor="@(hour == 0 ? "start" : hour == 11 ? "end" : "middle")">@_windowStart.AddHours(hour).ToString("HH'h'")</text></g>
+            }
+            <polyline points="@string.Join(" ", _visiblePoints.Select(p => $"{F(X(p.At))},{F(Y(p.ParcelsPerHour))}"))" fill="none" stroke="@($"url(#{_gradientId})")" stroke-width="2" stroke-linejoin="round" />
+            @foreach (var point in _visiblePoints)
             {
                 <circle cx="@F(X(point.At))" cy="@F(Y(point.ParcelsPerHour))" r="2.5" fill="@Tone(point.ParcelsPerHour)">
                     <title>@point.At.ToLocalTime().ToString("HH:mm") · @point.ParcelsPerHour.ToString("N0") colis/h</title>
                 </circle>
             }
-            <g><text x="38" y="96">@Points[0].At.ToLocalTime().ToString("HH:mm")</text></g>
-            @if (Points.Count > 1) { <g><text x="470" y="96" text-anchor="end">@Points[^1].At.ToLocalTime().ToString("HH:mm")</text></g> }
         </svg>
-    }
     <small>Vert &gt; 3 000 · jaune 2 000–3 000 · rouge &lt; 2 000</small>
 </div>
 
 @code {
     [Parameter] public IReadOnlyList<CadencePoint> Points { get; set; } = [];
     private readonly string _gradientId = "cadence-" + Guid.NewGuid().ToString("N");
-    private double Maximum => Math.Max(3500, Points.Max(p => p.ParcelsPerHour) * 1.1);
+    private DateTime _windowStart;
+    private IReadOnlyList<CadencePoint> _visiblePoints = [];
+    protected override void OnParametersSet()
+    {
+        _windowStart = WindowStart(DateTime.Now);
+        _visiblePoints = Points.Where(p => p.At.LocalDateTime >= _windowStart && p.At.LocalDateTime <= _windowStart.AddHours(11))
+            .OrderBy(p => p.At).ToArray();
+    }
+    internal static DateTime WindowStart(DateTime localNow) =>
+        (localNow.Hour < 16 ? localNow.Date.AddDays(-1) : localNow.Date).AddHours(16);
+    internal static double Position(DateTime localAt, DateTime start) => 38 + 432 * (localAt - start).TotalHours / 11;
+    private double Maximum => Math.Max(3500, _visiblePoints.Select(p => p.ParcelsPerHour).DefaultIfEmpty(0).Max() * 1.1);
     private double Y(double rate) => 78 - 70 * rate / Maximum;
-    private double X(DateTimeOffset at) => Points.Count < 2 ? 38 : 38 + 432 * (at - Points[0].At).TotalSeconds / (Points[^1].At - Points[0].At).TotalSeconds;
+    private double X(DateTimeOffset at) => Position(at.LocalDateTime, _windowStart);
     private string Offset(double rate) => F(1 - rate / Maximum);
     private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
     private static string Tone(double rate) => rate > 3000 ? "#50d98b" : rate >= 2000 ? "#ffd15c" : "#ff6c79";

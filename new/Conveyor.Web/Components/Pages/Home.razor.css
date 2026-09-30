@@ -1,5 +1,9 @@
 
 .mobile-only { display: none; }
+.parcel-details-button { display: block; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.parcel-details-button:hover { background: #ffffff08; }
+.parcel-details-button:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; }
+.parcel-details-button > .metric, .parcel-details-button > .mobile-counter { height: 100%; }
 .mobile-counters { display: none; }
 .conveyor-tag-counts { display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .conveyor-tag-counts strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }

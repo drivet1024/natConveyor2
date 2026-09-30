@@ -1,0 +1,21 @@
+.principal-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem}
+.principal-heading h1{margin:.2rem 0;font-size:clamp(1.6rem,3vw,2.5rem)}
+.updated{color:var(--muted);font-size:.85rem;white-space:nowrap}
+.principal-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem}
+.principal-lines.single-line{grid-template-columns:minmax(0,1fr)}
+.principal-line{container-type:inline-size;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.principal-line-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding:1.1rem 1.4rem;border-bottom:1px solid var(--line)}
+.principal-line-heading h2{margin:0;color:var(--orange);font-size:clamp(1.1rem,3cqi,1.75rem);letter-spacing:.08em}
+.mode{color:var(--muted);font-size:.8rem;font-weight:700;letter-spacing:.07em}.mode.maintenance{color:var(--orange)}
+.principal-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:1rem}
+.principal-kpis ::deep .operator-kpi{justify-content:center;min-height:clamp(210px,30vh,340px);padding:1.5rem .6rem;gap:.75rem;background:#ffffff03;border:1px solid var(--line);border-radius:9px}
+.principal-kpis ::deep .kpi-heading{min-height:0;gap:.65rem;font-size:clamp(1rem,3cqi,1.8rem);color:#dce4e9;font-weight:600}
+.principal-kpis ::deep .kpi-heading svg{width:36px;height:36px}
+.principal-kpis ::deep .kpi-value{font-size:clamp(2.5rem,8cqi,6rem);font-weight:800;line-height:1.1}
+.principal-kpis ::deep .kpi-unit{font-size:clamp(1rem,2.8cqi,1.5rem)}
+.principal-kpis ::deep .kpi-rate{font-size:clamp(1.1rem,3.5cqi,2rem);padding:.3rem .5rem}
+.principal-kpis ::deep .kpi-values{gap:.6rem}
+.empty-state{padding:2rem;border:1px solid var(--line);border-radius:12px;color:var(--muted)}
+@media(min-width:1600px){.principal-kpis ::deep .kpi-value{font-size:clamp(3rem,8cqi,8rem)}}
+@media(max-width:1050px){.principal-lines{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:550px){.principal-heading{align-items:flex-start;flex-direction:column}.principal-kpis{gap:.5rem;padding:.5rem}.principal-kpis ::deep .operator-kpi{min-height:190px}.principal-kpis ::deep .kpi-value{font-size:clamp(1.8rem,8cqi,3rem)}.principal-line-heading{padding:1rem}}

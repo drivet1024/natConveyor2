@@ -1,0 +1,75 @@
+@page "/operateur-principal"
+@implements IDisposable
+@using System.Globalization
+@inject IConveyorSupervisor Supervisor
+@inject IOptions<ConveyorOptions> Options
+
+<PageTitle>Opérateur principal</PageTitle>
+
+<header class="principal-heading">
+    <div><span class="eyebrow">TEMPS RÉEL</span><h1>Opérateur principal</h1></div>
+    <span class="updated">Actualisé à @_updatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+</header>
+
+@if (_lines.Count == 0)
+{
+    <p class="empty-state">Aucune ligne disponible.</p>
+}
+else
+{
+    <section class="principal-lines @(_lines.Count == 1 ? "single-line" : null)" aria-label="Indicateurs principaux par ligne">
+        @foreach (var line in _lines)
+        {
+            var counters = line.Counters;
+            <article class="principal-line" @key="line.LineId" aria-label="@($"Ligne {line.LineId + 1}")">
+                <header class="principal-line-heading">
+                    <h2>LIGNE @(line.LineId + 1)</h2>
+                    <span class="mode @(line.Maintenance ? "maintenance" : null)">@(line.Maintenance ? "MAINTENANCE" : "PRODUCTION")</span>
+                </header>
+                <div class="principal-kpis">
+                    <OperatorKpi Label="Colis convoyés" Value="@counters.TotalParcels.ToString("N0")" Help="Total des colis reçus par la caméra" />
+                    <OperatorKpi Label="Triés sans problème" Value="@Percent(counters.SortedWithoutIssue, counters.TotalParcels)" Unit="@($"{counters.SortedWithoutIssue:N0} colis")" Tone="@Thresholds.SortedTone(counters.SortedWithoutIssue, counters.TotalParcels)" Icon="check" Help="Colis triés sans problème ÷ total des colis × 100" />
+                    <OperatorKpi Label="Cadence" Value="@(counters.ParcelsPerHour?.ToString("N0") ?? "—")" Unit="colis/heure" Tone="@Thresholds.CadenceTone(counters.ParcelsPerHour)" Icon="speed" Help="Total convoyé ÷ temps de marche cumulé en heures" />
+                    <OperatorKpi Label="Sans lecture" Value="@counters.NoReads.ToString("N0")" Rate="@Percent(counters.NoReads, counters.TotalParcels)" Tone="@Thresholds.RateTone(counters.NoReads, counters.TotalParcels)" Icon="alert" Help="Colis sans lecture ÷ total des colis × 100" />
+                </div>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<LineSnapshot> _lines = [];
+    private DateTimeOffset _updatedAt;
+    private System.Threading.Timer? _refreshTimer;
+    private bool _disposed;
+    private OperatorKpiOptions Thresholds => Options.Value.OperatorKpis;
+    private static string Percent(long count, long total) =>
+        (total > 0 ? count * 100m / total : 0).ToString("0.#", CultureInfo.GetCultureInfo("fr-CA")) + " %";
+
+    protected override void OnInitialized()
+    {
+        Supervisor.Changed += OnChanged;
+        Refresh();
+        _refreshTimer = new System.Threading.Timer(_ => OnChanged(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void Refresh()
+    {
+        _lines = Supervisor.GetSnapshots();
+        _updatedAt = DateTimeOffset.Now;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        Refresh();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _refreshTimer?.Dispose();
+        Supervisor.Changed -= OnChanged;
+    }
+}

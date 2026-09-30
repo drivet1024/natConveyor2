@@ -9,6 +9,11 @@
 
 <PageTitle>Contrôle des convoyeurs</PageTitle>
 
+@if (_unconfiguredRouteLineId is { } routeLineId && _lines.FirstOrDefault(line => line.LineId == routeLineId) is { } routeLine)
+{
+    <UnconfiguredRoutesModal Line="routeLine" OnClose="() => _unconfiguredRouteLineId = null" />
+}
+
 @if (_database.Parcels == 0 || _database.PostalCodes == 0)
 {
     <DataWaitModal Parcels="_database.Parcels" PostalCodes="_database.PostalCodes" />
@@ -99,7 +104,16 @@
             <div class="mobile-counter-rejections">
                 @foreach (var cause in line.Counters.RejectionCauses())
                 {
+                    @if (cause.Label == "Route non configurée")
+                    {
+                        <button type="button" class="parcel-details-button" aria-haspopup="dialog" aria-label="@($"Afficher les colis et routes non configurées — ligne {line.LineId + 1}")" @onclick="() => _unconfiguredRouteLineId = line.LineId">
+                            @MobileMetric(cause.Label, cause.Count, line.Counters.TotalParcels)
+                        </button>
+                    }
+                    else
+                    {
                     @MobileMetric(cause.Label == "Plusieurs code-barres" ? "Plusieurs CB" : cause.Label, cause.Count, line.Counters.TotalParcels)
+                    }
                 }
                 @MobileMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels)
                 @MobileMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, false)
@@ -123,7 +137,16 @@
             </div>
             @foreach (var cause in line.Counters.RejectionCauses())
             {
+                @if (cause.Label == "Route non configurée")
+                {
+                    <button type="button" class="parcel-details-button" aria-haspopup="dialog" aria-label="@($"Afficher les colis et routes non configurées — ligne {line.LineId + 1}")" @onclick="() => _unconfiguredRouteLineId = line.LineId">
+                        @PercentageMetric(cause.Label, cause.Count, line.Counters.TotalParcels, "Afficher les colis et leur route de destination non configurée")
+                    </button>
+                }
+                else
+                {
                 @PercentageMetric(cause.Label, cause.Count, line.Counters.TotalParcels, $"{cause.Label} ÷ total des colis × 100")
+                }
             }
             @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100")
             @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")
@@ -176,6 +199,7 @@
 </section>
 
 @code {
+    private int? _unconfiguredRouteLineId;
     private readonly HashSet<int> _mobileDataLines = [];
     private void ToggleMobileData(int lineId)
     {
