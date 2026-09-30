@@ -634,6 +634,9 @@ public sealed class SortEngineTests
             Assert.Contains("balance=4.75 lb", message, StringComparison.Ordinal);
             Assert.Contains("dimensions=12 x 8 x 5", message, StringComparison.Ordinal);
             Assert.Contains("chute finalement envoyée=4", message, StringComparison.Ordinal);
+            var sentAt = controller.Snapshot().LastPlcDispatch!.SentAt.ToLocalTime()
+                .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture);
+            Assert.Contains($"envoi automate confirmé à {sentAt}", message, StringComparison.Ordinal);
         }
         finally { await controller.StopAsync(); }
     }

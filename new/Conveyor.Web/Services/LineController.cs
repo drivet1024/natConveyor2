@@ -421,6 +421,7 @@ internal sealed class LineController
         var recirculationCounted = false;
         var code98Sent = false;
         int? finalDispatchedChute = null;
+        DateTimeOffset? finalDispatchedAt = null;
         SortDecision? classifiedDecision = null;
         var successfullySortedByPostalCode = false;
         try
@@ -474,7 +475,7 @@ internal sealed class LineController
             }
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
-            await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, fallback: false, token);
+            finalDispatchedAt = await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, fallback: false, token);
             finalDispatchedChute = decision.PlcChute;
             _plcConnected = true;
             code98Sent = decision.PlcChute == 98;
@@ -554,7 +555,7 @@ internal sealed class LineController
                 else
                 {
                     var fallbackChute = ResolveClosedChute(_options.RejectedChute);
-                    await SendParcelToPlcAsync(fallbackChute, 1, parcel, fallback: true, token);
+                    finalDispatchedAt = await SendParcelToPlcAsync(fallbackChute, 1, parcel, fallback: true, token);
                     finalDispatchedChute = fallbackChute;
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
@@ -576,13 +577,13 @@ internal sealed class LineController
             }
         if (code68Count.HasValue && code68CountedAt.HasValue && code68Transfer is not null)
             LogCode68Increment(code68Count.Value, code68CountedAt.Value, code68Transfer, plcAtCode68,
-                previousDispatchAtCode68, parcel, classifiedDecision, finalDispatchedChute);
+                previousDispatchAtCode68, parcel, classifiedDecision, finalDispatchedChute, finalDispatchedAt);
         _changed();
     }
 
     private void LogCode68Increment(long count, DateTimeOffset countedAt, DeviceReception transfer,
         DeviceReception? plcAtIncrement, PlcDispatch? previousDispatch, ParcelContext parcel,
-        SortDecision? decision, int? finalDispatchedChute)
+        SortDecision? decision, int? finalDispatchedChute, DateTimeOffset? finalDispatchedAt)
     {
         var transferAgeMs = (long)(parcel.CameraTimestamp - transfer.ReceivedAt).TotalMilliseconds;
         _logger.LogWarning(
@@ -592,7 +593,7 @@ internal sealed class LineController
             "dimensions={Dimensions} reçues à {DimensionAt}; automate reçu=[{PlcValue}] à {PlcAt}, séquence={PlcSequence}; " +
             "dernier envoi avant incrément: chute={PreviousChute}, à {PreviousSentAt}, colis={PreviousParcelKey}; " +
             "décision: code-barres={Barcode}, raison={Reason}, chute calculée={DecisionChute}, chute automate={DecisionPlcChute}, " +
-            "chute finalement envoyée={FinalDispatchedChute}",
+            "chute finalement envoyée={FinalDispatchedChute}, envoi automate confirmé à {FinalDispatchedAt}",
             _options.Id + 1, parcel.ParcelId, count, FormatTimestamp(countedAt),
             _options.Plc.TransferTag, FormatFrame(transfer.Raw), FormatTimestamp(transfer.ReceivedAt), transfer.Sequence, transferAgeMs,
             FormatFrame(parcel.CameraData), FormatTimestamp(parcel.CameraTimestamp),
@@ -605,10 +606,11 @@ internal sealed class LineController
             decision?.Barcode ?? "absent", decision?.Reason ?? "absente",
             decision?.Chute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
             decision?.PlcChute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
-            finalDispatchedChute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente");
+            finalDispatchedChute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            FormatTimestamp(finalDispatchedAt));
     }
 
-    private async Task SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, bool fallback,
+    private async Task<DateTimeOffset> SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, bool fallback,
         CancellationToken token)
     {
         await _plc.SendChuteAsync(_options.Plc.ChuteTag, chute, repeat, token);
@@ -632,6 +634,7 @@ internal sealed class LineController
             FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
             FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp));
         _changed();
+        return sentAt;
     }
 
     private static string FormatTimestamp(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
