@@ -24,6 +24,7 @@
                         <th scope="col">Début du shift</th>
                         <th scope="col">Colis</th>
                         <th scope="col">Triés</th>
+                        <th scope="col" title="Somme des cadences des lignes, calculées selon leur temps de marche">Cadence totale (colis/h)</th>
                         <th scope="col">Sans lecture</th>
                         <th scope="col">Erreurs balance</th>
                         <th scope="col">Erreurs dimensionneur</th>
@@ -45,6 +46,7 @@
                             <th scope="row">@point.ShiftStart.ToString("dd MMM yyyy · HH:mm", CultureInfo.GetCultureInfo("fr-CA"))</th>
                             <td class="numeric parcels">@point.TotalParcels.ToString("N0")</td>
                             <td class="numeric">@FormatPercent(point.SortedPercent)</td>
+                            <td class="numeric">@(point.TotalParcelsPerHour?.ToString("N0", CultureInfo.GetCultureInfo("fr-CA")) ?? "—")</td>
                             <td class="numeric">@FormatPercent(point.NoReadPercent)</td>
                             <td class="numeric">@FormatPercent(point.BalanceErrorPercent)</td>
                             <td class="numeric">@FormatPercent(point.DimensionErrorPercent)</td>
@@ -77,7 +79,7 @@
     private static string FormatPercent(double value) => value.ToString("0.##", CultureInfo.GetCultureInfo("fr-CA")) + " %";
     private static string FormatPercent(double? value) => value.HasValue ? FormatPercent(value.Value) : "—";
     private static bool HasMissingDetail(StatisticsHistoryPoint point) =>
-        point.DimensionErrorPercent is null || point.ShipmentNotFoundPercent is null ||
+        point.TotalParcelsPerHour is null || point.DimensionErrorPercent is null || point.ShipmentNotFoundPercent is null ||
         point.RouteNotConfiguredPercent is null || point.MultipleBarcodesPercent is null ||
         point.NoReadPercent is null || point.InverseDimensionPercent is null;
 }

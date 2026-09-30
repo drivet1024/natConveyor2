@@ -9,6 +9,7 @@ namespace Conveyor.Web.Services;
 public sealed record StatisticsHistoryPoint(DateTime ShiftStart, long TotalParcels,
     double BalanceErrorPercent, double? DimensionErrorPercent, long? LightParcels, long? SmallParcels)
 {
+    public double? TotalParcelsPerHour { get; init; }
     public double? SortedPercent { get; init; }
     public double? ShipmentNotFoundPercent { get; init; }
     public double? RouteNotConfiguredPercent { get; init; }
@@ -81,13 +82,15 @@ public sealed class StatisticsHistoryService(IOptions<ConveyorOptions> options)
             filterByLine ? lineId ?? 0 : null, from, to, token);
         return rows.Select(row =>
         {
-            detailedCounters.TryGetValue(row.ShiftStart, out var counters);
+            detailedCounters.TryGetValue(row.ShiftStart, out var detail);
+            var counters = detail.Counters;
             var total = row.TotalParcels;
             var eligible = counters is null ? 0 : Math.Max(0, counters.TotalParcels - counters.NoReads);
             return new StatisticsHistoryPoint(row.ShiftStart, total, row.BalanceErrorPercent,
                 counters is null ? null : Percentage(counters.DimensionErrors, eligible),
                 row.LightParcels, row.SmallParcels)
             {
+                TotalParcelsPerHour = detail.Cadence,
                 SortedPercent = counters is null
                     ? Percentage(row.Sorted, total)
                     : Percentage(counters.SortedByWaybill + counters.SortedByPostalCode, total),
@@ -110,7 +113,7 @@ public sealed class StatisticsHistoryService(IOptions<ConveyorOptions> options)
         }).ToArray();
     }
 
-    private static async Task<Dictionary<DateTime, LineCounters>> LoadDetailedCountersAsync(MySqlConnection connection,
+    private static async Task<Dictionary<DateTime, (LineCounters? Counters, double? Cadence)>> LoadDetailedCountersAsync(MySqlConnection connection,
         int depotId, StatisticsDestination destination, int? storedLineId, DateTime from, DateTime to,
         CancellationToken token)
     {
@@ -140,7 +143,16 @@ public sealed class StatisticsHistoryService(IOptions<ConveyorOptions> options)
         }
         catch (MySqlException exception) when (exception.Number == 1146) { return []; }
         return grouped.ToDictionary(group => group.Key,
-            group => CounterStatistics.CaptureCombined(depotId, group.Key, group.Value).Counters!);
+            group => (CounterStatistics.CaptureCombined(depotId, group.Key, group.Value).Counters,
+                CalculateTotalCadence(group.Value)));
+    }
+
+    internal static double? CalculateTotalCadence(IEnumerable<LineCounters> lines)
+    {
+        var active = lines.Where(line => line.TotalParcels > 0).ToArray();
+        if (active.Length == 0 || active.Any(line => !double.IsFinite(line.SortingRunSeconds) || line.SortingRunSeconds <= 0))
+            return null;
+        return active.Sum(line => line.ParcelsPerHour ?? 0);
     }
 
     private static long? NullableInt64(MySqlDataReader reader, int ordinal) =>
