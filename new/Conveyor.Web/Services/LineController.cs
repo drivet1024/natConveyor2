@@ -382,6 +382,11 @@ internal sealed class LineController
         LineCounters parcelCounters;
         bool parcelMaintenance;
         long parcelId;
+        long? code68Count = null;
+        DateTimeOffset? code68CountedAt = null;
+        DeviceReception? code68Transfer = null;
+        DeviceReception? plcAtCode68 = null;
+        PlcDispatch? previousDispatchAtCode68 = null;
         lock (_gate)
         {
             parcelCounters = _counters;
@@ -389,7 +394,14 @@ internal sealed class LineController
             parcelId = ++_parcelSequenceSinceReset;
             parcelCounters.CameraReads++;
             parcelCounters.TotalParcels++;
-            if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
+            if (IsCode68(_plcTransferInput?.Raw))
+            {
+                code68Count = ++parcelCounters.Code68;
+                code68CountedAt = DateTimeOffset.Now;
+                code68Transfer = _plcTransferInput;
+                plcAtCode68 = _plcInput;
+                previousDispatchAtCode68 = _lastPlcDispatch;
+            }
         }
         if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
         // Wait first so measurements received shortly after the camera frame are
@@ -562,7 +574,38 @@ internal sealed class LineController
                 }
                 if (classification.CountNoRead) parcelCounters.NoReads++;
             }
+        if (code68Count.HasValue && code68CountedAt.HasValue && code68Transfer is not null)
+            LogCode68Increment(code68Count.Value, code68CountedAt.Value, code68Transfer, plcAtCode68,
+                previousDispatchAtCode68, parcel, classifiedDecision, finalDispatchedChute);
         _changed();
+    }
+
+    private void LogCode68Increment(long count, DateTimeOffset countedAt, DeviceReception transfer,
+        DeviceReception? plcAtIncrement, PlcDispatch? previousDispatch, ParcelContext parcel,
+        SortDecision? decision, int? finalDispatchedChute)
+    {
+        var transferAgeMs = (long)(parcel.CameraTimestamp - transfer.ReceivedAt).TotalMilliseconds;
+        _logger.LogWarning(
+            "DIAGNOSTIC CODE 68 — ligne {Line}, colis #{ParcelId}, compteur Code 68={Code68Count}, incrémenté à {CountedAt}; " +
+            "cause: {TransferTag}=[{TransferValue}] reçu à {TransferAt}, séquence={TransferSequence}, âge à la caméra={TransferAgeMs} ms; " +
+            "caméra=[{CameraData}] reçue à {CameraAt}; balance={Weight} reçue à {WeightAt}; " +
+            "dimensions={Dimensions} reçues à {DimensionAt}; automate reçu=[{PlcValue}] à {PlcAt}, séquence={PlcSequence}; " +
+            "dernier envoi avant incrément: chute={PreviousChute}, à {PreviousSentAt}, colis={PreviousParcelKey}; " +
+            "décision: code-barres={Barcode}, raison={Reason}, chute calculée={DecisionChute}, chute automate={DecisionPlcChute}, " +
+            "chute finalement envoyée={FinalDispatchedChute}",
+            _options.Id + 1, parcel.ParcelId, count, FormatTimestamp(countedAt),
+            _options.Plc.TransferTag, FormatFrame(transfer.Raw), FormatTimestamp(transfer.ReceivedAt), transfer.Sequence, transferAgeMs,
+            FormatFrame(parcel.CameraData), FormatTimestamp(parcel.CameraTimestamp),
+            FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
+            FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp),
+            plcAtIncrement is null ? "absent" : FormatFrame(plcAtIncrement.Raw), FormatTimestamp(plcAtIncrement?.ReceivedAt),
+            plcAtIncrement?.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            previousDispatch?.Chute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            FormatTimestamp(previousDispatch?.SentAt), previousDispatch?.ParcelKey ?? "absent",
+            decision?.Barcode ?? "absent", decision?.Reason ?? "absente",
+            decision?.Chute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            decision?.PlcChute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            finalDispatchedChute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente");
     }
 
     private async Task SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, bool fallback,
@@ -593,6 +636,9 @@ internal sealed class LineController
 
     private static string FormatTimestamp(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
         .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
+
+    private static string FormatFrame(string value) => value.Replace("\r", "<CR>", StringComparison.Ordinal)
+        .Replace("\n", "<LF>", StringComparison.Ordinal).Replace("\0", "<NUL>", StringComparison.Ordinal);
 
     private static string FormatWeight(decimal weight, DateTimeOffset? timestamp) => timestamp.HasValue
         ? weight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " lb"
