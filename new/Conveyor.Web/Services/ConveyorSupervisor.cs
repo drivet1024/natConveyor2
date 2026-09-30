@@ -30,6 +30,12 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly object _stopAndGoGate = new();
     private CancellationTokenSource? _stopAndGoPending;
     private bool? _chute4FullState;
+    private bool? _chute4CountState;
+    private long _chute4FullTransitions;
+    public long? Chute4FullTransitions
+    {
+        get { lock (_stopAndGoGate) return _chute4CountState.HasValue ? _chute4FullTransitions : null; }
+    }
     private bool? _stopAndGoState;
     private bool _stopAndGoStopping;
     public int CurrentShiftId => _configuration.General!.ShiftId;
@@ -159,8 +165,17 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
         if (!string.IsNullOrWhiteSpace(_chute4FullTag) &&
-            string.Equals(tag, _chute4FullTag, StringComparison.OrdinalIgnoreCase) && binaryState.HasValue)
-            ScheduleStopAndGo(binaryState.Value);
+            string.Equals(tag, _chute4FullTag, StringComparison.OrdinalIgnoreCase))
+        {
+            lock (_stopAndGoGate)
+            {
+                // The first reading establishes the baseline; only observed 0 -> 1 edges count.
+                if (_chute4CountState == false && binaryState == true) _chute4FullTransitions++;
+                _chute4CountState = binaryState;
+            }
+            if (binaryState.HasValue) ScheduleStopAndGo(binaryState.Value);
+            Changed?.Invoke();
+        }
         if (!string.IsNullOrWhiteSpace(_stopAndGoTag) &&
             string.Equals(tag, _stopAndGoTag, StringComparison.OrdinalIgnoreCase) && binaryState.HasValue)
             RecordStopAndGoState(binaryState.Value);
@@ -399,6 +414,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             foreach (var line in _lines.Values) line.SetConveyorRunning(null);
             ConveyorStopCause = null;
             FullChutesCount = null;
+            lock (_stopAndGoGate) _chute4CountState = null;
             Code42Count = null;
             Changed?.Invoke();
             var reconnected = false;

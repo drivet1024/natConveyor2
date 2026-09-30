@@ -1,0 +1,50 @@
+@using System.Globalization
+
+<div class="cadence-chart">
+    <div class="chart-heading"><strong>Cadence · 10 min</strong><span>colis/h · total des lignes</span></div>
+    @if (Points.Count == 0)
+    {
+        <p>Premier point après 10 minutes de collecte.</p>
+    }
+    else
+    {
+        <svg viewBox="0 0 480 100" role="img" aria-label="Cadence moyenne par intervalle de dix minutes">
+            <defs>
+                <linearGradient id="@_gradientId" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="8" y2="78">
+                    <stop offset="0" stop-color="#50d98b" />
+                    <stop offset="@Offset(3000)" stop-color="#50d98b" />
+                    <stop offset="@Offset(3000)" stop-color="#ffd15c" />
+                    <stop offset="@Offset(2000)" stop-color="#ffd15c" />
+                    <stop offset="@Offset(2000)" stop-color="#ff6c79" />
+                    <stop offset="1" stop-color="#ff6c79" />
+                </linearGradient>
+            </defs>
+            @foreach (var threshold in new[] { 0, 2000, 3000 })
+            {
+                <line x1="38" x2="470" y1="@F(Y(threshold))" y2="@F(Y(threshold))" class="grid-line" />
+                <g><text x="32" y="@F(Y(threshold) + 3)" text-anchor="end">@threshold</text></g>
+            }
+            <polyline points="@string.Join(" ", Points.Select(p => $"{F(X(p.At))},{F(Y(p.ParcelsPerHour))}"))" fill="none" stroke="@($"url(#{_gradientId})")" stroke-width="2" stroke-linejoin="round" />
+            @foreach (var point in Points)
+            {
+                <circle cx="@F(X(point.At))" cy="@F(Y(point.ParcelsPerHour))" r="2.5" fill="@Tone(point.ParcelsPerHour)">
+                    <title>@point.At.ToLocalTime().ToString("HH:mm") · @point.ParcelsPerHour.ToString("N0") colis/h</title>
+                </circle>
+            }
+            <g><text x="38" y="96">@Points[0].At.ToLocalTime().ToString("HH:mm")</text></g>
+            @if (Points.Count > 1) { <g><text x="470" y="96" text-anchor="end">@Points[^1].At.ToLocalTime().ToString("HH:mm")</text></g> }
+        </svg>
+    }
+    <small>Vert &gt; 3 000 · jaune 2 000–3 000 · rouge &lt; 2 000</small>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<CadencePoint> Points { get; set; } = [];
+    private readonly string _gradientId = "cadence-" + Guid.NewGuid().ToString("N");
+    private double Maximum => Math.Max(3500, Points.Max(p => p.ParcelsPerHour) * 1.1);
+    private double Y(double rate) => 78 - 70 * rate / Maximum;
+    private double X(DateTimeOffset at) => Points.Count < 2 ? 38 : 38 + 432 * (at - Points[0].At).TotalSeconds / (Points[^1].At - Points[0].At).TotalSeconds;
+    private string Offset(double rate) => F(1 - rate / Maximum);
+    private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Tone(double rate) => rate > 3000 ? "#50d98b" : rate >= 2000 ? "#ffd15c" : "#ff6c79";
+}

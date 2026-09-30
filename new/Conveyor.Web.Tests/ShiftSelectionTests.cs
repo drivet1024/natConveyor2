@@ -117,6 +117,32 @@ public sealed class ShiftSelectionTests
         Assert.False(supervisor.Chute4AlarmActive);
     }
 
+    [Fact]
+    public void Chute4CounterCountsOnlyObservedRisingEdges()
+    {
+        var options = CreateOptions(1);
+        options.General!.Chute4FullTag = "CHUTE_4_FULL";
+        options.General.StopAndGoTag = "STOP_AND_GO";
+        using var supervisor = CreateSupervisor(options);
+        Assert.Null(supervisor.Chute4FullTransitions);
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        Assert.Equal(0L, supervisor.Chute4FullTransitions);
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "0");
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        Assert.Equal(1L, supervisor.Chute4FullTransitions);
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "0");
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "invalid");
+        Assert.Null(supervisor.Chute4FullTransitions);
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        Assert.Equal(1L, supervisor.Chute4FullTransitions);
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "0");
+        supervisor.RecordPlcTagChange("CHUTE_4_FULL", "1");
+        supervisor.RecordPlcTagChange("OTHER", "1");
+        Assert.Equal(2L, supervisor.Chute4FullTransitions);
+    }
+
     [Theory]
     [InlineData("FULL", "", 5)]
     [InlineData("", "STOP", 5)]

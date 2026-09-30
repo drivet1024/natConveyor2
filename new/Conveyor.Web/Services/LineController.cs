@@ -513,9 +513,10 @@ internal sealed class LineController
                 if (routingReason == "Route de l'expédition") parcelCounters.SortedByWaybill++;
                 if (routingReason == "Route du code postal") parcelCounters.SortedByPostalCode++;
                 var routed = routingReason is "Route de l'expédition" or "Route du code postal";
-                var measurementsValid = parcel.Dimension.IsValid(_options.MaximumDimension) &&
-                                        parcel.Weight > 0 && parcel.Weight <= _options.MaximumWeight;
-                if (routed && (!_options.ValidateDimensionsAndWeight || measurementsValid) &&
+                // The sorting decision already applies the effective code 98 policy,
+                // including shipment exemptions. Do not reclassify a successful route
+                // using raw measurements or a toggle that changed after the decision.
+                if (routed &&
                     (!decision.ShipmentNotFound || postalRoute) && decision.Reason == routingReason &&
                     decision.PlcChute != _options.RejectedChute)
                 {

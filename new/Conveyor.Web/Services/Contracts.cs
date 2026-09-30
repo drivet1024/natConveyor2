@@ -70,6 +70,7 @@ public interface IConveyorSupervisor
     int? ConveyorId => null;
     string? ConveyorStopCause => null;
     int? FullChutesCount { get; }
+    long? Chute4FullTransitions => null;
     int? Code42Count { get; }
     bool Chute4AlarmActive { get; }
     bool Maintenance { get; }

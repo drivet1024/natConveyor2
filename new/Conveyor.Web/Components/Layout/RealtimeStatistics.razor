@@ -10,9 +10,25 @@
     <div class="headline-kpis">
         @Headline("Total colis", Counters.TotalParcels, null, "Tous les colis reçus par les caméras")
         @Headline("Colis triés", SortedParcels, Percentage(SortedParcels, Counters.TotalParcels), "Tris par expédition et par code postal ÷ total des colis")
+        <div class="cadence-summary"><CadenceSparkline Points="CadencePoints" /></div>
     </div>
 
     <div class="realtime-sections">
+        <section class="metric-section" aria-labelledby="full-chutes-title">
+            <h3 id="full-chutes-title">Chutes pleines</h3>
+            <div class="metric-grid">
+                <div class="realtime-metric">
+                    <div><strong>@(FullChutesCount?.ToString("N0") ?? "—")</strong></div>
+                    <span class="label">Nombre de chutes pleines</span>
+                    <small>@(FullChutesCount.HasValue ? "Valeur du compteur automate en temps réel" : "Compteur automate indisponible")</small>
+                </div>
+                <div class="realtime-metric">
+                    <div><strong>@(Chute4FullTransitions?.ToString("N0") ?? "—")</strong></div>
+                    <span class="label">Chute 4 pleine</span>
+                    <small>Passages de 0 à 1 depuis le démarrage de l’application</small>
+                </div>
+            </div>
+        </section>
         <section class="metric-section" aria-labelledby="rejection-causes-title">
             <h3 id="rejection-causes-title">Causes de rejet</h3>
             <div class="metric-grid">
@@ -54,6 +70,9 @@
 @code {
     [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
+    [Parameter] public int? FullChutesCount { get; set; }
+    [Parameter] public long? Chute4FullTransitions { get; set; }
+    [Parameter] public IReadOnlyList<CadencePoint> CadencePoints { get; set; } = [];
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
     private long SortedParcels => Counters.SortedByWaybill + Counters.SortedByPostalCode;
     private string LightParcelRule

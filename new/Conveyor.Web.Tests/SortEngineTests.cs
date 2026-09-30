@@ -1228,6 +1228,33 @@ public sealed class SortEngineTests
     }
 
     [Theory]
+    [InlineData(true, 500, 12, 1)]
+    [InlineData(true, 5, 500, 1)]
+    [InlineData(true, 500, 500, 1)]
+    [InlineData(false, 500, 500, 0)]
+    public async Task SortedWithoutIssueUsesShipmentCode98Exemption(bool exempt, int weight, int length, long expected)
+    {
+        var config = new ConveyorOptions { Simulation = true,
+            Sorting = new() { CorrelationDelayMs = 0, RejectedChute = 16,
+                ValidateDimensionsAndWeight = true, MaximumWeight = 100, MaximumDimension = 100 },
+            Lines = [new() { Id = 0 }] };
+        config.ApplyGlobalSorting();
+        var repo = new FakeRepository { Disable98 = exempt };
+        using var supervisor = new ConveyorSupervisor(Microsoft.Extensions.Options.Options.Create(config), repo,
+            new SortEngine(repo, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
+        try
+        {
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(length, 8, 5), weight);
+            var snapshot = supervisor.GetSnapshots()[0];
+            Assert.Equal(expected, snapshot.Counters.SortedWithoutIssue);
+            Assert.Equal(exempt ? 4 : 98, snapshot.LastPlcDispatch!.Chute);
+            Assert.Equal(weight > 100 ? 1 : 0, snapshot.Counters.ScaleErrors);
+            Assert.Equal(length > 100 ? 1 : 0, snapshot.Counters.DimensionErrors);
+        }
+        finally { await supervisor.StopLineAsync(0); }
+    }
+
+    [Theory]
     [InlineData("98765432101", 1, false, 1)]
     [InlineData("98765432101", 1, true, 1)]
     [InlineData("12345678901", 1, false, 0)]

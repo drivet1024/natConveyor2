@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject StatisticsHistoryService History
 @inject IConveyorSupervisor Supervisor
+@inject CadenceHistoryService CadenceHistory
 
 <PageTitle>Statistiques</PageTitle>
 
@@ -20,7 +21,7 @@
 @if (_activeTab == "realtime")
 {
     <div id="realtime-statistics" role="tabpanel" aria-labelledby="realtime-tab">
-        <RealtimeStatistics Counters="_realtimeCounters" UpdatedAt="_realtimeUpdatedAt" />
+        <RealtimeStatistics Counters="_realtimeCounters" UpdatedAt="_realtimeUpdatedAt" FullChutesCount="_fullChutesCount" Chute4FullTransitions="_chute4FullTransitions" CadencePoints="CadenceHistory.GetPoints()" />
     </div>
 }
 else
@@ -47,6 +48,8 @@ else
 @code {
     private IReadOnlyList<StatisticsHistoryPoint> _points = [];
     private LineCounters _realtimeCounters = new();
+    private int? _fullChutesCount;
+    private long? _chute4FullTransitions;
     private DateTimeOffset _realtimeUpdatedAt;
     private string _activeTab = "realtime";
     private bool _historyLoaded;
@@ -61,6 +64,7 @@ else
     protected override void OnInitialized()
     {
         Supervisor.Changed += OnSupervisorChanged;
+        CadenceHistory.Changed += OnSupervisorChanged;
         RefreshRealtime();
     }
     private async Task SelectTabAsync(string tab)
@@ -78,6 +82,11 @@ else
     private void RefreshRealtime()
     {
         var lines = Supervisor.GetSnapshots();
+        var runningLines = lines.Where(line => line.Running).ToArray();
+        _fullChutesCount = runningLines.Length > 0 && runningLines.All(line => line.Connections.Plc && !line.Connections.Simulated)
+            ? Supervisor.FullChutesCount : null;
+        _chute4FullTransitions = runningLines.Length > 0 && runningLines.All(line => line.Connections.Plc && !line.Connections.Simulated)
+            ? Supervisor.Chute4FullTransitions : null;
         _realtimeCounters = CounterStatistics.CaptureCombined(0, DateTime.Today,
             lines.Select(line => line.ProductionCounters ?? new LineCounters())).Counters ?? new();
         _realtimeUpdatedAt = DateTimeOffset.Now;
@@ -94,5 +103,9 @@ else
         catch (Exception exception) { _error = exception.Message; }
         finally { _loading = false; }
     }
-    public void Dispose() => Supervisor.Changed -= OnSupervisorChanged;
+    public void Dispose()
+    {
+        Supervisor.Changed -= OnSupervisorChanged;
+        CadenceHistory.Changed -= OnSupervisorChanged;
+    }
 }

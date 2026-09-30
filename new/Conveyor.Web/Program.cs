@@ -93,6 +93,8 @@ builder.Services.AddSingleton<StatisticsHistoryService>();
 builder.Services.AddSingleton<IConveyorSupervisor>(services => services.GetRequiredService<ConveyorSupervisor>());
 builder.Services.AddHostedService(services => services.GetRequiredService<ConveyorSupervisor>());
 builder.Services.AddHostedService<PlcRecoveryMonitor>();
+builder.Services.AddSingleton<CadenceHistoryService>();
+builder.Services.AddHostedService(services => services.GetRequiredService<CadenceHistoryService>());
 
 var app = builder.Build();
 
