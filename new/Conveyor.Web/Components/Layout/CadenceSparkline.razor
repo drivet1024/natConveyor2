@@ -8,6 +8,10 @@
     {
         <p>Aucune cadence disponible pour cette période. Un point est calculé toutes les 10 minutes.</p>
     }
+    else
+    {
+        <p class="cadence-latest">Dernier relevé : <strong>@_visiblePoints[^1].ParcelsPerHour.ToString("N0") colis/h</strong> à @_visiblePoints[^1].At.ToLocalTime().ToString("HH:mm")</p>
+    }
         <svg viewBox="0 0 480 100" role="img" aria-label="Cadence en colis par heure, de 16 h à 3 h le lendemain, calculée toutes les dix minutes">
             <defs>
                 <linearGradient id="@_gradientId" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="8" y2="78">
@@ -40,7 +44,7 @@
             }
             @foreach (var point in _visiblePoints)
             {
-                <circle cx="@F(X(point.At))" cy="@F(Y(point.ParcelsPerHour))" r="5" fill="transparent">
+                <circle cx="@F(X(point.At))" cy="@F(Y(point.ParcelsPerHour))" r="2.5" fill="@PointColor(point.ParcelsPerHour)">
                     <title>@point.At.ToLocalTime().ToString("HH:mm") · @point.ParcelsPerHour.ToString("N0") colis/h</title>
                 </circle>
             }
@@ -80,6 +84,7 @@
     private double GreenAbove => (double)Options.Value.OperatorKpis.ChartCadenceGreenAbove;
     private static string FormatThreshold(double value) => value.ToString("#,0.##", CultureInfo.GetCultureInfo("fr-CA"));
     private double Maximum => Math.Max(Math.Max(1, GreenAbove * 7 / 6), _visiblePoints.Select(p => p.ParcelsPerHour).DefaultIfEmpty(0).Max() * 1.1);
+    private string PointColor(double rate) => rate > GreenAbove ? "#50d98b" : rate >= YellowFrom ? "#ffd15c" : "#ff6c79";
     private double Y(double rate) => 78 - 70 * rate / Maximum;
     private double X(DateTimeOffset at) => Position(at.LocalDateTime, _windowStart);
     private string Offset(double rate) => F(1 - rate / Maximum);

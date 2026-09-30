@@ -333,3 +333,20 @@ Dans les journaux, « Lecture directe DDE reçue … sans notification correspon
 ### Commandes de marche du convoyeur
 
 Configurer **Conveyor ID** dans les paramètres globaux, puis enregistrer et redémarrer. Les boutons **DÉMARRER / ARRÊTER** à côté d’AUTOMATE commandent ensemble les deux lignes via `START=1` / `START=0`, comme DDEFrm. Démarrer demande confirmation ; arrêter impose PAUSE (0), JAM (1) ou DOWN (2). Après l’envoi, une ligne est insérée dans `conveyor_action` avec la date locale, CONVEYOR_ID, ACTION (1/0) et CAUSE (NULL au démarrage). Un échec d’insertion après envoi est signalé sans renvoyer la commande. La simulation n’insère aucune action réelle. CONNECTER/DÉCONNECTER dans l’engrenage restent les commandes de connexion aux appareils.
+
+## Volume et poids moyens par shift
+
+Le graphique des historiques Statistiques et Maintenance présente le volume moyen
+par colis en pi³ (axe gauche) et le poids moyen en lb (axe droit). Le volume d’un
+passage est L × l × h en pouces ÷ 1 728. Chaque moyenne divise la somme des mesures
+valides par leur nombre, indépendamment pour le poids et les dimensions; les
+mesures absentes, nulles ou supérieures aux limites configurées sont exclues.
+Les comptages restent des passages et incluent donc les recirculations.
+
+Les sommes et nombres mesurés sont conservés dans les compteurs détaillés JSON,
+restaurés après redémarrage et remis à zéro avec le shift. Les historiques antérieurs
+sans ces mesures restent indisponibles. Un shift commencé avant la mise à jour
+peut être partiellement couvert : le graphique indique les nombres mesurés sur
+le total des colis. Les moyennes globales sont pondérées par le nombre de mesures,
+et non calculées comme la moyenne des moyennes des lignes. Les shifts à zéro
+colis sont masqués, comme dans le tableau.

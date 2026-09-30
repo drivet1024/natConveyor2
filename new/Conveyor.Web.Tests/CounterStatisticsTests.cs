@@ -109,12 +109,14 @@ public sealed class CounterStatisticsTests
     [Fact]
     public void DimensionHistoryUsesCombinedReadParcelsAsDenominator()
     {
-        var rate = StatisticsHistoryService.CalculateDimensionErrorPercent([
+        var combined = CounterStatistics.CaptureCombined(28, DateTime.Today, [
             new() { TotalParcels = 100, NoReads = 20, DimensionErrors = 8 },
             new() { TotalParcels = 300, NoReads = 80, DimensionErrors = 22 }
         ]);
+        var restored = combined.RestoreCounters();
 
-        Assert.Equal(10, rate);
+        Assert.Equal(30, restored.DimensionErrors);
+        Assert.Equal(10, StatisticsHistoryService.CalculateDimensionErrorPercent([restored]));
     }
 
     [Fact]

@@ -2,100 +2,104 @@
 
 <section class="parcel-profile-panel" aria-labelledby="parcel-profile-title">
     <div class="parcel-profile-heading">
-        <div><span class="eyebrow">30 DERNIERS JOURS</span><h2 id="parcel-profile-title">Profil des colis</h2></div>
+        <div><span class="eyebrow">30 DERNIERS JOURS</span><h2 id="parcel-profile-title">Volume et poids moyens des colis</h2></div>
         <div class="parcel-profile-legend" aria-label="Légende">
-            <span class="light"><i></i>Colis légers</span>
-            <span class="small"><i></i>Petits colis</span>
+            <span class="volume"><i></i>Volume moyen · pi³</span>
+            <span class="weight"><i></i>Poids moyen · lb</span>
         </div>
     </div>
-
     @if (!HasData)
     {
-        <div class="parcel-profile-empty">Aucune donnée de colis légers ou de petits colis pour cette période.</div>
+        <div class="parcel-profile-empty">Aucune mesure de volume ou de poids conservée pour cette période. Les moyennes apparaîtront avec les nouveaux colis mesurés.</div>
     }
     else
     {
         <div class="parcel-profile-kpis">
-            <div><strong>@FormatNullable(LastLight)</strong><span>colis légers au dernier shift disponible</span></div>
-            <div><strong>@FormatNullable(LastSmall)</strong><span>petits colis au dernier shift disponible</span></div>
+            <div><strong>@Format(Last?.AverageVolumeCubicFeet) pi³</strong><span>volume moyen par colis · dernier shift (@Last?.ShiftStart.ToString("dd MMM HH:mm", French))</span><br /><span>@Last?.VolumeMeasuredParcels.ToString("N0") / @Last?.TotalParcels.ToString("N0") colis avec dimensions valides</span></div>
+            <div><strong>@Format(Last?.AverageWeightPounds) lb</strong><span>poids moyen par colis · dernier shift (@Last?.ShiftStart.ToString("dd MMM HH:mm", French))</span><br /><span>@Last?.WeightMeasuredParcels.ToString("N0") / @Last?.TotalParcels.ToString("N0") colis avec poids valide</span></div>
         </div>
         <div class="parcel-profile-scroll">
             <svg class="parcel-profile-chart" viewBox="0 0 1000 340" role="img" aria-labelledby="parcel-profile-title parcel-profile-description">
-                <desc id="parcel-profile-description">Graphique à lignes des nombres de colis légers et de petits colis sur les 30 derniers jours.</desc>
+                <desc id="parcel-profile-description">Moyennes par shift : volume en pieds cubes sur l’axe gauche et poids en livres sur l’axe droit. Les périodes sans mesures restent absentes.</desc>
                 @for (var i = 0; i <= 4; i++)
                 {
                     var y = Top + PlotHeight * i / 4d;
                     <g>
                         <line class="grid-line" x1="@Left" y1="@F(y)" x2="@(Width - Right)" y2="@F(y)" />
-                        <text class="axis-label count-axis" x="@(Left - 12)" y="@F(y + 4)">@FormatAxis(Maximum * (4 - i) / 4d)</text>
+                        <text class="axis-label count-axis" x="@(Left - 12)" y="@F(y + 4)">@Axis(VolumeMaximum * (4 - i) / 4d)</text>
+                        <text class="axis-label" x="@(Width - Right + 12)" y="@F(y + 4)">@Axis(WeightMaximum * (4 - i) / 4d)</text>
                     </g>
                 }
                 @for (var i = 0; i < 5; i++)
                 {
                     var date = PeriodStart.AddDays(i == 4 ? 29 : i * 7);
-                    <g><text class="axis-label date-axis" x="@F(X(date))" y="@(Height - 13)">@date.ToString("dd MMM", CultureInfo.GetCultureInfo("fr-CA"))</text></g>
+                    <g><text class="axis-label date-axis" x="@F(X(date))" y="@(Height - 13)">@date.ToString("dd MMM", French)</text></g>
                 }
-                <text class="axis-title" x="12" y="18">COLIS</text>
-                @foreach (var segment in Segments(point => point.LightParcels))
+                <text class="axis-title" x="12" y="18">VOLUME · PI³</text>
+                <text class="axis-title" x="988" y="18" text-anchor="end">POIDS · LB</text>
+                @foreach (var segment in Segments(point => point.AverageVolumeCubicFeet))
                 {
-                    <polyline class="series light" points="@Polyline(segment, point => point.LightParcels!.Value)" />
+                    <polyline class="series volume" points="@Polyline(segment, point => point.AverageVolumeCubicFeet!.Value, VolumeMaximum)" />
                 }
-                @foreach (var segment in Segments(point => point.SmallParcels))
+                @foreach (var segment in Segments(point => point.AverageWeightPounds))
                 {
-                    <polyline class="series small" points="@Polyline(segment, point => point.SmallParcels!.Value)" />
+                    <polyline class="series weight" points="@Polyline(segment, point => point.AverageWeightPounds!.Value, WeightMaximum)" />
                 }
-                @foreach (var point in Points)
+                @foreach (var point in _activePoints)
                 {
-                    @if (point.LightParcels is { } light)
+                    @if (point.AverageVolumeCubicFeet is { } volume)
                     {
-                        <circle class="point light" cx="@F(X(point.ShiftStart))" cy="@F(Y(light))" r="4"><title>@Tooltip(point, "Colis légers", light)</title></circle>
+                        <circle class="point volume" cx="@F(X(point.ShiftStart))" cy="@F(Y(volume, VolumeMaximum))" r="4"><title>@Tooltip(point, volume, "pi³", point.VolumeMeasuredParcels)</title></circle>
                     }
-                    @if (point.SmallParcels is { } small)
+                    @if (point.AverageWeightPounds is { } weight)
                     {
-                        <circle class="point small" cx="@F(X(point.ShiftStart))" cy="@F(Y(small))" r="4"><title>@Tooltip(point, "Petits colis", small)</title></circle>
+                        <circle class="point weight" cx="@F(X(point.ShiftStart))" cy="@F(Y(weight, WeightMaximum))" r="4"><title>@Tooltip(point, weight, "lb", point.WeightMeasuredParcels)</title></circle>
                     }
                 }
             </svg>
         </div>
-        @if (Points.Any(point => point.LightParcels is null || point.SmallParcels is null))
-        {
-            <p class="parcel-profile-note">Les périodes antérieures à l’ajout des colonnes restent absentes et ne sont pas remplacées par zéro.</p>
-        }
     }
+    <p class="parcel-profile-note">Volume moyen = somme des volumes (L × l × h en pouces ÷ 1 728) ÷ nombre de colis avec dimensions valides. Poids moyen = somme des poids en lb ÷ nombre de colis avec poids valide. Chaque passage est compté. Les mesures absentes ou hors limites sont exclues. Les journées à zéro colis sont masquées; les anciennes périodes sans mesures conservées ne sont pas remplacées par zéro.</p>
 </section>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<StatisticsHistoryPoint> Points { get; set; } = [];
-    private const double Width = 1000, Height = 340, Left = 72, Right = 36, Top = 30, Bottom = 52;
+    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-CA");
+    private IReadOnlyList<StatisticsHistoryPoint> _activePoints = [];
+    protected override void OnParametersSet() => _activePoints = Points.Where(point => point.TotalParcels > 0).OrderBy(point => point.ShiftStart).ToArray();
+    private const double Width = 1000, Height = 340, Left = 80, Right = 80, Top = 30, Bottom = 52;
     private const double PlotHeight = Height - Top - Bottom;
     private DateTime PeriodStart => DateTime.Today.AddDays(-29);
-    private bool HasData => Points.Any(point => point.LightParcels.HasValue || point.SmallParcels.HasValue);
-    private long? LastLight => Points.LastOrDefault(point => point.LightParcels.HasValue)?.LightParcels;
-    private long? LastSmall => Points.LastOrDefault(point => point.SmallParcels.HasValue)?.SmallParcels;
-    private double Maximum => NiceMaximum(Points.SelectMany(point => new[] { point.LightParcels, point.SmallParcels })
-        .Where(value => value.HasValue).Max(value => (double)value!.Value), 10);
-    private double X(DateTime date) => Left + Math.Clamp((date.Date - PeriodStart).TotalDays / 29d, 0, 1) * (Width - Left - Right);
-    private double Y(long value) => Top + PlotHeight * (1 - value / Maximum);
-    private string Polyline(IEnumerable<StatisticsHistoryPoint> points, Func<StatisticsHistoryPoint, long> value) =>
-        string.Join(' ', points.Select(point => $"{F(X(point.ShiftStart))},{F(Y(value(point)))}"));
-    private IEnumerable<IReadOnlyList<StatisticsHistoryPoint>> Segments(Func<StatisticsHistoryPoint, long?> value)
+    private bool HasData => _activePoints.Any(point => point.AverageVolumeCubicFeet.HasValue || point.AverageWeightPounds.HasValue);
+    private StatisticsHistoryPoint? Last => _activePoints.LastOrDefault();
+    private double VolumeMaximum => Maximum(point => point.AverageVolumeCubicFeet, 0.1);
+    private double WeightMaximum => Maximum(point => point.AverageWeightPounds, 1);
+    private double Maximum(Func<StatisticsHistoryPoint, decimal?> value, double minimum)
+    {
+        var max = Math.Max(minimum, _activePoints.Select(point => (double)(value(point) ?? 0)).DefaultIfEmpty(0).Max());
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(max)));
+        return Math.Ceiling(max / magnitude * 2) / 2 * magnitude;
+    }
+    private double X(DateTime date) => Left + Math.Clamp((date - PeriodStart).TotalDays / 30d, 0, 1) * (Width - Left - Right);
+    private static double Y(decimal value, double maximum) => Top + PlotHeight * (1 - (double)value / maximum);
+    private string Polyline(IEnumerable<StatisticsHistoryPoint> points, Func<StatisticsHistoryPoint, decimal> value, double maximum) =>
+        string.Join(' ', points.Select(point => $"{F(X(point.ShiftStart))},{F(Y(value(point), maximum))}"));
+    private IEnumerable<IReadOnlyList<StatisticsHistoryPoint>> Segments(Func<StatisticsHistoryPoint, decimal?> value)
     {
         List<StatisticsHistoryPoint> segment = [];
-        foreach (var point in Points)
+        foreach (var point in _activePoints)
         {
+            if (!value(point).HasValue || segment.Count > 0 && point.ShiftStart - segment[^1].ShiftStart > TimeSpan.FromHours(36))
+            {
+                if (segment.Count > 0) { yield return segment.ToArray(); segment.Clear(); }
+            }
             if (value(point).HasValue) segment.Add(point);
-            else if (segment.Count > 0) { yield return segment.ToArray(); segment.Clear(); }
         }
         if (segment.Count > 0) yield return segment;
     }
-    private static double NiceMaximum(double value, double minimum)
-    {
-        if (value <= minimum) return minimum;
-        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(value)));
-        return Math.Ceiling(value / magnitude * 2) / 2 * magnitude;
-    }
     private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
-    private static string FormatAxis(double value) => value >= 1000 ? $"{value / 1000:0.#} k" : $"{value:0}";
-    private static string FormatNullable(long? value) => value?.ToString("N0") ?? "—";
-    private static string Tooltip(StatisticsHistoryPoint point, string metric, long value) => $"{point.ShiftStart:yyyy-MM-dd HH:mm} — {metric} : {value:N0}";
+    private static string Axis(double value) => value.ToString("0.##", French);
+    private static string Format(decimal? value) => value?.ToString("N2", French) ?? "—";
+    private static string Tooltip(StatisticsHistoryPoint point, decimal value, string unit, long measured) =>
+        $"{point.ShiftStart:yyyy-MM-dd HH:mm} — {Format(value)} {unit} par colis · {measured:N0}/{point.TotalParcels:N0} colis mesurés";
 }

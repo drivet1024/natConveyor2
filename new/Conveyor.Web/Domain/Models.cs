@@ -139,6 +139,23 @@ public sealed class LineCounters
     public long Code98RecirculatedOverTwice { get; set; }
     public long Code68 { get; set; }
     public long Code97 { get; set; }
+    public decimal? MeasuredVolumeCubicFeet { get; set; }
+    public long VolumeMeasuredParcels { get; set; }
+    public decimal? MeasuredWeightPounds { get; set; }
+    public long WeightMeasuredParcels { get; set; }
+    public void RecordMeasurements(Dimension dimension, decimal weight, decimal maximumDimension, decimal maximumWeight)
+    {
+        if (dimension.IsValid(maximumDimension))
+        {
+            MeasuredVolumeCubicFeet = (MeasuredVolumeCubicFeet ?? 0) + dimension.Length * dimension.Width * dimension.Height / 1728m;
+            VolumeMeasuredParcels++;
+        }
+        if (weight > 0 && weight <= maximumWeight)
+        {
+            MeasuredWeightPounds = (MeasuredWeightPounds ?? 0) + weight;
+            WeightMeasuredParcels++;
+        }
+    }
     public long DimensionErrors { get; set; }
     public long ScaleErrors { get; set; }
     public long ScaleFaults { get; set; }

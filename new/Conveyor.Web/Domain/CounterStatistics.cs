@@ -43,6 +43,13 @@ public sealed record CounterStatistics(int DepotId, int? LineId, DateTime ShiftS
             Code98 = counters.Sum(line => line.Code98), Code68 = counters.Sum(line => line.Code68),
             Code98RecirculatedOverTwice = counters.Sum(line => line.Code98RecirculatedOverTwice),
             NoReads = counters.Sum(line => line.NoReads),
+            MeasuredVolumeCubicFeet = counters.Any(line => line.MeasuredVolumeCubicFeet.HasValue)
+                ? counters.Sum(line => line.MeasuredVolumeCubicFeet ?? 0) : null,
+            VolumeMeasuredParcels = counters.Sum(line => line.VolumeMeasuredParcels),
+            MeasuredWeightPounds = counters.Any(line => line.MeasuredWeightPounds.HasValue)
+                ? counters.Sum(line => line.MeasuredWeightPounds ?? 0) : null,
+            WeightMeasuredParcels = counters.Sum(line => line.WeightMeasuredParcels),
+            DimensionErrors = counters.Sum(line => line.DimensionErrors),
             ScaleErrors = counters.Sum(line => line.ScaleErrors),
             ScaleFaults = counters.Sum(line => line.ScaleFaults),
             LightParcels = counters.Sum(line => line.LightParcels),

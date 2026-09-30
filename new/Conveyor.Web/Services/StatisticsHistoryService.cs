@@ -20,6 +20,11 @@ public sealed record StatisticsHistoryPoint(DateTime ShiftStart, long TotalParce
     public double? SmallParcelPercent { get; init; }
     public double? InverseDimensionPercent { get; init; }
     public long? ScaleFaults { get; init; }
+    public decimal? TotalVolumeCubicFeet { get; init; }
+    public long VolumeMeasuredParcels { get; init; }
+    public decimal? AverageVolumeCubicFeet => VolumeMeasuredParcels > 0 ? TotalVolumeCubicFeet / VolumeMeasuredParcels : null;
+    public decimal? AverageWeightPounds { get; init; }
+    public long WeightMeasuredParcels { get; init; }
 }
 
 public sealed class StatisticsHistoryService(IOptions<ConveyorOptions> options)
@@ -95,7 +100,12 @@ public sealed class StatisticsHistoryService(IOptions<ConveyorOptions> options)
                 LightParcelPercent = counters is null ? Percentage(row.LightParcels, total) : Percentage(counters.LightParcels, total),
                 SmallParcelPercent = counters is null ? Percentage(row.SmallParcels, total) : Percentage(counters.SmallParcels, total),
                 InverseDimensionPercent = counters is null ? Percentage(row.InverseDimensions, total) : Percentage(counters.InverseLengthParcels, total),
-                ScaleFaults = counters?.ScaleFaults ?? row.ScaleFaults
+                ScaleFaults = counters?.ScaleFaults ?? row.ScaleFaults,
+                TotalVolumeCubicFeet = counters?.MeasuredVolumeCubicFeet,
+                VolumeMeasuredParcels = counters?.VolumeMeasuredParcels ?? 0,
+                AverageWeightPounds = counters is { WeightMeasuredParcels: > 0 }
+                    ? counters.MeasuredWeightPounds / counters.WeightMeasuredParcels : null,
+                WeightMeasuredParcels = counters?.WeightMeasuredParcels ?? 0
             };
         }).ToArray();
     }

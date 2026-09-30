@@ -42,6 +42,32 @@ public sealed class SortEngineTests
     }
 
     [Fact]
+    public async Task ParcelMeasurementsAreCollectedInProductionCountersAndResetWithTheShift()
+    {
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12, 12, 12), 10);
+            await controller.SimulateAsync("12345678902", new(24, 12, 6), 20);
+            var counters = controller.Snapshot().ProductionCounters!;
+            Assert.Equal(2m, counters.MeasuredVolumeCubicFeet);
+            Assert.Equal(2, counters.VolumeMeasuredParcels);
+            Assert.Equal(30m, counters.MeasuredWeightPounds);
+            Assert.Equal(2, counters.WeightMeasuredParcels);
+            controller.ResetCounters();
+            counters = controller.Snapshot().ProductionCounters!;
+            Assert.Null(counters.MeasuredVolumeCubicFeet);
+            Assert.Null(counters.MeasuredWeightPounds);
+            Assert.Equal(0, counters.VolumeMeasuredParcels);
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Fact]
     public async Task Plc_dispatch_log_contains_camera_scale_dimension_and_timestamps()
     {
         using var logs = new InMemoryLogStore();

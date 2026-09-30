@@ -6,11 +6,6 @@
 
 <PageTitle>Opérateur</PageTitle>
 
-@if (_unconfiguredRouteLineId is { } routeLineId && _lines.FirstOrDefault(line => line.LineId == routeLineId) is { } routeLine)
-{
-    <UnconfiguredRoutesModal Line="routeLine" OnClose="() => _unconfiguredRouteLineId = null" />
-}
-
 @if (_smallParcelLineId is { } smallLineId && _lines.FirstOrDefault(line => line.LineId == smallLineId) is { } smallLine)
 {
     <SmallParcelsModal Line="smallLine" OnClose="() => _smallParcelLineId = null" />
@@ -98,10 +93,9 @@
                 <fieldset class="kpi-category">
                     <legend>Particularités des colis</legend>
                     <div class="kpi-category-grid">
-                <OperatorKpi Label="Route non configurée" Value="@counters.RejectedRouteNotConfigured.ToString("N0")" Rate="@(FormatPercentage(counters.RejectedRouteNotConfigured, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.RejectedRouteNotConfigured, counters.TotalParcels)" Icon="alert" Help="Afficher les colis et leur route de destination non configurée" OnClick="() => _unconfiguredRouteLineId = line.LineId" />
-                <OperatorKpi Label="Pas dans le système" Value="@counters.RejectedShipmentNotFound.ToString("N0")" Rate="@(FormatPercentage(counters.RejectedShipmentNotFound, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.RejectedShipmentNotFound, counters.TotalParcels)" Icon="alert" Help="@CalculationDescription("Pas dans le système")" OnClick="() => _missingShipmentLineId = line.LineId" />
-                <OperatorKpi Label="Petits colis" Value="@counters.SmallParcels.ToString("N0")" Rate="@(FormatPercentage(counters.SmallParcels, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.SmallParcels, counters.TotalParcels)" Help="@CalculationDescription("Petits colis")" OnClick="() => _smallParcelLineId = line.LineId" />
-                <OperatorKpi Label="Colis inversés" Value="@counters.InverseLengthParcels.ToString("N0")" Rate="@(FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) + " %")" Tone="@OperatorTone(counters.InverseLengthParcels, counters.TotalParcels)" Icon="rotate" Help="@CalculationDescription("Dimensions inversées")" />
+                <OperatorKpi Label="Pas dans le système" Value="@(FormatPercentage(counters.RejectedShipmentNotFound, counters.TotalParcels) + " %")" Rate="@counters.RejectedShipmentNotFound.ToString("N0")" Tone="@OperatorTone(counters.RejectedShipmentNotFound, counters.TotalParcels)" Icon="alert" Help="@CalculationDescription("Pas dans le système")" OnClick="() => _missingShipmentLineId = line.LineId" />
+                <OperatorKpi Label="Petits colis" Value="@(FormatPercentage(counters.SmallParcels, counters.TotalParcels) + " %")" Rate="@counters.SmallParcels.ToString("N0")" Tone="@OperatorTone(counters.SmallParcels, counters.TotalParcels)" Help="@CalculationDescription("Petits colis")" OnClick="() => _smallParcelLineId = line.LineId" />
+                <OperatorKpi Label="Colis inversés" Value="@(FormatPercentage(counters.InverseLengthParcels, counters.TotalParcels) + " %")" Rate="@counters.InverseLengthParcels.ToString("N0")" Tone="@OperatorTone(counters.InverseLengthParcels, counters.TotalParcels)" Icon="rotate" Help="@CalculationDescription("Dimensions inversées")" />
                     </div>
                 </fieldset>
             </div>
@@ -121,9 +115,9 @@
         </div>
 
         <div class="supervision-metrics rejection-metrics">
-            @foreach (var cause in counters.RejectionCauses())
+            @foreach (var cause in counters.RejectionCauses().Where(cause => cause.Label != "Route non configurée"))
             {
-                @if (cause.Label is "Plusieurs code-barres" or "Pas dans le système" or "Route non configurée")
+                @if (cause.Label is "Plusieurs code-barres" or "Pas dans le système")
                 {
                     <button type="button" class="supervision-metric metric-button @SeverityCss(cause.Count, counters.TotalParcels, true)"
                             aria-haspopup="dialog" aria-label="@($"Afficher les colis : {cause.Label} — ligne {line.LineId + 1}")"
@@ -221,18 +215,16 @@
     private OperatorKpiOptions KpiThresholds => Options.Value.OperatorKpis;
     private string OperatorTone(long count, long total) => KpiThresholds.RateTone(count, total);
     private RenderFragment OperatorCount(string label, long count, long total, string icon, bool enabled = true) => @<OperatorKpi
-        Label="@label" Value="@(enabled ? count.ToString("N0") : "—")" Unit="@(enabled ? "" : "Code 98 désactivé")"
-        Rate="@(enabled ? FormatPercentage(count, total) + " %" : null)" Icon="@icon"
+        Label="@label" Value="@(enabled ? FormatPercentage(count, total) + " %" : "—")" Unit="@(enabled ? "" : "Code 98 désactivé")"
+        Rate="@(enabled ? count.ToString("N0") : null)" Icon="@icon"
         Tone="@(enabled ? OperatorTone(count, total) : "inactive")" Help="@CalculationDescription(label)" />;
     private int? _multipleBarcodeLineId;
-    private int? _unconfiguredRouteLineId;
     private int? _smallParcelLineId;
     private int? _missingShipmentLineId;
     private void OpenParcelDetails(int lineId, string cause)
     {
         if (cause == "Pas dans le système") _missingShipmentLineId = lineId;
         else if (cause == "Plusieurs code-barres") _multipleBarcodeLineId = lineId;
-        else if (cause == "Route non configurée") _unconfiguredRouteLineId = lineId;
     }
     private IReadOnlyList<LineSnapshot> _lines = [];
     private string SharedTagCount(int? count)

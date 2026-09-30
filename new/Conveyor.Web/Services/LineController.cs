@@ -442,6 +442,7 @@ internal sealed class LineController
             RecordScalePresenceForParcel(hasCorrelatedWeight, parcelCounters);
             lock (_gate)
             {
+                parcelCounters.RecordMeasurements(parcel.Dimension, parcel.Weight, _options.MaximumDimension, _options.MaximumWeight);
                 if (IsSmallParcel(parcel.Dimension, _options.SmallParcelMaximumSide) &&
                     IsLightParcel(parcel.Weight, _options.LightParcelMaximumWeight))
                 {
