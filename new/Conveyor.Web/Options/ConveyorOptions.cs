@@ -71,6 +71,15 @@ public sealed class GeneralOptions
     public string FullChutesTag { get; set; } = "SHARE_NB_CHUTEPLEINE";
     public string Code42Tag { get; set; } = "SHARE_NB_CODE42";
     public string Chute4FullTag { get; set; } = "";
+    public Dictionary<int, string> FullChuteTags { get; set; } = new();
+    public string GetFullChuteTag(int chute) => chute == 4
+        ? Chute4FullTag : FullChuteTags.GetValueOrDefault(chute, "");
+    public void SetFullChuteTag(int chute, string value)
+    {
+        if (chute is < 1 or > 48) throw new ArgumentOutOfRangeException(nameof(chute));
+        if (chute == 4) Chute4FullTag = value.Trim();
+        else FullChuteTags[chute] = value.Trim();
+    }
     public string StopAndGoTag { get; set; } = "";
     [Range(1, 3_600)] public int StopAndGoDelaySeconds { get; set; } = 5;
     public int? ConveyorId { get; set; }
