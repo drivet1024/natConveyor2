@@ -177,6 +177,36 @@ public sealed class ShiftSelectionTests
         Assert.Empty(supervisor.FullChuteAlarms);
     }
 
+    [Fact]
+    public async Task SharedStopAndGoWaitsUntilAllConfiguredChutesClear()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(1, "FULL_1");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.StopAndGoTag = "STOP";
+        options.General.StopAndGoDelaySeconds = 1;
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        gateway.Emit("STOP", "0");
+        gateway.Emit("FULL_1", "1");
+        await Task.Delay(1200);
+        Assert.Equal(("STOP", 1), Assert.Single(gateway.Writes));
+        gateway.Emit("STOP", "1");
+        gateway.Emit("FULL_1", "0");
+        await Task.Delay(1200);
+        Assert.Single(gateway.Writes); // Chute 48 has not reported a state yet.
+        Assert.Contains(1, supervisor.FullChuteAlarms);
+        gateway.Emit("FULL_48", "1");
+        await Task.Delay(1200);
+        Assert.Single(gateway.Writes);
+        gateway.Emit("FULL_48", "0");
+        await Task.Delay(1200);
+        Assert.Equal(new[] { 1, 0 }, gateway.Writes.Select(write => write.Value));
+        Assert.Equal(new[] { 1, 48 }, supervisor.FullChuteAlarms);
+        gateway.Emit("STOP", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions

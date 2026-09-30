@@ -100,6 +100,9 @@ public sealed class GeneralOptions
 
     public string? StopAndGoValidationError()
     {
+        if (!string.IsNullOrWhiteSpace(StopAndGoTag) && Enumerable.Range(1, 48)
+            .Any(chute => string.Equals(GetFullChuteTag(chute).Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase)))
+            return "Le tag STOP_AND_GO doit être différent des tags de chute pleine.";
         var chuteConfigured = !string.IsNullOrWhiteSpace(Chute4FullTag);
         if (chuteConfigured && string.Equals(Chute4FullTag.Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase))
             return "Les tags chute 4 pleine et STOP_AND_GO doivent être différents.";
