@@ -72,6 +72,7 @@ public interface IConveyorSupervisor
     string? ConveyorStopCause => null;
     int? FullChutesCount { get; }
     long? Chute4FullTransitions => null;
+    IReadOnlyDictionary<int, long?> FullChuteTransitions => new Dictionary<int, long?>();
     int? Code42Count { get; }
     bool Chute4AlarmActive { get; }
     IReadOnlyList<int> FullChuteAlarms => Chute4AlarmActive ? new[] { 4 } : Array.Empty<int>();

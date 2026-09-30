@@ -22,11 +22,14 @@
                     <span class="label">Nombre de chutes pleines</span>
                     <small>@(FullChutesCount.HasValue ? "Valeur du compteur automate en temps réel" : "Compteur automate indisponible")</small>
                 </div>
-                <div class="realtime-metric">
-                    <div><strong>@(Chute4FullTransitions?.ToString("N0") ?? "—")</strong></div>
-                    <span class="label">Chute 4 pleine</span>
-                    <small>Passages de 0 à 1 depuis le démarrage de l’application</small>
-                </div>
+                @foreach (var chute in FullChuteTransitions.OrderBy(pair => pair.Key))
+                {
+                    <div class="realtime-metric" @key="chute.Key">
+                        <div><strong>@(chute.Value?.ToString("N0") ?? "—")</strong></div>
+                        <span class="label">Chute @chute.Key pleine</span>
+                        <small>Passages de 0 à 1 depuis le démarrage de l’application</small>
+                    </div>
+                }
             </div>
         </section>
         <section class="metric-section" aria-labelledby="rejection-causes-title">
@@ -71,7 +74,7 @@
     [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
     [Parameter] public int? FullChutesCount { get; set; }
-    [Parameter] public long? Chute4FullTransitions { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, long?> FullChuteTransitions { get; set; } = new Dictionary<int, long?>();
     [Parameter] public IReadOnlyList<CadencePoint> CadencePoints { get; set; } = [];
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
     private long SortedParcels => Counters.SortedByWaybill + Counters.SortedByPostalCode;

@@ -208,6 +208,33 @@ public sealed class ShiftSelectionTests
     }
 
     [Fact]
+    public void ConfiguredFullChutesCountOnlyObservedRisingEdges()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(3, "FULL_3");
+        options.General.SetFullChuteTag(4, "FULL_4");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.SetFullChuteTag(2, " ");
+        using var supervisor = CreateSupervisor(options);
+        Assert.Equal(new[] { 3, 4, 48 }, supervisor.FullChuteTransitions.Keys);
+        Assert.All(supervisor.FullChuteTransitions.Values, value => Assert.Null(value));
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(0L, supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_3", "0");
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(1L, supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(supervisor.Chute4FullTransitions, supervisor.FullChuteTransitions[4]);
+        supervisor.RecordPlcTagChange("FULL_3", "invalid");
+        Assert.Null(supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(1L, supervisor.FullChuteTransitions[3]);
+        Assert.Null(supervisor.FullChuteTransitions[48]);
+    }
+
+    [Fact]
     public void EmptyAndNullFullChuteSettingsAreIgnored()
     {
         var options = CreateOptions(1);

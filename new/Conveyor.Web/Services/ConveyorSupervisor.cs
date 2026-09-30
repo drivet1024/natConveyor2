@@ -29,6 +29,18 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly Dictionary<int, string> _fullChuteTags;
     private readonly HashSet<int> _activeFullChutes = new();
     private readonly Dictionary<int, bool?> _fullChuteStates = new();
+    private readonly Dictionary<int, bool?> _fullChuteCountStates = new();
+    private readonly Dictionary<int, long> _fullChuteTransitions = new();
+    public IReadOnlyDictionary<int, long?> FullChuteTransitions
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+                return _fullChuteTags.Keys.Order().ToDictionary(chute => chute,
+                    chute => _fullChuteCountStates.GetValueOrDefault(chute).HasValue
+                        ? (long?)_fullChuteTransitions.GetValueOrDefault(chute) : null);
+        }
+    }
     public IReadOnlyList<int> FullChuteAlarms
     {
         get
@@ -186,6 +198,9 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var matched = _fullChuteTags.Where(pair => string.Equals(pair.Value, tag, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Key).ToArray();
             foreach (var chute in matched)
             {
+                if (_fullChuteCountStates.GetValueOrDefault(chute) == false && binaryState == true)
+                    _fullChuteTransitions[chute] = _fullChuteTransitions.GetValueOrDefault(chute) + 1;
+                _fullChuteCountStates[chute] = binaryState;
                 _fullChuteStates[chute] = binaryState;
                 if (binaryState == true) _activeFullChutes.Add(chute);
             }
@@ -453,7 +468,11 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             foreach (var line in _lines.Values) line.SetConveyorRunning(null);
             ConveyorStopCause = null;
             FullChutesCount = null;
-            lock (_stopAndGoGate) _chute4CountState = null;
+            lock (_stopAndGoGate)
+            {
+                _chute4CountState = null;
+                _fullChuteCountStates.Clear();
+            }
             Code42Count = null;
             Changed?.Invoke();
             var reconnected = false;
