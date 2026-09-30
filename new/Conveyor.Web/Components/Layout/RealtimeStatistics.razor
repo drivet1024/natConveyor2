@@ -17,11 +17,14 @@
         <section class="metric-section" aria-labelledby="full-chutes-title">
             <h3 id="full-chutes-title">Chutes pleines</h3>
             <div class="metric-grid">
+                @if (!string.IsNullOrWhiteSpace(Options.Value.General?.FullChutesTag))
+                {
                 <div class="realtime-metric">
                     <div><strong>@(FullChutesCount?.ToString("N0") ?? "—")</strong></div>
                     <span class="label">Nombre de chutes pleines</span>
                     <small>@(FullChutesCount.HasValue ? "Valeur du compteur automate en temps réel" : "Compteur automate indisponible")</small>
                 </div>
+                }
                 @foreach (var chute in FullChuteTransitions.OrderBy(pair => pair.Key))
                 {
                     <div class="realtime-metric" @key="chute.Key">
