@@ -104,8 +104,12 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         if (string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag))
             throw new InvalidOperationException("Le tag de démarrage du convoyeur est obligatoire.");
         options.General.ConveyorStartTag = options.General.ConveyorStartTag.Trim();
-        options.General.Chute4FullTag = options.General.Chute4FullTag.Trim();
-        options.General.StopAndGoTag = options.General.StopAndGoTag.Trim();
+        options.General.Chute4FullTag = options.General.GetFullChuteTag(4);
+        options.General.StopAndGoTag = options.General.StopAndGoTag?.Trim() ?? "";
+        options.General.FullChuteTags = Enumerable.Range(1, 48).Where(chute => chute != 4)
+            .Select(chute => (Chute: chute, Tag: options.General.GetFullChuteTag(chute)))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Tag))
+            .ToDictionary(item => item.Chute, item => item.Tag);
         if (options.Lines.Select(line => line.Id).Distinct().Count() != options.Lines.Count) throw new InvalidOperationException("Les identifiants de ligne doivent être uniques.");
         if (options.Sorting is null || options.Sorting.SmallParcelMaximumSide < 0 || options.Sorting.LightParcelMaximumWeight < 0)
             throw new InvalidOperationException("Les seuils petit colis et colis léger doivent être positifs ou nuls.");

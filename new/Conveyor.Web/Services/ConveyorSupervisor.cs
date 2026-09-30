@@ -138,13 +138,13 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var sharedTags = configuration.General ?? new GeneralOptions();
         _fullChutesTag = sharedTags.FullChutesTag.Trim();
         _code42Tag = sharedTags.Code42Tag.Trim();
-        _chute4FullTag = sharedTags.Chute4FullTag.Trim();
+        _chute4FullTag = sharedTags.GetFullChuteTag(4);
         _fullChuteTags = Enumerable.Range(1, 48).Where(chute => chute != 4)
             .Select(chute => (Chute: chute, Tag: sharedTags.GetFullChuteTag(chute).Trim()))
             .Where(item => !string.IsNullOrWhiteSpace(item.Tag)).ToDictionary(item => item.Chute, item => item.Tag);
         if (!string.IsNullOrWhiteSpace(_chute4FullTag)) _fullChuteTags[4] = _chute4FullTag;
         foreach (var chute in _fullChuteTags.Keys) _fullChuteStates[chute] = null;
-        _stopAndGoTag = _fullChuteTags.Count == 0 ? "" : sharedTags.StopAndGoTag.Trim();
+        _stopAndGoTag = _fullChuteTags.Count == 0 ? "" : sharedTags.StopAndGoTag?.Trim() ?? "";
         _stopAndGoDelay = TimeSpan.FromSeconds(Math.Clamp(sharedTags.StopAndGoDelaySeconds, 1, 3_600));
         PlcConfiguration.Validate(primaryLine.Plc);
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })

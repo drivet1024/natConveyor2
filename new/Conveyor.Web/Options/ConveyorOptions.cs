@@ -72,13 +72,13 @@ public sealed class GeneralOptions
     public string Code42Tag { get; set; } = "SHARE_NB_CODE42";
     public string Chute4FullTag { get; set; } = "";
     public Dictionary<int, string> FullChuteTags { get; set; } = new();
-    public string GetFullChuteTag(int chute) => chute == 4
-        ? Chute4FullTag : FullChuteTags.GetValueOrDefault(chute, "");
-    public void SetFullChuteTag(int chute, string value)
+    public string GetFullChuteTag(int chute) =>
+        (chute == 4 ? Chute4FullTag : FullChuteTags?.GetValueOrDefault(chute))?.Trim() ?? "";
+    public void SetFullChuteTag(int chute, string? value)
     {
         if (chute is < 1 or > 48) throw new ArgumentOutOfRangeException(nameof(chute));
-        if (chute == 4) Chute4FullTag = value.Trim();
-        else FullChuteTags[chute] = value.Trim();
+        if (chute == 4) Chute4FullTag = value?.Trim() ?? "";
+        else (FullChuteTags ??= new())[chute] = value?.Trim() ?? "";
     }
     public string StopAndGoTag { get; set; } = "";
     [Range(1, 3_600)] public int StopAndGoDelaySeconds { get; set; } = 5;
@@ -103,9 +103,6 @@ public sealed class GeneralOptions
         if (!string.IsNullOrWhiteSpace(StopAndGoTag) && Enumerable.Range(1, 48)
             .Any(chute => string.Equals(GetFullChuteTag(chute).Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase)))
             return "Le tag STOP_AND_GO doit être différent des tags de chute pleine.";
-        var chuteConfigured = !string.IsNullOrWhiteSpace(Chute4FullTag);
-        if (chuteConfigured && string.Equals(Chute4FullTag.Trim(), StopAndGoTag.Trim(), StringComparison.OrdinalIgnoreCase))
-            return "Les tags chute 4 pleine et STOP_AND_GO doivent être différents.";
         if (StopAndGoDelaySeconds is < 1 or > 3_600)
             return "Le délai STOP_AND_GO doit être compris entre 1 et 3600 secondes.";
         return null;

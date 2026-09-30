@@ -207,6 +207,29 @@ public sealed class ShiftSelectionTests
         Assert.Empty(supervisor.FullChuteAlarms);
     }
 
+    [Fact]
+    public void EmptyAndNullFullChuteSettingsAreIgnored()
+    {
+        var options = CreateOptions(1);
+        options.General!.Chute4FullTag = null!;
+        options.General.StopAndGoTag = null!;
+        options.General.FullChuteTags = new() { [1] = null!, [2] = " ", [3] = "", [48] = " FULL_48 " };
+        Assert.Null(options.General.StopAndGoValidationError());
+        using (var supervisor = CreateSupervisor(options))
+        {
+            supervisor.RecordPlcTagChange("", "1");
+            Assert.Empty(supervisor.FullChuteAlarms);
+            supervisor.RecordPlcTagChange("FULL_48", "1");
+            Assert.Equal(new[] { 48 }, supervisor.FullChuteAlarms);
+        }
+        options.General.FullChuteTags = null!;
+        Assert.Null(options.General.StopAndGoValidationError());
+        using var emptySupervisor = CreateSupervisor(options);
+        Assert.Empty(emptySupervisor.FullChuteAlarms);
+        options.General.SetFullChuteTag(1, null);
+        Assert.Equal("", options.General.GetFullChuteTag(1));
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions
