@@ -633,6 +633,13 @@ public sealed class SortEngineTests
             var message = Assert.Single(logger.Messages,
                 value => value.Contains("DIAGNOSTIC CODE 68", StringComparison.Ordinal));
             Assert.Contains("compteur Code 68=1", message, StringComparison.Ordinal);
+            Assert.Contains("ÉCART TRANSFERT / ENVOI DDE", message, StringComparison.Ordinal);
+            Assert.Contains("ms APRÈS la mise à jour du transfert 68", message, StringComparison.Ordinal);
+            Assert.Contains("association au même colis non confirmée", message, StringComparison.Ordinal);
+            Assert.Contains("\n\nDÉCLENCHEUR DU COMPTAGE\n", message, StringComparison.Ordinal);
+            Assert.Contains("\n\nLECTURES DU COLIS\n", message, StringComparison.Ordinal);
+            Assert.Contains("\n\nCONTEXTE AUTOMATE AVANT INCRÉMENT\n", message, StringComparison.Ordinal);
+            Assert.Contains("\n\nDÉCISION POUR CE COLIS\n", message, StringComparison.Ordinal);
             Assert.Contains("TRANSFER_TEST=[68]", message, StringComparison.Ordinal);
             Assert.Contains("caméra=[12345678901]", message, StringComparison.Ordinal);
             Assert.Contains("balance=4.75 lb", message, StringComparison.Ordinal);

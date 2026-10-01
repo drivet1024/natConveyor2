@@ -160,30 +160,25 @@
         <div class="metrics desktop-only"><div class="metric metric-parcels">
             <div><FlashingValue Value="@(line.Counters.TotalParcels.ToString("N0"))"><strong>@line.Counters.TotalParcels.ToString("N0")</strong></FlashingValue><span>Colis</span></div>
         </div>
+            <div class="metric @MetricTone(KpiThresholds.SortedTone(line.Counters.SortedWithoutIssue, line.Counters.TotalParcels))" title="Colis triés sans problème ÷ total des colis × 100">
+                <strong>@Percentage(line.Counters.SortedWithoutIssue, line.Counters.TotalParcels).ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("fr-CA")) %</strong>
+                <span>Bien triés</span>
+            </div>
             <div class="metric @MetricTone(KpiThresholds.CadenceTone(line.Counters.ParcelsPerHour))" title="Total des colis convoyés ÷ temps de marche cumulé en heures">
                 <strong>@(line.Counters.ParcelsPerHour?.ToString("N0") ?? "—")</strong>
                 <span>Cadence · colis/heure</span>
             </div>
-            @foreach (var cause in line.Counters.RejectionCauses())
-            {
-                @if (cause.Label == "Route non configurée")
-                {
-                    <button type="button" class="parcel-details-button" aria-haspopup="dialog" aria-label="@($"Afficher les colis et routes non configurées — ligne {line.LineId + 1}")" @onclick="() => _unconfiguredRouteLineId = line.LineId">
-                        @PercentageMetric(cause.Label, cause.Count, line.Counters.TotalParcels, "Afficher les colis et leur route de destination non configurée")
-                    </button>
-                }
-                else
-                {
-                @PercentageMetric(cause.Label, cause.Count, line.Counters.TotalParcels, $"{cause.Label} ÷ total des colis × 100")
-                }
-            }
+            @PercentageMetric("Colis inversés", line.Counters.InverseLengthParcels, line.Counters.TotalParcels, "2e mesure ≥ 1re mesure + 2 po, avec deux mesures positives. Pourcentage = colis inversés ÷ total des colis × 100")
             @PercentageMetric("Code 98", line.Counters.Code98, line.Counters.TotalParcels, "Colis dirigés vers la chute 98 ÷ total des colis × 100")
             @PercentageMetric("Code 68", line.Counters.Code68, line.Counters.TotalParcels, "Colis comptés lorsque le tag de transfert vaut 68 ÷ total des colis × 100")
+            @PercentageMetric("Plusieurs code-barres", line.Counters.RejectedMultipleShipments, line.Counters.TotalParcels, "Plusieurs code-barres ÷ total des colis × 100")
             @PercentageMetric("Petits colis", line.Counters.SmallParcels, line.Counters.TotalParcels, "Plus grande dimension ≤ seuil petit colis ET poids < seuil colis léger ÷ total des colis × 100")
-            @PercentageMetric("Colis inversés", line.Counters.InverseLengthParcels, line.Counters.TotalParcels, "2e mesure ≥ 1re mesure + 2 po, avec deux mesures positives. Pourcentage = colis inversés ÷ total des colis × 100")
-            @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters)
             @PercentageMetric("Sans lecture", line.Counters.NoReads, line.Counters.TotalParcels, "Sans lecture ÷ total des colis × 100")
             @ScaleErrorMetric(line.Counters)
+            @ErrorMetric("Erreurs dim.", line.Counters.DimensionErrors, line.Counters)
+            <button type="button" class="parcel-details-button" aria-haspopup="dialog" aria-label="@($"Afficher les colis et routes non configurées — ligne {line.LineId + 1}")" @onclick="() => _unconfiguredRouteLineId = line.LineId">
+                @PercentageMetric("Route non configurée", line.Counters.RejectedRouteNotConfigured, line.Counters.TotalParcels, "Afficher les colis et leur route de destination non configurée")
+            </button>
         </div>
         <div class="desktop-only"><DeviceFeed Line="line" /></div>
         <div id="@($"last-decision-{line.LineId}")" class="decision-section @(_mobileDataLines.Contains(line.LineId) ? "mobile-data-open" : null)">

@@ -47,8 +47,8 @@
 .metrics .metric .metric-tone-critical strong,
 .metrics .metric.metric-tone-critical .metric-percentage,
 .metrics .metric .metric-tone-critical .metric-percentage { color: #ff6c79; }
-.metrics > .metric:nth-child(4), .metrics > .metric:last-child,
-.metrics > .parcel-details-button:nth-child(4) > .metric,
+.metrics > .metric:nth-child(4n), .metrics > .metric:last-child,
+.metrics > .parcel-details-button:nth-child(4n) > .metric,
 .metrics > .parcel-details-button:last-child > .metric { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }

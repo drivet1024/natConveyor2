@@ -623,14 +623,33 @@ internal sealed class LineController
     {
         var transferAgeMs = (long)(parcel.CameraTimestamp - transfer.ReceivedAt).TotalMilliseconds;
         _logger.LogWarning(
-            "DIAGNOSTIC CODE 68 — ligne {Line}, colis #{ParcelId}, compteur Code 68={Code68Count}, incrémenté à {CountedAt}; " +
-            "cause: {TransferTag}=[{TransferValue}] reçu à {TransferAt}, séquence={TransferSequence}, âge à la caméra={TransferAgeMs} ms; " +
-            "caméra=[{CameraData}] reçue à {CameraAt}; balance={Weight} reçue à {WeightAt}; " +
-            "dimensions={Dimensions} reçues à {DimensionAt}; automate reçu=[{PlcValue}] à {PlcAt}, séquence={PlcSequence}; " +
-            "dernier envoi avant incrément: chute={PreviousChute}, à {PreviousSentAt}, colis={PreviousParcelKey}; " +
-            "décision: code-barres={Barcode}, raison={Reason}, chute calculée={DecisionChute}, chute automate={DecisionPlcChute}, " +
-            "chute finalement envoyée={FinalDispatchedChute}, envoi automate confirmé à {FinalDispatchedAt}",
+            "DIAGNOSTIC CODE 68 — ligne {Line} · colis #{ParcelId}\n" +
+            "COMPTEUR : compteur Code 68={Code68Count} · incrémenté à {CountedAt}\n\n" +
+            "ÉCART TRANSFERT / ENVOI DDE\n" +
+            "  {TransferDispatchTiming}\n" +
+            "  {TransferAssociation}\n" +
+            "  Horodatages côté application ; réception effective dans l’automate non mesurée.\n\n" +
+            "DÉCLENCHEUR DU COMPTAGE\n" +
+            "  {TransferTag}=[{TransferValue}] · reçu à {TransferAt}\n" +
+            "  Séquence={TransferSequence} · âge à la caméra={TransferAgeMs} ms\n\n" +
+            "LECTURES DU COLIS\n" +
+            "  caméra=[{CameraData}] · reçue à {CameraAt}\n" +
+            "  balance={Weight} · reçue à {WeightAt}\n" +
+            "  dimensions={Dimensions} · reçues à {DimensionAt}\n\n" +
+            "CONTEXTE AUTOMATE AVANT INCRÉMENT\n" +
+            "  Dernière valeur reçue=[{PlcValue}] · à {PlcAt} · séquence={PlcSequence}\n" +
+            "  Dernier envoi : chute={PreviousChute} · à {PreviousSentAt}\n" +
+            "  Colis de cet envoi={PreviousParcelKey}\n\n" +
+            "DÉCISION POUR CE COLIS\n" +
+            "  Code-barres={Barcode} · raison={Reason}\n" +
+            "  Chute calculée={DecisionChute} · chute automate={DecisionPlcChute}\n" +
+            "  chute finalement envoyée={FinalDispatchedChute}\n" +
+            "  envoi automate confirmé à {FinalDispatchedAt}",
             _options.Id + 1, parcel.ParcelId, count, FormatTimestamp(countedAt),
+            FormatTransferDispatchTiming(transfer.ReceivedAt, finalDispatchedAt),
+            transfer.ReceivedAt < parcel.CameraTimestamp
+                ? "Le transfert 68 était déjà présent avant cette caméra : association au même colis non confirmée."
+                : "Comparaison avec le transfert 68 observé pour ce diagnostic.",
             _options.Plc.TransferTag, FormatFrame(transfer.Raw), FormatTimestamp(transfer.ReceivedAt), transfer.Sequence, transferAgeMs,
             FormatFrame(parcel.CameraData), FormatTimestamp(parcel.CameraTimestamp),
             FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
@@ -644,6 +663,20 @@ internal sealed class LineController
             decision?.PlcChute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
             finalDispatchedChute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
             FormatTimestamp(finalDispatchedAt));
+    }
+
+    internal static string FormatTransferDispatchTiming(DateTimeOffset transferAt, DateTimeOffset? dispatchedAt)
+    {
+        if (dispatchedAt is null) return "Écart indisponible : aucun envoi DDE confirmé pour ce colis.";
+        var milliseconds = (transferAt - dispatchedAt.Value).TotalMilliseconds;
+        var delay = Math.Abs(milliseconds).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        var signedDelay = milliseconds.ToString("+0.###;-0.###;0", System.Globalization.CultureInfo.InvariantCulture);
+        var description = milliseconds < 0
+            ? $"Envoi DDE confirmé {delay} ms APRÈS la mise à jour du transfert 68."
+            : milliseconds > 0
+                ? $"Envoi DDE confirmé {delay} ms AVANT la mise à jour du transfert 68."
+                : "Envoi DDE confirmé et mise à jour du transfert 68 au même instant (0 ms).";
+        return $"DÉLAI = TRANSFERT − DDE = {signedDelay} ms\n  {description}";
     }
 
     private async Task<DateTimeOffset> SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, CameraTransferTrace? cameraTrace, bool fallback,

@@ -313,14 +313,15 @@ public sealed class ShiftSelectionTests
         options.Lines[1].Plc.StopManuelTag = "MANUAL_2";
         var gateway = new RecordingPlcGateway();
         using var supervisor = CreateSupervisor(options, gateway);
-        gateway.Emit("MANUAL_1", "0");
+        gateway.Emit("MANUAL_1", "1");
         gateway.Emit("MANUAL_2", "1");
         await supervisor.SetManualLineAsync(0, true);
-        Assert.Equal(("MANUAL_1", 1), Assert.Single(gateway.Writes));
+        Assert.Equal(("MANUAL_1", 0), Assert.Single(gateway.Writes));
         Assert.True(supervisor.GetManualLineState(0));
         Assert.True(supervisor.GetManualLineState(1));
+        gateway.Emit("MANUAL_1", "0");
         await supervisor.SetManualLineAsync(0, false);
-        Assert.Equal(("MANUAL_1", 0), gateway.Writes.Last());
+        Assert.Equal(("MANUAL_1", 1), gateway.Writes.Last());
         Assert.False(supervisor.GetManualLineState(0));
         gateway.Emit("MANUAL_1", "1");
         Assert.True(supervisor.GetManualLineState(0));
@@ -338,6 +339,42 @@ public sealed class ShiftSelectionTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetManualLineAsync(0, true));
         Assert.Empty(gateway.Writes);
     }
+
+    [Fact]
+    public async Task ManualLinePollingReadsBothTagsAndClearsUnavailableStates()
+    {
+        var options = CreateOptions(1);
+        options.Lines[0].Plc.StopManuelTag = " MANUAL_1 ";
+        options.Lines[1].Plc.StopManuelTag = "MANUAL_2";
+        var gateway = new RecordingPlcGateway { ReadValue = "1" };
+        using var supervisor = CreateSupervisor(options, gateway);
+        await supervisor.PollManualLinesAsync(default);
+        Assert.Equal(2, gateway.ReadCount);
+        Assert.True(supervisor.GetManualLineState(0));
+        Assert.True(supervisor.GetManualLineState(1));
+        gateway.ReadValue = "0";
+        await supervisor.PollManualLinesAsync(default);
+        Assert.Equal(4, gateway.ReadCount);
+        Assert.False(supervisor.GetManualLineState(0));
+        gateway.FailReadTag = "MANUAL_1";
+        gateway.ReadValue = "1";
+        await supervisor.PollManualLinesAsync(default);
+        Assert.Null(supervisor.GetManualLineState(0));
+        Assert.True(supervisor.GetManualLineState(1));
+        gateway.IsConnected = false;
+        await supervisor.PollManualLinesAsync(default);
+        Assert.Null(supervisor.GetManualLineState(1));
+        gateway.IsConnected = true;
+        Assert.Null(supervisor.GetManualLineState(1));
+        Assert.Empty(gateway.Writes);
+    }
+
+    [Theory]
+    [InlineData(true, "DÉPART LIGNE")]
+    [InlineData(false, "ARRÊT LIGNE")]
+    [InlineData(null, "ÉTAT INCONNU")]
+    public void ManualButtonLabelMatchesRawTag(bool? state, string label) =>
+        Assert.Equal(label, Conveyor.Web.Components.Layout.ManualLineButton.Label(state));
 
     [Fact]
     public async Task RecirculationWritesOneAndReadsUntilAutomateReturnsZero()
@@ -399,14 +436,16 @@ public sealed class ShiftSelectionTests
     private sealed class RecordingPlcGateway : IPlcGateway, IPlcReadback
     {
         public string ReadValue { get; set; } = "0";
+        public string? FailReadTag { get; set; }
         public int ReadCount { get; private set; }
         public Task<string?> ReadTagAsync(string tag, CancellationToken token)
         {
             ReadCount++;
+            if (tag == FailReadTag) throw new IOException("Read failed");
             return Task.FromResult<string?>(ReadValue);
         }
         public bool FailWrites { get; set; }
-        public bool IsConnected => true;
+        public bool IsConnected { get; set; } = true;
         public bool ReadsHealthy => true;
         public event Action<string, string>? TagChanged;
         public System.Collections.Concurrent.ConcurrentQueue<(string Tag, int Value)> Writes { get; } = new();

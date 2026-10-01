@@ -1,9 +1,9 @@
 @inject IConveyorSupervisor Supervisor
 
 <div class="manual-line-control">
-    <button type="button" class="btn @(Started == true ? "manual-stop" : "manual-start")"
-            disabled="@_busy" @onclick="ToggleAsync">
-        @(Started == true ? "ARRÊT LIGNE" : "DÉPART LIGNE")
+    <button type="button" class="btn @(Started == true ? "manual-start" : Started == false ? "manual-stop" : null)"
+            disabled="@(_busy || Started is null)" @onclick="ToggleAsync">
+        @Label(Started)
     </button>
     @if (_error is not null) { <small role="alert">@_error</small> }
 </div>
@@ -13,12 +13,13 @@
     [Parameter] public bool? Started { get; set; }
     private bool _busy;
     private string? _error;
+    internal static string Label(bool? state) => state switch { true => "DÉPART LIGNE", false => "ARRÊT LIGNE", _ => "ÉTAT INCONNU" };
     private async Task ToggleAsync()
     {
-        if (_busy) return;
+        if (_busy || Supervisor.GetManualLineState(LineId) is not { } state) return;
         _busy = true;
         _error = null;
-        try { await Supervisor.SetManualLineAsync(LineId, Supervisor.GetManualLineState(LineId) != true); }
+        try { await Supervisor.SetManualLineAsync(LineId, state); }
         catch (Exception exception) { _error = exception.Message; }
         finally { _busy = false; }
     }

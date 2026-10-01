@@ -52,7 +52,38 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _manualLineStates = new();
-    public bool? GetManualLineState(int lineId) => _manualLineStates.TryGetValue(lineId, out var state) ? state : null;
+    public bool? GetManualLineState(int lineId) => _plc.IsConnected && _manualLineStates.TryGetValue(lineId, out var state) ? state : null;
+
+    internal async Task PollManualLinesAsync(CancellationToken token)
+    {
+        foreach (var tag in _configuration.GetConfiguredLines().Select(line => line.Plc.StopManuelTag?.Trim())
+            .Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            await _motionGate.WaitAsync(token);
+            try
+            {
+                var value = _plc.IsConnected ? await _plc.ReadTagAsync(tag!, token) : null;
+                RecordPlcTagChange(tag!, value ?? "");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !token.IsCancellationRequested)
+            {
+                RecordPlcTagChange(tag!, "");
+                _logger.LogWarning(exception, "Lecture STOP_MANUEL impossible pour {Tag}", tag);
+            }
+            finally { _motionGate.Release(); }
+        }
+    }
+
+    private async Task MonitorManualLinesAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            do { await PollManualLinesAsync(token); }
+            while (await timer.WaitForNextTickAsync(token));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
     private readonly IConfigurationEditor _editor;
@@ -455,6 +486,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
             await line.StartAsync();
         var recirculationMonitor = MonitorRecirculationAsync(stoppingToken);
+        var manualLineMonitor = MonitorManualLinesAsync(stoppingToken);
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
@@ -476,7 +508,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             } while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
-        finally { await recirculationMonitor; }
+        finally { await Task.WhenAll(recirculationMonitor, manualLineMonitor); }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
@@ -625,10 +657,9 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var tag = line.Plc.StopManuelTag?.Trim();
         if (string.IsNullOrWhiteSpace(tag)) throw new InvalidOperationException("Tag STOP_MANUEL non configuré pour cette ligne.");
         if (!_plc.IsConnected) throw new InvalidOperationException("Automate déconnecté.");
-        await _plc.SendChuteAsync(tag, start ? 1 : 0, 1, CancellationToken.None);
-        _manualLineStates[lineId] = start;
+        await _plc.SendChuteAsync(tag, start ? 0 : 1, 1, CancellationToken.None);
         _logger.LogInformation("Ligne {Line}: commande {Command} — {Tag}={Value}", lineId + 1,
-            start ? "DÉPART LIGNE" : "ARRÊT LIGNE", tag, start ? 1 : 0);
+            start ? "DÉPART LIGNE" : "ARRÊT LIGNE", tag, start ? 0 : 1);
         Changed?.Invoke();
     });
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();
