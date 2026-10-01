@@ -144,14 +144,236 @@ public sealed class ShiftSelectionTests
     }
 
     [Theory]
-    [InlineData("FULL", "", 5)]
-    [InlineData("", "STOP", 5)]
     [InlineData("SAME", "same", 5)]
     [InlineData("FULL", "STOP", 0)]
     public void StopAndGoSettingsRejectIncompleteOrUnsafeValues(string input, string output, int delay)
     {
         var settings = new GeneralOptions { Chute4FullTag = input, StopAndGoTag = output, StopAndGoDelaySeconds = delay };
         Assert.NotNull(settings.StopAndGoValidationError());
+    }
+
+    [Fact]
+    public void FullChuteAlarmsTrackConfiguredTagsIndependently()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(1, "FULL_1");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.SetFullChuteTag(2, " ");
+        options.General.SetFullChuteTag(4, "FULL_4");
+        Assert.Null(options.General.StopAndGoValidationError());
+        using var supervisor = CreateSupervisor(options);
+        supervisor.RecordPlcTagChange("", "1");
+        supervisor.RecordPlcTagChange("UNKNOWN", "1");
+        Assert.Empty(supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_1", "1");
+        supervisor.RecordPlcTagChange("FULL_48", "1");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(new[] { 1, 4, 48 }, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_1", "0");
+        supervisor.RecordPlcTagChange("FULL_48", "invalid");
+        Assert.Equal(new[] { 4, 48 }, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_48", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
+    }
+
+    [Fact]
+    public async Task SharedStopAndGoWaitsUntilAllConfiguredChutesClear()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(1, "FULL_1");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.StopAndGoTag = "STOP";
+        options.General.StopAndGoDelaySeconds = 1;
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        gateway.Emit("STOP", "0");
+        gateway.Emit("FULL_1", "1");
+        await Task.Delay(1200);
+        Assert.Equal(("STOP", 1), Assert.Single(gateway.Writes));
+        gateway.Emit("STOP", "1");
+        gateway.Emit("FULL_1", "0");
+        await Task.Delay(1200);
+        Assert.Single(gateway.Writes); // Chute 48 has not reported a state yet.
+        Assert.Contains(1, supervisor.FullChuteAlarms);
+        gateway.Emit("FULL_48", "1");
+        await Task.Delay(1200);
+        Assert.Single(gateway.Writes);
+        gateway.Emit("FULL_48", "0");
+        await Task.Delay(1200);
+        Assert.Equal(new[] { 1, 0 }, gateway.Writes.Select(write => write.Value));
+        Assert.Equal(new[] { 1, 48 }, supervisor.FullChuteAlarms);
+        gateway.Emit("STOP", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
+    }
+
+    [Fact]
+    public void ConfiguredFullChutesCountOnlyObservedRisingEdges()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(3, "FULL_3");
+        options.General.SetFullChuteTag(4, "FULL_4");
+        options.General.SetFullChuteTag(48, "FULL_48");
+        options.General.SetFullChuteTag(2, " ");
+        using var supervisor = CreateSupervisor(options);
+        Assert.Equal(new[] { 3, 4, 48 }, supervisor.FullChuteTransitions.Keys);
+        Assert.All(supervisor.FullChuteTransitions.Values, value => Assert.Null(value));
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(0L, supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_3", "0");
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(1L, supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(supervisor.Chute4FullTransitions, supervisor.FullChuteTransitions[4]);
+        supervisor.RecordPlcTagChange("FULL_3", "invalid");
+        Assert.Null(supervisor.FullChuteTransitions[3]);
+        supervisor.RecordPlcTagChange("FULL_3", "1");
+        Assert.Equal(1L, supervisor.FullChuteTransitions[3]);
+        Assert.Null(supervisor.FullChuteTransitions[48]);
+    }
+
+    [Fact]
+    public void EmptyAndNullFullChuteSettingsAreIgnored()
+    {
+        var options = CreateOptions(1);
+        options.General!.Chute4FullTag = null!;
+        options.General.StopAndGoTag = null!;
+        options.General.FullChuteTags = new() { [1] = null!, [2] = " ", [3] = "", [48] = " FULL_48 " };
+        Assert.Null(options.General.StopAndGoValidationError());
+        using (var supervisor = CreateSupervisor(options))
+        {
+            supervisor.RecordPlcTagChange("", "1");
+            Assert.Empty(supervisor.FullChuteAlarms);
+            supervisor.RecordPlcTagChange("FULL_48", "1");
+            Assert.Equal(new[] { 48 }, supervisor.FullChuteAlarms);
+        }
+        options.General.FullChuteTags = null!;
+        Assert.Null(options.General.StopAndGoValidationError());
+        using var emptySupervisor = CreateSupervisor(options);
+        Assert.Empty(emptySupervisor.FullChuteAlarms);
+        options.General.SetFullChuteTag(1, null);
+        Assert.Equal("", options.General.GetFullChuteTag(1));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task BlankStopAndGoNeverWritesAndKeepsConfiguredChuteAlarms(string? stopTag)
+    {
+        var options = CreateOptions(1);
+        options.General!.StopAndGoTag = stopTag!;
+        options.General.StopAndGoDelaySeconds = 1;
+        options.General.SetFullChuteTag(3, "FULL_3");
+        options.General.SetFullChuteTag(4, " ");
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        Assert.Equal(new[] { 3 }, supervisor.FullChuteTransitions.Keys);
+        gateway.Emit("FULL_3", "0");
+        gateway.Emit("FULL_3", "1");
+        Assert.Equal(new[] { 3 }, supervisor.FullChuteAlarms);
+        await Task.Delay(1200);
+        Assert.Empty(gateway.Writes);
+        gateway.Emit("FULL_3", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
+        await Task.Delay(1200);
+        Assert.Empty(gateway.Writes);
+    }
+
+    [Fact]
+    public void ResetClearsChuteStatisticsWithoutClearingActiveAlarm()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(4, "FULL_4");
+        using var supervisor = CreateSupervisor(options);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(1, supervisor.FullChuteTransitions[4]);
+        var resetNotified = false;
+        supervisor.CountersReset += () => resetNotified = true;
+        supervisor.ResetCounters(0);
+        Assert.True(resetNotified);
+        Assert.Equal(0, supervisor.FullChuteTransitions[4]);
+        Assert.Equal(0, supervisor.Chute4FullTransitions);
+        Assert.Contains(4, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(0, supervisor.FullChuteTransitions[4]);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(1, supervisor.FullChuteTransitions[4]);
+    }
+
+    [Fact]
+    public async Task ManualLineCommandUsesItsOwnTagAndTracksReadback()
+    {
+        var options = CreateOptions(1);
+        options.Lines[0].Plc.StopManuelTag = " MANUAL_1 ";
+        options.Lines[1].Plc.StopManuelTag = "MANUAL_2";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        gateway.Emit("MANUAL_1", "0");
+        gateway.Emit("MANUAL_2", "1");
+        await supervisor.SetManualLineAsync(0, true);
+        Assert.Equal(("MANUAL_1", 1), Assert.Single(gateway.Writes));
+        Assert.True(supervisor.GetManualLineState(0));
+        Assert.True(supervisor.GetManualLineState(1));
+        await supervisor.SetManualLineAsync(0, false);
+        Assert.Equal(("MANUAL_1", 0), gateway.Writes.Last());
+        Assert.False(supervisor.GetManualLineState(0));
+        gateway.Emit("MANUAL_1", "1");
+        Assert.True(supervisor.GetManualLineState(0));
+        gateway.FailWrites = true;
+        await Assert.ThrowsAsync<IOException>(() => supervisor.SetManualLineAsync(0, false));
+        Assert.True(supervisor.GetManualLineState(0));
+    }
+
+    [Fact]
+    public async Task ManualLineWithoutTagNeverWrites()
+    {
+        var options = CreateOptions(1);
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetManualLineAsync(0, true));
+        Assert.Empty(gateway.Writes);
+    }
+
+    [Fact]
+    public async Task RecirculationWritesOneAndReadsUntilAutomateReturnsZero()
+    {
+        var options = CreateOptions(1);
+        options.General!.RecirculationDrainTag = "DRAIN";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await supervisor.StartRecirculationDrainAsync();
+        Assert.True(supervisor.RecirculationDrainActive);
+        Assert.Equal(("DRAIN", 1), Assert.Single(gateway.Writes));
+        gateway.ReadValue = "1";
+        await supervisor.PollRecirculationAsync(default);
+        Assert.True(supervisor.RecirculationDrainActive);
+        gateway.ReadValue = "0";
+        await supervisor.PollRecirculationAsync(default);
+        Assert.False(supervisor.RecirculationDrainActive);
+        await supervisor.PollRecirculationAsync(default);
+        Assert.Equal(2, gateway.ReadCount);
+        Assert.Single(gateway.Writes);
+        gateway.FailWrites = true;
+        await Assert.ThrowsAsync<IOException>(() => supervisor.StartRecirculationDrainAsync());
+        Assert.False(supervisor.RecirculationDrainActive);
+    }
+
+    [Fact]
+    public async Task BlankRecirculationTagNeverReadsOrWrites()
+    {
+        var options = CreateOptions(1);
+        options.General!.RecirculationDrainTag = " ";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await supervisor.PollRecirculationAsync(default);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.StartRecirculationDrainAsync());
+        Assert.Empty(gateway.Writes);
+        Assert.Equal(0, gateway.ReadCount);
     }
 
     private static ConveyorOptions CreateOptions(int depot)
@@ -176,6 +398,14 @@ public sealed class ShiftSelectionTests
 
     private sealed class RecordingPlcGateway : IPlcGateway, IPlcReadback
     {
+        public string ReadValue { get; set; } = "0";
+        public int ReadCount { get; private set; }
+        public Task<string?> ReadTagAsync(string tag, CancellationToken token)
+        {
+            ReadCount++;
+            return Task.FromResult<string?>(ReadValue);
+        }
+        public bool FailWrites { get; set; }
         public bool IsConnected => true;
         public bool ReadsHealthy => true;
         public event Action<string, string>? TagChanged;
@@ -186,6 +416,7 @@ public sealed class ShiftSelectionTests
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
         public Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken token)
         {
+            if (FailWrites) throw new IOException("Write failed");
             Writes.Enqueue((tag, chute));
             return Task.CompletedTask;
         }

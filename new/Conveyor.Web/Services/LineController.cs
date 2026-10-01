@@ -71,6 +71,14 @@ internal sealed class LineController
     private DeviceReception? _dimensionInput;
     private DeviceReception? _scaleInput;
     private PlcDispatch? _lastPlcDispatch;
+    private sealed class CameraTransferTrace(DeviceReception camera)
+    {
+        public DeviceReception Camera { get; } = camera;
+        public List<DeviceReception> Transfers { get; } = [];
+        public bool Dispatched { get; set; }
+    }
+    private CameraTransferTrace? _latestCameraTrace;
+    private readonly Queue<CameraTransferTrace> _cameraTraces = new();
     private readonly Queue<PlcDispatch> _recentPlcDispatches = new();
     private readonly ChuteTrafficWindow _chuteTraffic = new();
     private long _dispatchSequence;
@@ -80,18 +88,31 @@ internal sealed class LineController
 
     private void RecordReception(string device, string frame)
     {
+        DeviceReception input;
         lock (_gate)
         {
             var previous = device switch { "camera" => _cameraInput, "dimension" => _dimensionInput, _ => _scaleInput };
-            var input = new DeviceReception(frame.Length > 4096 ? frame[..4096] : frame,
+            input = new DeviceReception(frame.Length > 4096 ? frame[..4096] : frame,
                 DateTimeOffset.Now, (previous?.Sequence ?? 0) + 1, frame.Length > 4096);
             switch (device)
             {
-                case "camera": _cameraInput = input; _lastParcelReceivedAt = input.ReceivedAt; break;
+                case "camera":
+                    _cameraInput = input;
+                    _lastParcelReceivedAt = input.ReceivedAt;
+                    if (!string.IsNullOrWhiteSpace(frame.Trim('\u0002', '\u0003', '\r', '\n')))
+                    {
+                        _latestCameraTrace = new(input);
+                        _cameraTraces.Enqueue(_latestCameraTrace);
+                        while (_cameraTraces.Count > 1000) _cameraTraces.Dequeue();
+                    }
+                    break;
                 case "dimension": _dimensionInput = input; break;
                 default: _scaleInput = input; break;
             }
         }
+        if (device == "camera")
+            _logger.LogInformation("TRACE CAMÉRA — ligne {Line}: caméra=[{CameraData}] reçue à {CameraAt}, séquence={CameraSequence}",
+                _options.Id + 1, FormatFrame(frame), FormatTimestamp(input.ReceivedAt), input.Sequence);
         _changed();
     }
     private LineCounters _productionCounters = new();
@@ -280,6 +301,8 @@ internal sealed class LineController
             _dimensionInput = null;
             _scaleInput = null;
             _lastPlcDispatch = null;
+            _latestCameraTrace = null;
+            _cameraTraces.Clear();
             _recentPlcDispatches.Clear();
             _lastUsedDimensionSequence = 0;
             _lastUsedScaleSequence = 0;
@@ -291,9 +314,13 @@ internal sealed class LineController
     }
     public void RecordPlcTransferReception(string value)
     {
+        DeviceReception reception;
         lock (_gate)
         {
-            _plcTransferInput = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
+            reception = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
+            _plcTransferInput = reception;
+            if (IsCode68(value) && _latestCameraTrace is { Dispatched: false } trace)
+                trace.Transfers.Add(reception);
         }
         _changed();
     }
@@ -382,14 +409,35 @@ internal sealed class LineController
         LineCounters parcelCounters;
         bool parcelMaintenance;
         long parcelId;
+        CameraTransferTrace? cameraTrace;
+        long? code68Count = null;
+        DateTimeOffset? code68CountedAt = null;
+        DeviceReception? code68Transfer = null;
+        DeviceReception? plcAtCode68 = null;
+        PlcDispatch? previousDispatchAtCode68 = null;
         lock (_gate)
         {
             parcelCounters = _counters;
             parcelMaintenance = _maintenance;
             parcelId = ++_parcelSequenceSinceReset;
+            cameraTrace = null;
+            while (_cameraTraces.TryDequeue(out var receivedCamera))
+            {
+                if (!string.Equals(receivedCamera.Camera.Raw.Trim('\u0002', '\u0003', '\r', '\n'),
+                    frame.Trim('\u0002', '\u0003', '\r', '\n'), StringComparison.Ordinal)) continue;
+                cameraTrace = receivedCamera;
+                break;
+            }
             parcelCounters.CameraReads++;
             parcelCounters.TotalParcels++;
-            if (IsCode68(_plcTransferInput?.Raw)) parcelCounters.Code68++;
+            if (IsCode68(_plcTransferInput?.Raw))
+            {
+                code68Count = ++parcelCounters.Code68;
+                code68CountedAt = DateTimeOffset.Now;
+                code68Transfer = _plcTransferInput;
+                plcAtCode68 = _plcInput;
+                previousDispatchAtCode68 = _lastPlcDispatch;
+            }
         }
         if (_options.CorrelationDelayMs > 0) await Task.Delay(_options.CorrelationDelayMs, token);
         // Wait first so measurements received shortly after the camera frame are
@@ -409,6 +457,7 @@ internal sealed class LineController
         var recirculationCounted = false;
         var code98Sent = false;
         int? finalDispatchedChute = null;
+        DateTimeOffset? finalDispatchedAt = null;
         SortDecision? classifiedDecision = null;
         var successfullySortedByPostalCode = false;
         try
@@ -462,7 +511,7 @@ internal sealed class LineController
             }
             _databaseConnected = true;
             stage = "envoi de la chute à l’automate (insertion non effectuée)";
-            await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, fallback: false, token);
+            finalDispatchedAt = await SendParcelToPlcAsync(decision.PlcChute, _options.Plc.SendCount, parcel, cameraTrace, fallback: false, token);
             finalDispatchedChute = decision.PlcChute;
             _plcConnected = true;
             code98Sent = decision.PlcChute == 98;
@@ -542,7 +591,7 @@ internal sealed class LineController
                 else
                 {
                     var fallbackChute = ResolveClosedChute(_options.RejectedChute);
-                    await SendParcelToPlcAsync(fallbackChute, 1, parcel, fallback: true, token);
+                    finalDispatchedAt = await SendParcelToPlcAsync(fallbackChute, 1, parcel, cameraTrace, fallback: true, token);
                     finalDispatchedChute = fallbackChute;
                     if (fallbackChute == 97 && !recirculationCounted)
                         lock (_gate) parcelCounters.Code97++;
@@ -562,24 +611,74 @@ internal sealed class LineController
                 }
                 if (classification.CountNoRead) parcelCounters.NoReads++;
             }
+        if (code68Count.HasValue && code68CountedAt.HasValue && code68Transfer is not null)
+            LogCode68Increment(code68Count.Value, code68CountedAt.Value, code68Transfer, plcAtCode68,
+                previousDispatchAtCode68, parcel, classifiedDecision, finalDispatchedChute, finalDispatchedAt);
         _changed();
     }
 
-    private async Task SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, bool fallback,
+    private void LogCode68Increment(long count, DateTimeOffset countedAt, DeviceReception transfer,
+        DeviceReception? plcAtIncrement, PlcDispatch? previousDispatch, ParcelContext parcel,
+        SortDecision? decision, int? finalDispatchedChute, DateTimeOffset? finalDispatchedAt)
+    {
+        var transferAgeMs = (long)(parcel.CameraTimestamp - transfer.ReceivedAt).TotalMilliseconds;
+        _logger.LogWarning(
+            "DIAGNOSTIC CODE 68 — ligne {Line}, colis #{ParcelId}, compteur Code 68={Code68Count}, incrémenté à {CountedAt}; " +
+            "cause: {TransferTag}=[{TransferValue}] reçu à {TransferAt}, séquence={TransferSequence}, âge à la caméra={TransferAgeMs} ms; " +
+            "caméra=[{CameraData}] reçue à {CameraAt}; balance={Weight} reçue à {WeightAt}; " +
+            "dimensions={Dimensions} reçues à {DimensionAt}; automate reçu=[{PlcValue}] à {PlcAt}, séquence={PlcSequence}; " +
+            "dernier envoi avant incrément: chute={PreviousChute}, à {PreviousSentAt}, colis={PreviousParcelKey}; " +
+            "décision: code-barres={Barcode}, raison={Reason}, chute calculée={DecisionChute}, chute automate={DecisionPlcChute}, " +
+            "chute finalement envoyée={FinalDispatchedChute}, envoi automate confirmé à {FinalDispatchedAt}",
+            _options.Id + 1, parcel.ParcelId, count, FormatTimestamp(countedAt),
+            _options.Plc.TransferTag, FormatFrame(transfer.Raw), FormatTimestamp(transfer.ReceivedAt), transfer.Sequence, transferAgeMs,
+            FormatFrame(parcel.CameraData), FormatTimestamp(parcel.CameraTimestamp),
+            FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
+            FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp),
+            plcAtIncrement is null ? "absent" : FormatFrame(plcAtIncrement.Raw), FormatTimestamp(plcAtIncrement?.ReceivedAt),
+            plcAtIncrement?.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            previousDispatch?.Chute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            FormatTimestamp(previousDispatch?.SentAt), previousDispatch?.ParcelKey ?? "absent",
+            decision?.Barcode ?? "absent", decision?.Reason ?? "absente",
+            decision?.Chute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            decision?.PlcChute.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            finalDispatchedChute?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "absente",
+            FormatTimestamp(finalDispatchedAt));
+    }
+
+    private async Task<DateTimeOffset> SendParcelToPlcAsync(int chute, int repeat, ParcelContext parcel, CameraTransferTrace? cameraTrace, bool fallback,
         CancellationToken token)
     {
         await _plc.SendChuteAsync(_options.Plc.ChuteTag, chute, repeat, token);
         var sentAt = DateTimeOffset.Now;
+        DeviceReception[] transfers = [];
         lock (_gate)
         {
             _lastPlcDispatch = new(sentAt, chute,
                 Math.Max(0, (long)(sentAt - parcel.CameraTimestamp).TotalMilliseconds),
                 ++_dispatchSequence)
             { ParcelKey = $"{parcel.CameraTimestamp.UtcTicks}:{parcel.ParcelId}" };
+            if (cameraTrace is not null)
+            {
+                cameraTrace.Dispatched = true;
+                transfers = cameraTrace.Transfers.ToArray();
+                cameraTrace.Transfers.Clear();
+            }
             _recentPlcDispatches.Enqueue(_lastPlcDispatch);
             _chuteTraffic.Add(_lastPlcDispatch);
             while (_recentPlcDispatches.Count > 256) _recentPlcDispatches.Dequeue();
         }
+        foreach (var transfer in transfers)
+            _logger.LogInformation(
+                "TRACE TRANSFERT — dimensions={Dimensions}; ligne {Line}, colis #{ParcelId}; caméra=[{CameraData}] reçue à {CameraAt}; " +
+                "{TransferTag}=68 reçu à {TransferAt}; DDE envoyé à {SentAt}; caméra → transfert={CameraToTransferMs} ms; " +
+                "transfert → DDE={TransferToSendMs} ms; caméra → DDE={CameraToSendMs} ms",
+                FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), _options.Id + 1, parcel.ParcelId,
+                FormatFrame(cameraTrace!.Camera.Raw), FormatTime(cameraTrace.Camera.ReceivedAt), _options.Plc.TransferTag,
+                FormatTime(transfer.ReceivedAt), FormatTime(sentAt),
+                (long)(transfer.ReceivedAt - cameraTrace.Camera.ReceivedAt).TotalMilliseconds,
+                (long)(sentAt - transfer.ReceivedAt).TotalMilliseconds,
+                (long)(sentAt - cameraTrace.Camera.ReceivedAt).TotalMilliseconds);
         _logger.LogInformation(
             "Ligne {Line}, colis #{ParcelId}: envoi automate {Mode} confirmé à {SentAt}; {Tag}={Chute}, répétitions={Repeat}; " +
             "caméra [{CameraData}] reçue à {CameraAt}; balance {Weight} reçue à {WeightAt}; " +
@@ -589,10 +688,17 @@ internal sealed class LineController
             FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
             FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), FormatTimestamp(parcel.DimensionTimestamp));
         _changed();
+        return sentAt;
     }
 
     private static string FormatTimestamp(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
         .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
+
+    private static string FormatTime(DateTimeOffset? timestamp) => timestamp?.ToLocalTime()
+        .ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture) ?? "absent";
+
+    private static string FormatFrame(string value) => value.Replace("\r", "<CR>", StringComparison.Ordinal)
+        .Replace("\n", "<LF>", StringComparison.Ordinal).Replace("\0", "<NUL>", StringComparison.Ordinal);
 
     private static string FormatWeight(decimal weight, DateTimeOffset? timestamp) => timestamp.HasValue
         ? weight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " lb"

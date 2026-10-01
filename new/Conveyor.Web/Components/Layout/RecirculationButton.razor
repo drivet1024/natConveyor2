@@ -1,0 +1,17 @@
+@inject IConveyorSupervisor Supervisor
+<div class="recirculation-control">
+    <button type="button" class="btn @(Active == true ? "active" : "inactive")" disabled="@(_busy || Active == true)" @onclick="StartAsync">RECIRCULATION</button>
+    @if (_error is not null) { <small role="alert">@_error</small> }
+</div>
+@code {
+    [Parameter] public bool? Active { get; set; }
+    private bool _busy;
+    private string? _error;
+    private async Task StartAsync()
+    {
+        _busy = true; _error = null;
+        try { await Supervisor.StartRecirculationDrainAsync(); }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+}

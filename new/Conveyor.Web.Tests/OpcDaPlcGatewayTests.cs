@@ -7,6 +7,16 @@ namespace Conveyor.Web.Tests;
 public sealed class OpcDaPlcGatewayTests
 {
     [Fact]
+    public async Task IndividualReadTargetsOnlyRequestedTag()
+    {
+        var connection = new FakeConnection();
+        using var gateway = new OpcDaPlcGateway(new(), NullLogger<OpcDaPlcGateway>.Instance,
+            ["COLISDDE", "DRAIN"], () => connection, TimeProvider.System, ["DRAIN"]);
+        await gateway.ConnectAsync(default);
+        Assert.Equal("1", await gateway.ReadTagAsync("DRAIN", default));
+        Assert.Equal("DRAIN", connection.SingleReadTag);
+    }
+    [Fact]
     public void SharedCountersArePolledWhileChutesAndTransfersRemainSubscriptionOnly()
     {
         var monitored = new[] { "COLISDDE", "DEPART_SYSTEMES", "TRANSFERT_DDE_M06", "TRANSFERT_DDE_M22",
@@ -224,6 +234,12 @@ public sealed class OpcDaPlcGatewayTests
 
     private sealed class FakeConnection : IOpcDaConnection
     {
+        public string? SingleReadTag;
+        public Task<IReadOnlyList<OpcDaReading>> ReadTagAsync(string tag, CancellationToken token)
+        {
+            SingleReadTag = tag;
+            return Task.FromResult<IReadOnlyList<OpcDaReading>>([new(tag, true, true, DateTimeOffset.UtcNow)]);
+        }
         public bool IsConnected { get; set; }
         public bool Disposed, FailRead, FailWrite, OmitReads;
         public int DisposeCount;

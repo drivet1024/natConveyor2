@@ -8,6 +8,51 @@ namespace Conveyor.Web.Services;
 public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 {
     private readonly Dictionary<int, LineController> _lines;
+    private readonly string _recirculationDrainTag;
+    public bool? RecirculationDrainActive { get; private set; }
+    public Task StartRecirculationDrainAsync() => WithConnectionGateAsync(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag)) throw new InvalidOperationException("Tag de recirculation non configuré.");
+        if (!_plc.IsConnected) throw new InvalidOperationException("Automate déconnecté.");
+        if (RecirculationDrainActive == true) return;
+        if (_plc is TcpPlcGateway) throw new InvalidOperationException("Le vidage surveillé exige une connexion OPC DA ou DDE.");
+        await _plc.SendChuteAsync(_recirculationDrainTag, 1, 1, CancellationToken.None);
+        _logger.LogInformation("Vidage recirculation demandé : {Tag}=1", _recirculationDrainTag);
+        RecirculationDrainActive = true;
+        Changed?.Invoke();
+    });
+
+    internal async Task PollRecirculationAsync(CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag) || !_plc.IsConnected || RecirculationDrainActive == false) return;
+        await _motionGate.WaitAsync(token);
+        try
+        {
+            var value = await _plc.ReadTagAsync(_recirculationDrainTag, token);
+            RecordPlcTagChange(_recirculationDrainTag, value ?? "");
+        }
+        finally { _motionGate.Release(); }
+    }
+
+    private async Task MonitorRecirculationAsync(CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag)) return;
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            do
+            {
+                try { await PollRecirculationAsync(token); }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logger.LogWarning(exception, "Lecture du tag de vidage recirculation impossible");
+                }
+            } while (await timer.WaitForNextTickAsync(token));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _manualLineStates = new();
+    public bool? GetManualLineState(int lineId) => _manualLineStates.TryGetValue(lineId, out var state) ? state : null;
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
     private readonly IConfigurationEditor _editor;
@@ -26,6 +71,43 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly string _fullChutesTag;
     private readonly string _code42Tag;
     private readonly string _chute4FullTag;
+    private readonly Dictionary<int, string> _fullChuteTags;
+    private readonly HashSet<int> _activeFullChutes = new();
+    private readonly Dictionary<int, bool?> _fullChuteStates = new();
+    private readonly Dictionary<int, bool?> _fullChuteCountStates = new();
+    private readonly Dictionary<int, long> _fullChuteTransitions = new();
+    private readonly Dictionary<int, FullChuteDuration> _fullChuteDurations = new();
+    public IReadOnlyDictionary<int, TimeSpan?> FullChuteDurations
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+            {
+                var now = DateTimeOffset.UtcNow;
+                return _fullChuteTags.Keys.ToDictionary(chute => chute,
+                    chute => _fullChuteCountStates.GetValueOrDefault(chute).HasValue
+                        ? (TimeSpan?)(_fullChuteDurations.GetValueOrDefault(chute)?.GetTotal(now) ?? TimeSpan.Zero) : null);
+            }
+        }
+    }
+    public IReadOnlyDictionary<int, long?> FullChuteTransitions
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+                return _fullChuteTags.Keys.Order().ToDictionary(chute => chute,
+                    chute => _fullChuteCountStates.GetValueOrDefault(chute).HasValue
+                        ? (long?)_fullChuteTransitions.GetValueOrDefault(chute) : null);
+        }
+    }
+    public IReadOnlyList<int> FullChuteAlarms
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+                return _activeFullChutes.Order().ToArray();
+        }
+    }
     private readonly string _stopAndGoTag;
     private readonly TimeSpan _stopAndGoDelay;
     private readonly object _stopAndGoGate = new();
@@ -125,19 +207,25 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _closeChute39Tag = primaryLine.Plc.CloseChute39Tag;
         _motionTag = configuration.General?.ConveyorStartTag?.Trim() ?? ConveyorMotion.DefaultMotionTag;
         var sharedTags = configuration.General ?? new GeneralOptions();
+        _recirculationDrainTag = sharedTags.RecirculationDrainTag?.Trim() ?? "";
         _fullChutesTag = sharedTags.FullChutesTag.Trim();
         _code42Tag = sharedTags.Code42Tag.Trim();
-        _chute4FullTag = sharedTags.Chute4FullTag.Trim();
-        _stopAndGoTag = sharedTags.StopAndGoTag.Trim();
+        _chute4FullTag = sharedTags.GetFullChuteTag(4);
+        _fullChuteTags = Enumerable.Range(1, 48).Where(chute => chute != 4)
+            .Select(chute => (Chute: chute, Tag: sharedTags.GetFullChuteTag(chute).Trim()))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Tag)).ToDictionary(item => item.Chute, item => item.Tag);
+        if (!string.IsNullOrWhiteSpace(_chute4FullTag)) _fullChuteTags[4] = _chute4FullTag;
+        foreach (var chute in _fullChuteTags.Keys) _fullChuteStates[chute] = null;
+        _stopAndGoTag = _fullChuteTags.Count == 0 ? "" : sharedTags.StopAndGoTag?.Trim() ?? "";
         _stopAndGoDelay = TimeSpan.FromSeconds(Math.Clamp(sharedTags.StopAndGoDelaySeconds, 1, 3_600));
         PlcConfiguration.Validate(primaryLine.Plc);
-        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
+        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag, line.Plc.StopManuelTag?.Trim() ?? "" })
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
-            .Append(_chute4FullTag).Append(_stopAndGoTag)
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag).Append(_recirculationDrainTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
-        var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
-            .Append(_chute4FullTag).Append(_stopAndGoTag)
+        var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.StopManuelTag?.Trim() ?? "" })
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag).Append(_recirculationDrainTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = plcGateway ?? (configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
@@ -165,6 +253,47 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     internal void RecordPlcTagChange(string tag, string value)
     {
         var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        if (!string.IsNullOrWhiteSpace(_recirculationDrainTag) && string.Equals(tag, _recirculationDrainTag, StringComparison.OrdinalIgnoreCase))
+        {
+            RecirculationDrainActive = binaryState;
+            Changed?.Invoke();
+        }
+        foreach (var line in _configuration.GetConfiguredLines().Where(line =>
+            !string.IsNullOrWhiteSpace(line.Plc.StopManuelTag) &&
+            string.Equals(line.Plc.StopManuelTag.Trim(), tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            if (binaryState.HasValue) _manualLineStates[line.Id] = binaryState.Value;
+            else _manualLineStates.TryRemove(line.Id, out _);
+            Changed?.Invoke();
+        }
+        lock (_stopAndGoGate)
+        {
+            var matched = _fullChuteTags.Where(pair => string.Equals(pair.Value, tag, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Key).ToArray();
+            foreach (var chute in matched)
+            {
+                if (!_fullChuteDurations.TryGetValue(chute, out var duration))
+                    _fullChuteDurations[chute] = duration = new();
+                duration.Observe(binaryState, DateTimeOffset.UtcNow);
+                if (_fullChuteCountStates.GetValueOrDefault(chute) == false && binaryState == true)
+                    _fullChuteTransitions[chute] = _fullChuteTransitions.GetValueOrDefault(chute) + 1;
+                _fullChuteCountStates[chute] = binaryState;
+                _fullChuteStates[chute] = binaryState;
+                if (binaryState == true) _activeFullChutes.Add(chute);
+            }
+            if (matched.Length > 0)
+            {
+                if (_fullChuteStates.Values.Any(state => state == true)) ScheduleStopAndGo(true);
+                else if (_fullChuteStates.Values.All(state => state == false)) ScheduleStopAndGo(false);
+                else
+                {
+                    _chute4FullState = null;
+                    _stopAndGoPending?.Cancel();
+                    _stopAndGoPending = null;
+                }
+                UpdateChute4AlarmLocked();
+                Changed?.Invoke();
+            }
+        }
         if (!string.IsNullOrWhiteSpace(_chute4FullTag) &&
             string.Equals(tag, _chute4FullTag, StringComparison.OrdinalIgnoreCase))
         {
@@ -174,7 +303,6 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                 if (_chute4CountState == false && binaryState == true) _chute4FullTransitions++;
                 _chute4CountState = binaryState;
             }
-            if (binaryState.HasValue) ScheduleStopAndGo(binaryState.Value);
             Changed?.Invoke();
         }
         if (!string.IsNullOrWhiteSpace(_stopAndGoTag) &&
@@ -246,7 +374,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var sameInput = _chute4FullState == state;
             _chute4FullState = state;
             alarmChanged = UpdateChute4AlarmLocked();
-            if (!(sameInput && _stopAndGoPending is not null))
+            if (!string.IsNullOrWhiteSpace(_stopAndGoTag) && !(sameInput && _stopAndGoPending is not null))
             {
                 _stopAndGoPending?.Cancel();
                 if (_stopAndGoState == state)
@@ -264,12 +392,13 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 
     private bool UpdateChute4AlarmLocked()
     {
+        var removed = 0;
+        if (string.IsNullOrWhiteSpace(_stopAndGoTag) || _stopAndGoState == false)
+            removed = _activeFullChutes.RemoveWhere(chute => _fullChuteStates[chute] == false);
         // L'alarme s'ouvre immédiatement sur le signal d'entrée. Une fois ouverte,
         // elle reste verrouillée jusqu'au retour OPC confirmé des deux tags à zéro.
-        var active = Chute4AlarmActive
-            ? _chute4FullState != false || _stopAndGoState != false
-            : _chute4FullState == true;
-        if (active == Chute4AlarmActive) return false;
+        var active = _activeFullChutes.Contains(4);
+        if (active == Chute4AlarmActive) return removed > 0;
         Chute4AlarmActive = active;
         return true;
     }
@@ -278,6 +407,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_stopAndGoTag)) return;
             await Task.Delay(_stopAndGoDelay, pending.Token);
             lock (_stopAndGoGate)
             {
@@ -285,8 +415,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                     return;
             }
             await _plc.SendChuteAsync(_stopAndGoTag, state ? 1 : 0, 1, pending.Token);
-            _logger.LogWarning("Automatisme chute 4 : {InputTag} stable à {InputState} pendant {DelaySeconds} s ; {OutputTag}={OutputState}",
-                _chute4FullTag, state ? 1 : 0, _stopAndGoDelay.TotalSeconds, _stopAndGoTag, state ? 1 : 0);
+            _logger.LogWarning("Automatisme chutes pleines : état commun stable à {InputState} pendant {DelaySeconds} s ; {OutputTag}={OutputState}",
+                state ? 1 : 0, _stopAndGoDelay.TotalSeconds, _stopAndGoTag, state ? 1 : 0);
         }
         catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
         catch (Exception exception)
@@ -324,6 +454,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         }
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
             await line.StartAsync();
+        var recirculationMonitor = MonitorRecirculationAsync(stoppingToken);
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
@@ -345,6 +476,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             } while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        finally { await recirculationMonitor; }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
@@ -415,7 +547,13 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             foreach (var line in _lines.Values) line.SetConveyorRunning(null);
             ConveyorStopCause = null;
             FullChutesCount = null;
-            lock (_stopAndGoGate) _chute4CountState = null;
+            lock (_stopAndGoGate)
+            {
+                _chute4CountState = null;
+                _fullChuteCountStates.Clear();
+                foreach (var duration in _fullChuteDurations.Values)
+                    duration.Observe(null, DateTimeOffset.UtcNow);
+            }
             Code42Count = null;
             Changed?.Invoke();
             var reconnected = false;
@@ -459,9 +597,40 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         if (_coordinateStatistics && !_statistics!.Initialized)
             throw new InvalidOperationException("Restauration des compteurs en cours. Vérifier la connexion MySQL avant de connecter les appareils.");
     }
-    public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
+    public event Action? CountersReset;
+    public void ResetCounters(int lineId)
+    {
+        Get(lineId).ResetCounters();
+        lock (_stopAndGoGate)
+        {
+            _fullChuteTransitions.Clear();
+            _chute4FullTransitions = 0;
+            _fullChuteDurations.Clear();
+            var now = DateTimeOffset.UtcNow;
+            foreach (var chute in _fullChuteTags.Keys)
+            {
+                var duration = new FullChuteDuration();
+                duration.Observe(_fullChuteCountStates.GetValueOrDefault(chute), now);
+                _fullChuteDurations[chute] = duration;
+            }
+        }
+        CountersReset?.Invoke();
+        Changed?.Invoke();
+    }
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);
     public Task SetLineMotionAsync(int lineId, bool start) => WithConnectionGateAsync(() => Get(lineId).SetLineMotionAsync(start));
+    public Task SetManualLineAsync(int lineId, bool start) => WithConnectionGateAsync(async () =>
+    {
+        var line = _configuration.GetConfiguredLines().Single(line => line.Id == lineId);
+        var tag = line.Plc.StopManuelTag?.Trim();
+        if (string.IsNullOrWhiteSpace(tag)) throw new InvalidOperationException("Tag STOP_MANUEL non configuré pour cette ligne.");
+        if (!_plc.IsConnected) throw new InvalidOperationException("Automate déconnecté.");
+        await _plc.SendChuteAsync(tag, start ? 1 : 0, 1, CancellationToken.None);
+        _manualLineStates[lineId] = start;
+        _logger.LogInformation("Ligne {Line}: commande {Command} — {Tag}={Value}", lineId + 1,
+            start ? "DÉPART LIGNE" : "ARRÊT LIGNE", tag, start ? 1 : 0);
+        Changed?.Invoke();
+    });
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();
     public Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight) => Get(lineId).SimulateAsync(cameraData, dimension, weight);
     private LineController Get(int lineId) => _lines.TryGetValue(lineId, out var line) ? line : throw new KeyNotFoundException($"Ligne {lineId} inconnue.");

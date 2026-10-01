@@ -21,7 +21,7 @@
 @if (_activeTab == "realtime")
 {
     <div id="realtime-statistics" role="tabpanel" aria-labelledby="realtime-tab">
-        <RealtimeStatistics Counters="_realtimeCounters" UpdatedAt="_realtimeUpdatedAt" FullChutesCount="_fullChutesCount" Chute4FullTransitions="_chute4FullTransitions" CadencePoints="CadenceHistory.GetPoints()" />
+        <RealtimeStatistics Counters="_realtimeCounters" UpdatedAt="_realtimeUpdatedAt" FullChutesCount="_fullChutesCount" FullChuteTransitions="_fullChuteTransitions" FullChuteDurations="_fullChuteDurations" CadencePoints="CadenceHistory.GetPoints()" />
     </div>
 }
 else
@@ -49,7 +49,8 @@ else
     private IReadOnlyList<StatisticsHistoryPoint> _points = [];
     private LineCounters _realtimeCounters = new();
     private int? _fullChutesCount;
-    private long? _chute4FullTransitions;
+    private IReadOnlyDictionary<int, long?> _fullChuteTransitions = new Dictionary<int, long?>();
+    private IReadOnlyDictionary<int, TimeSpan?> _fullChuteDurations = new Dictionary<int, TimeSpan?>();
     private DateTimeOffset _realtimeUpdatedAt;
     private string _activeTab = "realtime";
     private bool _historyLoaded;
@@ -85,8 +86,11 @@ else
         var runningLines = lines.Where(line => line.Running).ToArray();
         _fullChutesCount = runningLines.Length > 0 && runningLines.All(line => line.Connections.Plc && !line.Connections.Simulated)
             ? Supervisor.FullChutesCount : null;
-        _chute4FullTransitions = runningLines.Length > 0 && runningLines.All(line => line.Connections.Plc && !line.Connections.Simulated)
-            ? Supervisor.Chute4FullTransitions : null;
+        var plcAvailable = runningLines.Length > 0 && runningLines.All(line => line.Connections.Plc && !line.Connections.Simulated);
+        _fullChuteTransitions = Supervisor.FullChuteTransitions.ToDictionary(pair => pair.Key,
+            pair => plcAvailable ? pair.Value : null);
+        _fullChuteDurations = Supervisor.FullChuteDurations.ToDictionary(pair => pair.Key,
+            pair => plcAvailable ? pair.Value : null);
         _realtimeCounters = CounterStatistics.CaptureCombined(0, DateTime.Today,
             lines.Select(line => line.ProductionCounters ?? new LineCounters())).Counters ?? new();
         _realtimeUpdatedAt = DateTimeOffset.Now;

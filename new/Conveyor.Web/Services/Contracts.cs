@@ -48,6 +48,7 @@ public interface IDatabaseMetricsService
 
 public interface IPlcGateway
 {
+    Task<string?> ReadTagAsync(string tag, CancellationToken token) => throw new NotSupportedException("Lecture individuelle non disponible pour cette passerelle.");
     bool IsConnected { get; }
     Task ConnectAsync(CancellationToken cancellationToken);
     Task DisconnectAsync();
@@ -63,6 +64,9 @@ public interface IPlcReadback
 
 public interface IConveyorSupervisor
 {
+    bool? RecirculationDrainActive => null;
+    Task StartRecirculationDrainAsync() => throw new NotSupportedException();
+    event Action? CountersReset { add { } remove { } }
     bool CountersReady => true;
     event Action? Changed;
     IReadOnlyList<LineSnapshot> GetSnapshots();
@@ -72,8 +76,11 @@ public interface IConveyorSupervisor
     string? ConveyorStopCause => null;
     int? FullChutesCount { get; }
     long? Chute4FullTransitions => null;
+    IReadOnlyDictionary<int, long?> FullChuteTransitions => new Dictionary<int, long?>();
+    IReadOnlyDictionary<int, TimeSpan?> FullChuteDurations => new Dictionary<int, TimeSpan?>();
     int? Code42Count { get; }
     bool Chute4AlarmActive { get; }
+    IReadOnlyList<int> FullChuteAlarms => Chute4AlarmActive ? new[] { 4 } : Array.Empty<int>();
     bool Maintenance { get; }
     bool HasStartedOperatingMode { get; }
     bool CanChangeOperatingMode { get; }
@@ -88,6 +95,8 @@ public interface IConveyorSupervisor
     void ResetCounters(int lineId);
     void SetCode98Enabled(int lineId, bool enabled);
     Task SetLineMotionAsync(int lineId, bool start);
+    bool? GetManualLineState(int lineId) => null;
+    Task SetManualLineAsync(int lineId, bool start) => throw new NotSupportedException();
     Task TriggerScaleFaultTestAsync(int lineId);
     Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight);
 }

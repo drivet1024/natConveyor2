@@ -18,12 +18,13 @@
     </main>
 </div>
 
-@if (Supervisor.Chute4AlarmActive)
+@if (Supervisor.FullChuteAlarms.Count > 0 && AlarmKey != _dismissedAlarmKey)
 {
-    <div class="chute-full-backdrop" role="presentation">
-        <section class="chute-full-alert" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="chute-full-title">
+    <div class="chute-full-backdrop" role="presentation" @onclick="DismissChuteAlarm">
+        <section class="chute-full-alert" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="chute-full-title" @onclick:stopPropagation="true">
             <div class="chute-full-symbol" aria-hidden="true">!</div>
             <h2 id="chute-full-title">CHUTE PLEINE</h2>
+            <p class="chute-full-numbers" aria-label="Numéros des chutes pleines">@string.Join(", ", Supervisor.FullChuteAlarms)</p>
         </section>
     </div>
 }
@@ -33,6 +34,17 @@
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainLayout).Assembly)?.InformationalVersion ?? "V1").TrimStart('V', 'v');
     private bool _menuCollapsed = true;
     private IJSObjectReference? _orientation;
+    private IJSObjectReference? _chuteAlarmKeyboard;
+    private string? _dismissedAlarmKey;
+    private string AlarmKey => string.Join(",", Supervisor.FullChuteAlarms);
+    private void DismissChuteAlarm() => _dismissedAlarmKey = AlarmKey;
+    [JSInvokable]
+    public Task DismissChuteAlarmFromKeyboard() => InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        DismissChuteAlarm();
+        StateHasChanged();
+    });
     private DotNetObjectReference<MainLayout>? _orientationReference;
     private string? _automaticPlan;
     private bool _disposed;
@@ -42,7 +54,16 @@
         Navigation.LocationChanged += OnLocationChanged;
         Supervisor.Changed += OnSupervisorChanged;
     }
-    private void OnSupervisorChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnSupervisorChanged()
+    {
+        var alarmsCleared = Supervisor.FullChuteAlarms.Count == 0;
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed) return;
+            if (alarmsCleared) _dismissedAlarmKey = null;
+            StateHasChanged();
+        });
+    }
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
         if (_automaticPlan is not null && CurrentPath != _automaticPlan) _automaticPlan = null;
@@ -75,6 +96,8 @@
             await using var orientationModule = await JS.InvokeAsync<IJSObjectReference>("import", "./phone-orientation.js");
             _orientationReference = DotNetObjectReference.Create(this);
             _orientation = await orientationModule.InvokeAsync<IJSObjectReference>("watch", _orientationReference);
+            await using var alarmModule = await JS.InvokeAsync<IJSObjectReference>("import", "./chute-alarm.js");
+            _chuteAlarmKeyboard = await alarmModule.InvokeAsync<IJSObjectReference>("watch", _orientationReference);
         }
         catch (JSDisconnectedException) { }
     }
@@ -85,6 +108,11 @@
         Supervisor.Changed -= OnSupervisorChanged;
         try
         {
+            if (_chuteAlarmKeyboard is not null)
+            {
+                await _chuteAlarmKeyboard.InvokeVoidAsync("dispose");
+                await _chuteAlarmKeyboard.DisposeAsync();
+            }
             if (_orientation is not null)
             {
                 await _orientation.InvokeVoidAsync("dispose");

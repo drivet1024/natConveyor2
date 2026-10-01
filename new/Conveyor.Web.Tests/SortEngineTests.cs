@@ -1,6 +1,7 @@
 using Conveyor.Web.Domain;
 using Conveyor.Web.Options;
 using Conveyor.Web.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Sockets;
@@ -608,6 +609,60 @@ public sealed class SortEngineTests
             await supervisor.StopLineAsync(0);
             await supervisor.StopLineAsync(1);
         }
+    }
+
+    [Fact]
+    public async Task Code68IncrementLogsSensorPlcDecisionAndTimestamps()
+    {
+        var repository = new FakeRepository();
+        var line = Line();
+        line.CorrelationDelayMs = 100;
+        line.Plc.TransferTag = "TRANSFER_TEST";
+        var logger = new RecordingLogger();
+        var controller = new LineController(line, true, repository, new MotionPlc(), false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), logger, () => { });
+        try
+        {
+            controller.RecordPlcTransferReception("68");
+            var processing = controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
+            controller.RecordPlcTransferReception("4");
+            controller.RecordPlcTransferReception(" 68\0");
+            Assert.DoesNotContain(logger.Messages, value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            await processing;
+
+            var message = Assert.Single(logger.Messages,
+                value => value.Contains("DIAGNOSTIC CODE 68", StringComparison.Ordinal));
+            Assert.Contains("compteur Code 68=1", message, StringComparison.Ordinal);
+            Assert.Contains("TRANSFER_TEST=[68]", message, StringComparison.Ordinal);
+            Assert.Contains("caméra=[12345678901]", message, StringComparison.Ordinal);
+            Assert.Contains("balance=4.75 lb", message, StringComparison.Ordinal);
+            Assert.Contains("dimensions=12 x 8 x 5", message, StringComparison.Ordinal);
+            Assert.Contains("chute finalement envoyée=4", message, StringComparison.Ordinal);
+            var sentAt = controller.Snapshot().LastPlcDispatch!.SentAt.ToLocalTime()
+                .ToString("yyyy-MM-dd HH:mm:ss.fff zzz", System.Globalization.CultureInfo.InvariantCulture);
+            Assert.Contains($"envoi automate confirmé à {sentAt}", message, StringComparison.Ordinal);
+            controller.RecordPlcTransferReception("4");
+            var traceCount = logger.Messages.Count(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            Assert.Equal(1, traceCount); // Only the 68 between camera and dispatch.
+            controller.RecordPlcTransferReception(" 68\0");
+            var transfer = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            Assert.Contains("TRACE TRANSFERT — dimensions=12 x 8 x 5", transfer, StringComparison.Ordinal);
+            Assert.Contains("TRANSFER_TEST=68", transfer, StringComparison.Ordinal);
+            Assert.Contains("caméra=[12345678901]", transfer, StringComparison.Ordinal);
+            Assert.Contains("caméra → transfert=", transfer, StringComparison.Ordinal);
+            Assert.Contains("transfert → DDE=", transfer, StringComparison.Ordinal);
+            Assert.Contains("caméra → DDE=", transfer, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentAt, transfer, StringComparison.Ordinal);
+            Assert.Equal(1, logger.Messages.Count(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal)));
+            var next = controller.SimulateAsync("12345678902", new Dimension(9, 8, 7), 3m);
+            controller.RecordPlcTransferReception("68");
+            await next;
+            var nextTrace = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
+            Assert.Contains("colis #2", nextTrace, StringComparison.Ordinal);
+            Assert.Contains("caméra=[12345678902]", nextTrace, StringComparison.Ordinal);
+            Assert.Contains("dimensions=9 x 8 x 7", nextTrace, StringComparison.Ordinal);
+        }
+        finally { await controller.StopAsync(); }
     }
 
     [Fact]
@@ -1771,5 +1826,14 @@ public sealed class SortEngineTests
             if (cachedPostalCodes is null) PostalCountReads++;
             return Task.FromResult((ParcelCount, cachedPostalCodes ?? PostalCount, ScanCount, HasOverdueScans));
         }
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
     }
 }

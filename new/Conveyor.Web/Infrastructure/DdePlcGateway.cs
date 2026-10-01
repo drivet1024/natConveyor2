@@ -41,6 +41,17 @@ public sealed class DdePlcGateway : IPlcGateway, IPlcReadback, IDisposable
     // Keep transport state separate so a read fault does not prevent a stop command.
     public bool ReadsHealthy => IsConnected && _readsHealthy;
 
+    public async Task<string?> ReadTagAsync(string tag, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+        try
+        {
+            if (!IsConnected) throw new IOException("Automate déconnecté.");
+            return Normalize(await Task.Run(() => _client!.Request(tag, 1_000), token));
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task ConnectAsync(CancellationToken token)
     {
         if (!OperatingSystem.IsWindows())

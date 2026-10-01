@@ -17,16 +17,26 @@
         <section class="metric-section" aria-labelledby="full-chutes-title">
             <h3 id="full-chutes-title">Chutes pleines</h3>
             <div class="metric-grid">
+                @if (!string.IsNullOrWhiteSpace(Options.Value.General?.FullChutesTag))
+                {
                 <div class="realtime-metric">
                     <div><strong>@(FullChutesCount?.ToString("N0") ?? "—")</strong></div>
                     <span class="label">Nombre de chutes pleines</span>
                     <small>@(FullChutesCount.HasValue ? "Valeur du compteur automate en temps réel" : "Compteur automate indisponible")</small>
                 </div>
-                <div class="realtime-metric">
-                    <div><strong>@(Chute4FullTransitions?.ToString("N0") ?? "—")</strong></div>
-                    <span class="label">Chute 4 pleine</span>
-                    <small>Passages de 0 à 1 depuis le démarrage de l’application</small>
-                </div>
+                }
+                @foreach (var chute in Enumerable.Range(1, 48).Where(number =>
+                    !string.IsNullOrWhiteSpace(Options.Value.General?.GetFullChuteTag(number))))
+                {
+                    <div class="realtime-metric" @key="chute">
+                        <div class="full-chute-values">
+                            <strong>@(FullChuteTransitions.GetValueOrDefault(chute)?.ToString("N0") ?? "—")</strong>
+                            <div class="full-chute-duration"><strong>@FormatDuration(FullChuteDurations.GetValueOrDefault(chute))</strong><small>Temps cumulé</small></div>
+                        </div>
+                        <span class="label">Chute @chute pleine</span>
+                        <small>Passages de 0 à 1 depuis la dernière remise à zéro</small>
+                    </div>
+                }
             </div>
         </section>
         <section class="metric-section" aria-labelledby="rejection-causes-title">
@@ -71,7 +81,10 @@
     [Parameter, EditorRequired] public LineCounters Counters { get; set; } = new();
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
     [Parameter] public int? FullChutesCount { get; set; }
-    [Parameter] public long? Chute4FullTransitions { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, long?> FullChuteTransitions { get; set; } = new Dictionary<int, long?>();
+    [Parameter] public IReadOnlyDictionary<int, TimeSpan?> FullChuteDurations { get; set; } = new Dictionary<int, TimeSpan?>();
+    private static string FormatDuration(TimeSpan? value) => value is { } duration
+        ? $"{(long)duration.TotalHours:00}:{duration.Minutes:00}:{duration.Seconds:00}" : "—";
     [Parameter] public IReadOnlyList<CadencePoint> CadencePoints { get; set; } = [];
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
     private long SortedParcels => Counters.SortedByWaybill + Counters.SortedByPostalCode;

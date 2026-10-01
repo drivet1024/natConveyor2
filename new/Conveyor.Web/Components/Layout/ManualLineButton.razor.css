@@ -1,0 +1,5 @@
+.manual-line-control { display: flex; flex-direction: column; gap: .3rem; }
+.manual-start { background: #198747; border-color: #28ac60; color: #fff; font-weight: 800; }
+.manual-stop { background: #bb2639; border-color: #e63a51; color: #fff; font-weight: 800; }
+.manual-line-control small { color: #ff8896; max-width: 18rem; }
+.manual-line-control button:disabled { opacity: .55; }
