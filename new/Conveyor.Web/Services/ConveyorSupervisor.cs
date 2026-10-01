@@ -331,6 +331,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_stopAndGoTag)) return;
             await Task.Delay(_stopAndGoDelay, pending.Token);
             lock (_stopAndGoGate)
             {

@@ -257,6 +257,31 @@ public sealed class ShiftSelectionTests
         Assert.Equal("", options.General.GetFullChuteTag(1));
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task BlankStopAndGoNeverWritesAndKeepsConfiguredChuteAlarms(string? stopTag)
+    {
+        var options = CreateOptions(1);
+        options.General!.StopAndGoTag = stopTag!;
+        options.General.StopAndGoDelaySeconds = 1;
+        options.General.SetFullChuteTag(3, "FULL_3");
+        options.General.SetFullChuteTag(4, " ");
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        Assert.Equal(new[] { 3 }, supervisor.FullChuteTransitions.Keys);
+        gateway.Emit("FULL_3", "0");
+        gateway.Emit("FULL_3", "1");
+        Assert.Equal(new[] { 3 }, supervisor.FullChuteAlarms);
+        await Task.Delay(1200);
+        Assert.Empty(gateway.Writes);
+        gateway.Emit("FULL_3", "0");
+        Assert.Empty(supervisor.FullChuteAlarms);
+        await Task.Delay(1200);
+        Assert.Empty(gateway.Writes);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions
