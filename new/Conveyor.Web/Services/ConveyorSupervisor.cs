@@ -8,6 +8,49 @@ namespace Conveyor.Web.Services;
 public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 {
     private readonly Dictionary<int, LineController> _lines;
+    private readonly string _recirculationDrainTag;
+    public bool? RecirculationDrainActive { get; private set; }
+    public Task StartRecirculationDrainAsync() => WithConnectionGateAsync(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag)) throw new InvalidOperationException("Tag de recirculation non configuré.");
+        if (!_plc.IsConnected) throw new InvalidOperationException("Automate déconnecté.");
+        if (RecirculationDrainActive == true) return;
+        if (_plc is TcpPlcGateway) throw new InvalidOperationException("Le vidage surveillé exige une connexion OPC DA ou DDE.");
+        await _plc.SendChuteAsync(_recirculationDrainTag, 1, 1, CancellationToken.None);
+        _logger.LogInformation("Vidage recirculation demandé : {Tag}=1", _recirculationDrainTag);
+        RecirculationDrainActive = true;
+        Changed?.Invoke();
+    });
+
+    internal async Task PollRecirculationAsync(CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag) || !_plc.IsConnected || RecirculationDrainActive == false) return;
+        await _motionGate.WaitAsync(token);
+        try
+        {
+            var value = await _plc.ReadTagAsync(_recirculationDrainTag, token);
+            RecordPlcTagChange(_recirculationDrainTag, value ?? "");
+        }
+        finally { _motionGate.Release(); }
+    }
+
+    private async Task MonitorRecirculationAsync(CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(_recirculationDrainTag)) return;
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            do
+            {
+                try { await PollRecirculationAsync(token); }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logger.LogWarning(exception, "Lecture du tag de vidage recirculation impossible");
+                }
+            } while (await timer.WaitForNextTickAsync(token));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _manualLineStates = new();
     public bool? GetManualLineState(int lineId) => _manualLineStates.TryGetValue(lineId, out var state) ? state : null;
     private readonly HashSet<int> _autoStartIds;
@@ -164,6 +207,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _closeChute39Tag = primaryLine.Plc.CloseChute39Tag;
         _motionTag = configuration.General?.ConveyorStartTag?.Trim() ?? ConveyorMotion.DefaultMotionTag;
         var sharedTags = configuration.General ?? new GeneralOptions();
+        _recirculationDrainTag = sharedTags.RecirculationDrainTag?.Trim() ?? "";
         _fullChutesTag = sharedTags.FullChutesTag.Trim();
         _code42Tag = sharedTags.Code42Tag.Trim();
         _chute4FullTag = sharedTags.GetFullChuteTag(4);
@@ -178,10 +222,10 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag, line.Plc.StopManuelTag?.Trim() ?? "" })
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
-            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag).Append(_recirculationDrainTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.StopManuelTag?.Trim() ?? "" })
-            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
+            .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag).Append(_recirculationDrainTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = plcGateway ?? (configuration.Simulation
             ? new SimulationPlcGateway(loggerFactory.CreateLogger<SimulationPlcGateway>())
@@ -209,6 +253,11 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     internal void RecordPlcTagChange(string tag, string value)
     {
         var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        if (!string.IsNullOrWhiteSpace(_recirculationDrainTag) && string.Equals(tag, _recirculationDrainTag, StringComparison.OrdinalIgnoreCase))
+        {
+            RecirculationDrainActive = binaryState;
+            Changed?.Invoke();
+        }
         foreach (var line in _configuration.GetConfiguredLines().Where(line =>
             !string.IsNullOrWhiteSpace(line.Plc.StopManuelTag) &&
             string.Equals(line.Plc.StopManuelTag.Trim(), tag, StringComparison.OrdinalIgnoreCase)))
@@ -405,6 +454,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         }
         foreach (var line in _lines.Where(pair => _autoStartIds.Contains(pair.Key)).Select(pair => pair.Value))
             await line.StartAsync();
+        var recirculationMonitor = MonitorRecirculationAsync(stoppingToken);
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
@@ -426,6 +476,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             } while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        finally { await recirculationMonitor; }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)

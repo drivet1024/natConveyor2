@@ -339,6 +339,43 @@ public sealed class ShiftSelectionTests
         Assert.Empty(gateway.Writes);
     }
 
+    [Fact]
+    public async Task RecirculationWritesOneAndReadsUntilAutomateReturnsZero()
+    {
+        var options = CreateOptions(1);
+        options.General!.RecirculationDrainTag = "DRAIN";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await supervisor.StartRecirculationDrainAsync();
+        Assert.True(supervisor.RecirculationDrainActive);
+        Assert.Equal(("DRAIN", 1), Assert.Single(gateway.Writes));
+        gateway.ReadValue = "1";
+        await supervisor.PollRecirculationAsync(default);
+        Assert.True(supervisor.RecirculationDrainActive);
+        gateway.ReadValue = "0";
+        await supervisor.PollRecirculationAsync(default);
+        Assert.False(supervisor.RecirculationDrainActive);
+        await supervisor.PollRecirculationAsync(default);
+        Assert.Equal(2, gateway.ReadCount);
+        Assert.Single(gateway.Writes);
+        gateway.FailWrites = true;
+        await Assert.ThrowsAsync<IOException>(() => supervisor.StartRecirculationDrainAsync());
+        Assert.False(supervisor.RecirculationDrainActive);
+    }
+
+    [Fact]
+    public async Task BlankRecirculationTagNeverReadsOrWrites()
+    {
+        var options = CreateOptions(1);
+        options.General!.RecirculationDrainTag = " ";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await supervisor.PollRecirculationAsync(default);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.StartRecirculationDrainAsync());
+        Assert.Empty(gateway.Writes);
+        Assert.Equal(0, gateway.ReadCount);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions
@@ -361,6 +398,13 @@ public sealed class ShiftSelectionTests
 
     private sealed class RecordingPlcGateway : IPlcGateway, IPlcReadback
     {
+        public string ReadValue { get; set; } = "0";
+        public int ReadCount { get; private set; }
+        public Task<string?> ReadTagAsync(string tag, CancellationToken token)
+        {
+            ReadCount++;
+            return Task.FromResult<string?>(ReadValue);
+        }
         public bool FailWrites { get; set; }
         public bool IsConnected => true;
         public bool ReadsHealthy => true;

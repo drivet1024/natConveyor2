@@ -48,6 +48,7 @@ public interface IDatabaseMetricsService
 
 public interface IPlcGateway
 {
+    Task<string?> ReadTagAsync(string tag, CancellationToken token) => throw new NotSupportedException("Lecture individuelle non disponible pour cette passerelle.");
     bool IsConnected { get; }
     Task ConnectAsync(CancellationToken cancellationToken);
     Task DisconnectAsync();
@@ -63,6 +64,8 @@ public interface IPlcReadback
 
 public interface IConveyorSupervisor
 {
+    bool? RecirculationDrainActive => null;
+    Task StartRecirculationDrainAsync() => throw new NotSupportedException();
     event Action? CountersReset { add { } remove { } }
     bool CountersReady => true;
     event Action? Changed;

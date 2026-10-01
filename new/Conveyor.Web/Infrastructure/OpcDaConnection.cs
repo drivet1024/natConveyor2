@@ -16,6 +16,7 @@ internal interface IOpcDaConnection : IDisposable
     event Action<IReadOnlyList<OpcDaReading>>? ValuesChanged;
     void Connect();
     Task<IReadOnlyList<OpcDaReading>> ReadAsync(CancellationToken token);
+    Task<IReadOnlyList<OpcDaReading>> ReadTagAsync(string tag, CancellationToken token) => throw new NotSupportedException();
     Task WriteAsync(string tag, int value, CancellationToken token);
 }
 
@@ -156,6 +157,12 @@ internal sealed class OpcDaConnection(PlcOptions options, string[] monitoredTags
 
     public async Task<IReadOnlyList<OpcDaReading>> ReadAsync(CancellationToken token) =>
         _readItems.Length == 0 ? [] : ConvertReadings(await _group!.ReadAsync(_readItems, token));
+
+    public async Task<IReadOnlyList<OpcDaReading>> ReadTagAsync(string tag, CancellationToken token)
+    {
+        var item = _items[ItemId(options.OpcTopic, tag)];
+        return ConvertReadings(await _group!.ReadAsync([item], token));
+    }
 
     public async Task WriteAsync(string tag, int value, CancellationToken token)
     {

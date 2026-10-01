@@ -1,0 +1,5 @@
+.recirculation-control { display:flex; flex-direction:column; gap:.3rem; }
+.recirculation-control .btn { font-weight:800; color:white; }
+.recirculation-control .inactive { background:#bb2639; border-color:#e63a51; }
+.recirculation-control .active, .recirculation-control .active:disabled { background:#198747; border-color:#28ac60; opacity:1; }
+.recirculation-control small { color:#ff8896; max-width:20rem; }

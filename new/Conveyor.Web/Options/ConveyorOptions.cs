@@ -81,6 +81,7 @@ public sealed class GeneralOptions
         else (FullChuteTags ??= new())[chute] = value?.Trim() ?? "";
     }
     public string StopAndGoTag { get; set; } = "";
+    public string RecirculationDrainTag { get; set; } = "";
     [Range(1, 3_600)] public int StopAndGoDelaySeconds { get; set; } = 5;
     public int? ConveyorId { get; set; }
     public bool Maintenance { get; set; }

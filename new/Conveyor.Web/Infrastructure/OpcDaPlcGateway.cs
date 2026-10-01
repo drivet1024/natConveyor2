@@ -41,6 +41,22 @@ public sealed class OpcDaPlcGateway : IPlcGateway, IPlcReadback, IDisposable
         _factory = factory ?? (() => new OpcDaConnection(options, monitored, subscriptionOnlyTags, logger));
     }
 
+    public async Task<string?> ReadTagAsync(string tag, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+        try
+        {
+            if (!IsConnected) throw new IOException("Automate déconnecté.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(3));
+            var values = await Task.Run(() => _client!.ReadTagAsync(tag, timeout.Token), token);
+            var reading = values.FirstOrDefault(value => string.Equals(value.Tag, tag, StringComparison.OrdinalIgnoreCase));
+            if (reading is null || !reading.Good || reading.Value is null or Array) throw new IOException("Valeur automate indisponible.");
+            return reading.Value is bool flag ? (flag ? "1" : "0") : Convert.ToString(reading.Value, CultureInfo.InvariantCulture);
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task ConnectAsync(CancellationToken token)
     {
         await _gate.WaitAsync(token);

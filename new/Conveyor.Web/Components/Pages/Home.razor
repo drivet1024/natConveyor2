@@ -44,6 +44,10 @@
             <div class="conveyor-buttons">
                 <button type="button" class="btn btn-start" @onclick="() => OpenMotion(true)">DÉMARRER</button>
                 <button type="button" class="btn btn-stop" @onclick="() => OpenMotion(false)">ARRÊTER</button>
+                @if (!string.IsNullOrWhiteSpace(Options.Value.General?.RecirculationDrainTag))
+                {
+                    <RecirculationButton Active="Supervisor.RecirculationDrainActive" />
+                }
             </div>
         </section>
         <button type="button" class="shared-status plc-restart-button" title="@(PlcTitle() + " — cliquer pour redémarrer RSLinx")" aria-label="Automate : ouvrir le redémarrage RSLinx" @onclick="() => _rslinxDialog = true"><span class="connection-led @PlcCss()"></span><span><small>AUTOMATE</small><strong>@PlcLabel()</strong></span></button>
