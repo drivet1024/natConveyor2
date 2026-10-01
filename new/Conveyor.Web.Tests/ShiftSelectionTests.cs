@@ -305,6 +305,40 @@ public sealed class ShiftSelectionTests
         Assert.Equal(1, supervisor.FullChuteTransitions[4]);
     }
 
+    [Fact]
+    public async Task ManualLineCommandUsesItsOwnTagAndTracksReadback()
+    {
+        var options = CreateOptions(1);
+        options.Lines[0].Plc.StopManuelTag = " MANUAL_1 ";
+        options.Lines[1].Plc.StopManuelTag = "MANUAL_2";
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        gateway.Emit("MANUAL_1", "0");
+        gateway.Emit("MANUAL_2", "1");
+        await supervisor.SetManualLineAsync(0, true);
+        Assert.Equal(("MANUAL_1", 1), Assert.Single(gateway.Writes));
+        Assert.True(supervisor.GetManualLineState(0));
+        Assert.True(supervisor.GetManualLineState(1));
+        await supervisor.SetManualLineAsync(0, false);
+        Assert.Equal(("MANUAL_1", 0), gateway.Writes.Last());
+        Assert.False(supervisor.GetManualLineState(0));
+        gateway.Emit("MANUAL_1", "1");
+        Assert.True(supervisor.GetManualLineState(0));
+        gateway.FailWrites = true;
+        await Assert.ThrowsAsync<IOException>(() => supervisor.SetManualLineAsync(0, false));
+        Assert.True(supervisor.GetManualLineState(0));
+    }
+
+    [Fact]
+    public async Task ManualLineWithoutTagNeverWrites()
+    {
+        var options = CreateOptions(1);
+        var gateway = new RecordingPlcGateway();
+        using var supervisor = CreateSupervisor(options, gateway);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.SetManualLineAsync(0, true));
+        Assert.Empty(gateway.Writes);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions
@@ -327,6 +361,7 @@ public sealed class ShiftSelectionTests
 
     private sealed class RecordingPlcGateway : IPlcGateway, IPlcReadback
     {
+        public bool FailWrites { get; set; }
         public bool IsConnected => true;
         public bool ReadsHealthy => true;
         public event Action<string, string>? TagChanged;
@@ -337,6 +372,7 @@ public sealed class ShiftSelectionTests
         public Task<bool> PingAsync(CancellationToken token) => Task.FromResult(true);
         public Task SendChuteAsync(string tag, int chute, int repeat, CancellationToken token)
         {
+            if (FailWrites) throw new IOException("Write failed");
             Writes.Enqueue((tag, chute));
             return Task.CompletedTask;
         }

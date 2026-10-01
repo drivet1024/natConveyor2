@@ -182,6 +182,7 @@ public sealed class PlcOptions
     public string TransferTag { get; set; } = "";
     public string CloseChute39Tag { get; set; } = "CLOSE_CHUTE_39";
     public string ScaleFaultTag { get; set; } = "";
+    public string StopManuelTag { get; set; } = "";
     [Range(1, 100)] public int ScaleFaultParcelThreshold { get; set; } = 3;
     [Range(1, 60_000)] public int ScaleFaultPulseMs { get; set; } = 7_000;
     public int SendCount { get; set; } = 1;

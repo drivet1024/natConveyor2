@@ -216,6 +216,10 @@
                         @foreach (var shift in _shifts) { <option value="@shift.Id" selected="@(shift.Id == Supervisor.CurrentShiftId)">@shift.Name</option> }
                     </select>
                 </label>
+                @if (!string.IsNullOrWhiteSpace(Options.Value.GetConfiguredLines().FirstOrDefault(option => option.Id == line.LineId)?.Plc.StopManuelTag))
+                {
+                    <ManualLineButton LineId="line.LineId" Started="Supervisor.GetManualLineState(line.LineId)" />
+                }
                 <button type="button" class="btn gear-button" title="Reset des appareils" aria-label="Ouvrir les commandes de reset des appareils" @onclick="() => _converterLineId = line.LineId">⚙</button>
             </div>
         </div>

@@ -8,6 +8,8 @@ namespace Conveyor.Web.Services;
 public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
 {
     private readonly Dictionary<int, LineController> _lines;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _manualLineStates = new();
+    public bool? GetManualLineState(int lineId) => _manualLineStates.TryGetValue(lineId, out var state) ? state : null;
     private readonly HashSet<int> _autoStartIds;
     private readonly IPlcGateway _plc;
     private readonly IConfigurationEditor _editor;
@@ -173,12 +175,12 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         _stopAndGoTag = _fullChuteTags.Count == 0 ? "" : sharedTags.StopAndGoTag?.Trim() ?? "";
         _stopAndGoDelay = TimeSpan.FromSeconds(Math.Clamp(sharedTags.StopAndGoDelaySeconds, 1, 3_600));
         PlcConfiguration.Validate(primaryLine.Plc);
-        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag })
+        var monitoredTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.ScaleFaultTag, line.Plc.StopManuelTag?.Trim() ?? "" })
             .Append(_closeChute39Tag).Append(_motionTag)
             .Append(_fullChutesTag).Append(_code42Tag)
             .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
-        var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag })
+        var subscriptionOnlyTags = activeLines.SelectMany(line => new[] { line.Plc.ChuteTag, line.Plc.TransferTag, line.Plc.StopManuelTag?.Trim() ?? "" })
             .Concat(_fullChuteTags.Values).Append(_chute4FullTag).Append(_stopAndGoTag)
             .Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
         _plc = plcGateway ?? (configuration.Simulation
@@ -207,6 +209,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     internal void RecordPlcTagChange(string tag, string value)
     {
         var binaryState = value.Trim('\0', ' ', '\r', '\n', '\t') switch { "1" => true, "0" => false, _ => (bool?)null };
+        foreach (var line in _configuration.GetConfiguredLines().Where(line =>
+            !string.IsNullOrWhiteSpace(line.Plc.StopManuelTag) &&
+            string.Equals(line.Plc.StopManuelTag.Trim(), tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            if (binaryState.HasValue) _manualLineStates[line.Id] = binaryState.Value;
+            else _manualLineStates.TryRemove(line.Id, out _);
+            Changed?.Invoke();
+        }
         lock (_stopAndGoGate)
         {
             var matched = _fullChuteTags.Where(pair => string.Equals(pair.Value, tag, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Key).ToArray();
@@ -558,6 +568,18 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     }
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);
     public Task SetLineMotionAsync(int lineId, bool start) => WithConnectionGateAsync(() => Get(lineId).SetLineMotionAsync(start));
+    public Task SetManualLineAsync(int lineId, bool start) => WithConnectionGateAsync(async () =>
+    {
+        var line = _configuration.GetConfiguredLines().Single(line => line.Id == lineId);
+        var tag = line.Plc.StopManuelTag?.Trim();
+        if (string.IsNullOrWhiteSpace(tag)) throw new InvalidOperationException("Tag STOP_MANUEL non configuré pour cette ligne.");
+        if (!_plc.IsConnected) throw new InvalidOperationException("Automate déconnecté.");
+        await _plc.SendChuteAsync(tag, start ? 1 : 0, 1, CancellationToken.None);
+        _manualLineStates[lineId] = start;
+        _logger.LogInformation("Ligne {Line}: commande {Command} — {Tag}={Value}", lineId + 1,
+            start ? "DÉPART LIGNE" : "ARRÊT LIGNE", tag, start ? 1 : 0);
+        Changed?.Invoke();
+    });
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();
     public Task SimulateParcelAsync(int lineId, string cameraData, Dimension dimension, decimal weight) => Get(lineId).SimulateAsync(cameraData, dimension, weight);
     private LineController Get(int lineId) => _lines.TryGetValue(lineId, out var line) ? line : throw new KeyNotFoundException($"Ligne {lineId} inconnue.");
