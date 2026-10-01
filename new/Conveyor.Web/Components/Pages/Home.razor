@@ -73,6 +73,31 @@
     <div class="config-notice error" role="status">@_resetDataMessage</div>
 }
 
+@{
+    var fullChuteCounts = Supervisor.FullChuteTransitions;
+    var fullChuteDurations = Supervisor.FullChuteDurations;
+}
+@if (fullChuteCounts.Count > 0)
+{
+    <section class="mobile-full-chutes" aria-labelledby="mobile-full-chutes-title">
+        <h2 id="mobile-full-chutes-title">Chutes pleines</h2>
+        <div class="mobile-full-chute-grid">
+            @foreach (var chute in fullChuteCounts.OrderBy(pair => pair.Key))
+            {
+                var duration = !PlcSimulated() && PlcConnected() ? fullChuteDurations.GetValueOrDefault(chute.Key) : null;
+                <div class="mobile-full-chute-card" @key="chute.Key">
+                    <h3>Chute @chute.Key</h3>
+                    <div class="mobile-full-chute-values">
+                        <div><strong>@(!PlcSimulated() && PlcConnected() ? chute.Value?.ToString("N0") ?? "—" : "—")</strong><small>Nombre de fois</small></div>
+                        <div class="mobile-full-chute-duration"><strong>@(duration is { } elapsed ? $"{(long)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}" : "—")</strong><small>Temps cumulé</small></div>
+                    </div>
+                </div>
+            }
+        </div>
+        <p>Depuis le démarrage de l’application</p>
+    </section>
+}
+
 <section class="line-grid @(_lines.Count == 1 ? "single-line" : null)">
 @foreach (var line in _lines)
 {

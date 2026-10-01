@@ -164,3 +164,17 @@
     .mobile-counter.counter-critical { background: rgba(255,78,91,.07); }
     .mobile-counter.counter-critical strong { color: #ff4e5b; }
 }
+.mobile-full-chutes { display: none; }
+@media (max-width: 768px) {
+    .mobile-full-chutes { display: block; margin-bottom: .8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+    .mobile-full-chutes h2 { margin: 0; padding: .65rem .75rem; color: var(--orange); font-size: .85rem; border-bottom: 1px solid var(--line); }
+    .mobile-full-chute-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mobile-full-chute-card { min-width: 0; padding: .65rem; border-bottom: 1px solid var(--line); }
+    .mobile-full-chute-card:nth-child(odd) { border-right: 1px solid var(--line); }
+    .mobile-full-chute-card h3 { margin: 0 0 .5rem; font-size: .8rem; color: #9eb8d7; }
+    .mobile-full-chute-values { display: flex; justify-content: space-between; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .mobile-full-chute-values strong { display: block; color: #fff; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .mobile-full-chute-values small { display: block; color: var(--muted); font-size: .6rem; margin-top: .2rem; }
+    .mobile-full-chute-duration { margin-left: auto; padding: .3rem; border: 1px solid var(--line); border-radius: 4px; text-align: right; }
+    .mobile-full-chutes p { margin: 0; padding: .45rem .75rem; color: var(--muted); font-size: .65rem; }
+}
