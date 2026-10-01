@@ -29,7 +29,10 @@
                     !string.IsNullOrWhiteSpace(Options.Value.General?.GetFullChuteTag(number))))
                 {
                     <div class="realtime-metric" @key="chute">
-                        <div><strong>@(FullChuteTransitions.GetValueOrDefault(chute)?.ToString("N0") ?? "—")</strong></div>
+                        <div class="full-chute-values">
+                            <strong>@(FullChuteTransitions.GetValueOrDefault(chute)?.ToString("N0") ?? "—")</strong>
+                            <div class="full-chute-duration"><strong>@FormatDuration(FullChuteDurations.GetValueOrDefault(chute))</strong><small>Temps cumulé</small></div>
+                        </div>
                         <span class="label">Chute @chute pleine</span>
                         <small>Passages de 0 à 1 depuis le démarrage de l’application</small>
                     </div>
@@ -79,6 +82,9 @@
     [Parameter] public DateTimeOffset UpdatedAt { get; set; }
     [Parameter] public int? FullChutesCount { get; set; }
     [Parameter] public IReadOnlyDictionary<int, long?> FullChuteTransitions { get; set; } = new Dictionary<int, long?>();
+    [Parameter] public IReadOnlyDictionary<int, TimeSpan?> FullChuteDurations { get; set; } = new Dictionary<int, TimeSpan?>();
+    private static string FormatDuration(TimeSpan? value) => value is { } duration
+        ? $"{(long)duration.TotalHours:00}:{duration.Minutes:00}:{duration.Seconds:00}" : "—";
     [Parameter] public IReadOnlyList<CadencePoint> CadencePoints { get; set; } = [];
     private long EligibleParcels => Math.Max(0, Counters.TotalParcels - Counters.NoReads);
     private long SortedParcels => Counters.SortedByWaybill + Counters.SortedByPostalCode;

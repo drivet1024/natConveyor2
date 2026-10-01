@@ -31,6 +31,20 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     private readonly Dictionary<int, bool?> _fullChuteStates = new();
     private readonly Dictionary<int, bool?> _fullChuteCountStates = new();
     private readonly Dictionary<int, long> _fullChuteTransitions = new();
+    private readonly Dictionary<int, FullChuteDuration> _fullChuteDurations = new();
+    public IReadOnlyDictionary<int, TimeSpan?> FullChuteDurations
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+            {
+                var now = DateTimeOffset.UtcNow;
+                return _fullChuteTags.Keys.ToDictionary(chute => chute,
+                    chute => _fullChuteCountStates.GetValueOrDefault(chute).HasValue
+                        ? (TimeSpan?)(_fullChuteDurations.GetValueOrDefault(chute)?.GetTotal(now) ?? TimeSpan.Zero) : null);
+            }
+        }
+    }
     public IReadOnlyDictionary<int, long?> FullChuteTransitions
     {
         get
@@ -198,6 +212,9 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var matched = _fullChuteTags.Where(pair => string.Equals(pair.Value, tag, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Key).ToArray();
             foreach (var chute in matched)
             {
+                if (!_fullChuteDurations.TryGetValue(chute, out var duration))
+                    _fullChuteDurations[chute] = duration = new();
+                duration.Observe(binaryState, DateTimeOffset.UtcNow);
                 if (_fullChuteCountStates.GetValueOrDefault(chute) == false && binaryState == true)
                     _fullChuteTransitions[chute] = _fullChuteTransitions.GetValueOrDefault(chute) + 1;
                 _fullChuteCountStates[chute] = binaryState;
@@ -473,6 +490,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             {
                 _chute4CountState = null;
                 _fullChuteCountStates.Clear();
+                foreach (var duration in _fullChuteDurations.Values)
+                    duration.Observe(null, DateTimeOffset.UtcNow);
             }
             Code42Count = null;
             Changed?.Invoke();
