@@ -3,7 +3,7 @@
 .parcel-details-button { display: block; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .parcel-details-button:hover { background: #ffffff08; }
 .parcel-details-button:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; }
-.parcel-details-button > .metric, .parcel-details-button > .mobile-counter { height: 100%; }
+.parcel-details-button > .metric, .parcel-details-button > .mobile-counter { box-sizing: border-box; width: 100%; height: 100%; }
 .mobile-counters { display: none; }
 .conveyor-tag-counts { display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .conveyor-tag-counts strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
@@ -27,6 +27,7 @@
 
 .metrics { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .metrics .metric { grid-column: span 3; border-right: 1px solid var(--line); }
+.metrics > .parcel-details-button { grid-column: span 3; width: 100%; }
 .metrics .metric strong { color: #fff; }
 .database-local-status { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding-right: .8rem; border-right: 1px solid var(--line); }
 .database-local-status .database-summary-title { padding: 0; border: 0; }
@@ -46,7 +47,9 @@
 .metrics .metric .metric-tone-critical strong,
 .metrics .metric.metric-tone-critical .metric-percentage,
 .metrics .metric .metric-tone-critical .metric-percentage { color: #ff6c79; }
-.metrics .metric:nth-child(4), .metrics .metric:last-child { border-right: 0; }
+.metrics > .metric:nth-child(4), .metrics > .metric:last-child,
+.metrics > .parcel-details-button:nth-child(4) > .metric,
+.metrics > .parcel-details-button:last-child > .metric { border-right: 0; }
 .actions .btn-code98 { margin-left: 0; }
 .line-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
 
