@@ -6,6 +6,20 @@ namespace Conveyor.Web.Tests;
 public class CadenceHistoryTests
 {
     [Fact]
+    public void ManualResetClearsGraphAndStartsANewBaseline()
+    {
+        using var history = new CadenceHistoryService(null!, NullLogger<CadenceHistoryService>.Instance);
+        var now = DateTimeOffset.UtcNow;
+        history.Observe(now, new() { [0] = 0 });
+        history.Observe(now.AddMinutes(10), new() { [0] = 100 });
+        Assert.Single(history.GetPoints());
+        history.Reset();
+        Assert.Empty(history.GetPoints());
+        history.Observe(now.AddMinutes(11), new() { [0] = 0 });
+        history.Observe(now.AddMinutes(21), new() { [0] = 10 });
+        Assert.Equal(60, Assert.Single(history.GetPoints()).ParcelsPerHour);
+    }
+    [Fact]
     public void RestorationDoesNotCountSavedParcelsAsNewTraffic()
     {
         using var history = new CadenceHistoryService(null!, NullLogger<CadenceHistoryService>.Instance);

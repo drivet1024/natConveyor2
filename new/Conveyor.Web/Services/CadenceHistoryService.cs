@@ -21,6 +21,18 @@ public sealed class CadenceHistoryService(IConveyorSupervisor supervisor, ILogge
     public event Action? Changed;
     public IReadOnlyList<CadencePoint> GetPoints() { lock (_gate) return _points.ToArray(); }
 
+    internal void Reset()
+    {
+        lock (_gate)
+        {
+            _points.Clear();
+            _previous = null;
+            _received = 0;
+            _dirty = true;
+        }
+        Changed?.Invoke();
+    }
+
     internal void Observe(DateTimeOffset now, Dictionary<int, long> totals, bool countersReady = true)
     {
         lock (_gate)
@@ -96,6 +108,7 @@ public sealed class CadenceHistoryService(IConveyorSupervisor supervisor, ILogge
         try { await LoadAsync(FilePath, DateTimeOffset.UtcNow, stoppingToken); }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         catch (Exception exception) { logger.LogWarning(exception, "Historique de cadence illisible ; nouvelle collecte sans historique"); }
+        supervisor.CountersReset += Reset;
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
@@ -119,5 +132,6 @@ public sealed class CadenceHistoryService(IConveyorSupervisor supervisor, ILogge
             } while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        finally { supervisor.CountersReset -= Reset; }
     }
 }

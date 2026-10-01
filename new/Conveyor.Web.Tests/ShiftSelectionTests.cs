@@ -282,6 +282,29 @@ public sealed class ShiftSelectionTests
         Assert.Empty(gateway.Writes);
     }
 
+    [Fact]
+    public void ResetClearsChuteStatisticsWithoutClearingActiveAlarm()
+    {
+        var options = CreateOptions(1);
+        options.General!.SetFullChuteTag(4, "FULL_4");
+        using var supervisor = CreateSupervisor(options);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(1, supervisor.FullChuteTransitions[4]);
+        var resetNotified = false;
+        supervisor.CountersReset += () => resetNotified = true;
+        supervisor.ResetCounters(0);
+        Assert.True(resetNotified);
+        Assert.Equal(0, supervisor.FullChuteTransitions[4]);
+        Assert.Equal(0, supervisor.Chute4FullTransitions);
+        Assert.Contains(4, supervisor.FullChuteAlarms);
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(0, supervisor.FullChuteTransitions[4]);
+        supervisor.RecordPlcTagChange("FULL_4", "0");
+        supervisor.RecordPlcTagChange("FULL_4", "1");
+        Assert.Equal(1, supervisor.FullChuteTransitions[4]);
+    }
+
     private static ConveyorOptions CreateOptions(int depot)
     {
         var options = new ConveyorOptions

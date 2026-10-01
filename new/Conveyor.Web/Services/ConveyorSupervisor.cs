@@ -536,7 +536,26 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
         if (_coordinateStatistics && !_statistics!.Initialized)
             throw new InvalidOperationException("Restauration des compteurs en cours. Vérifier la connexion MySQL avant de connecter les appareils.");
     }
-    public void ResetCounters(int lineId) => Get(lineId).ResetCounters();
+    public event Action? CountersReset;
+    public void ResetCounters(int lineId)
+    {
+        Get(lineId).ResetCounters();
+        lock (_stopAndGoGate)
+        {
+            _fullChuteTransitions.Clear();
+            _chute4FullTransitions = 0;
+            _fullChuteDurations.Clear();
+            var now = DateTimeOffset.UtcNow;
+            foreach (var chute in _fullChuteTags.Keys)
+            {
+                var duration = new FullChuteDuration();
+                duration.Observe(_fullChuteCountStates.GetValueOrDefault(chute), now);
+                _fullChuteDurations[chute] = duration;
+            }
+        }
+        CountersReset?.Invoke();
+        Changed?.Invoke();
+    }
     public void SetCode98Enabled(int lineId, bool enabled) => Get(lineId).SetCode98Enabled(enabled);
     public Task SetLineMotionAsync(int lineId, bool start) => WithConnectionGateAsync(() => Get(lineId).SetLineMotionAsync(start));
     public Task TriggerScaleFaultTestAsync(int lineId) => Get(lineId).TriggerScaleFaultTestAsync();

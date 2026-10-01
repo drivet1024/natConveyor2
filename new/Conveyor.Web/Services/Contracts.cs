@@ -63,6 +63,7 @@ public interface IPlcReadback
 
 public interface IConveyorSupervisor
 {
+    event Action? CountersReset { add { } remove { } }
     bool CountersReady => true;
     event Action? Changed;
     IReadOnlyList<LineSnapshot> GetSnapshots();
