@@ -24,7 +24,7 @@ else
             <article class="principal-line" @key="line.LineId" aria-label="@($"Ligne {line.LineId + 1}")">
                 <header class="principal-line-heading">
                     <h2>LIGNE @(line.LineId + 1)</h2>
-                    <span class="mode @(line.Maintenance ? "maintenance" : null)">@(line.Maintenance ? "MAINTENANCE" : "EN MARCHE")</span>
+                    <span class="mode @(line.Maintenance ? "maintenance" : "running")">@(line.Maintenance ? "MAINTENANCE" : "EN MARCHE")</span>
                 </header>
                 <div class="principal-kpis">
                     <OperatorKpi Label="Colis convoyés" Value="@counters.TotalParcels.ToString("N0")" Help="Total des colis reçus par la caméra" />

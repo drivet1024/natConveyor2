@@ -7,6 +7,7 @@
 .principal-line-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding:.65rem 1rem;border-bottom:1px solid var(--line)}
 .principal-line-heading h2{margin:0;color:var(--orange);font-size:clamp(1.1rem,3cqi,1.75rem);letter-spacing:.08em}
 .mode{color:var(--muted);font-size:.8rem;font-weight:700;letter-spacing:.07em}.mode.maintenance{color:var(--orange)}
+.mode.running{color:var(--green)}
 .principal-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;padding:.65rem}
 .principal-kpis ::deep .operator-kpi{justify-content:center;min-height:clamp(130px,23vh,250px);padding:.6rem;gap:.4rem;background:#ffffff03;border:1px solid var(--line);border-radius:9px}
 .principal-kpis ::deep .kpi-heading{min-height:0;gap:.35rem;font-size:clamp(1rem,2.4vh,1.4rem);color:#dce4e9;font-weight:600}
