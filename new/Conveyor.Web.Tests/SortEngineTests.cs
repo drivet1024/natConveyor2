@@ -553,16 +553,19 @@ public sealed class SortEngineTests
         Assert.Equal("68", snapshot.PlcTransferInput.Raw);
     }
 
-    [Fact]
-    public void PlcDisplayIgnoresValue68AndKeepsThePreviousValue()
+    [Theory]
+    [InlineData(68)]
+    [InlineData(41)]
+    public void PlcDisplayIgnoresConfiguredTransferErrorAndKeepsThePreviousValue(int code)
     {
         var line = Line();
+        line.Plc.TransferErrorCode = code;
         var repository = new FakeRepository();
         var controller = new LineController(line, false, repository, new MotionPlc(), false,
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { });
 
         controller.RecordPlcReception("39");
-        controller.RecordPlcReception(" 68\0");
+        controller.RecordPlcReception($" {code}\0");
 
         var input = controller.Snapshot().PlcInput;
         Assert.NotNull(input);
@@ -570,15 +573,17 @@ public sealed class SortEngineTests
         Assert.Equal(1, input.Sequence);
     }
 
-    [Fact]
-    public async Task PersistentTransferCode68CountsEveryNewCameraParcelOnEachLine()
+    [Theory]
+    [InlineData(68)]
+    [InlineData(41)]
+    public async Task PersistentTransferCode68CountsEveryNewCameraParcelOnEachLine(int code)
     {
         var config = new ConveyorOptions
         {
             Simulation = true,
             Lines =
             [
-                new() { Id = 0, CorrelationDelayMs = 0, Plc = new() { TransferTag = "TRANSFER_1" } },
+                new() { Id = 0, CorrelationDelayMs = 0, Plc = new() { TransferTag = "TRANSFER_1", TransferErrorCode = code } },
                 new() { Id = 1, CorrelationDelayMs = 0, Plc = new() { TransferTag = "TRANSFER_2" } }
             ]
         };
@@ -588,7 +593,10 @@ public sealed class SortEngineTests
             new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLoggerFactory.Instance, new TestConfigurationEditor());
         try
         {
-            supervisor.RecordPlcTagChange("TRANSFER_1", "68");
+            supervisor.RecordPlcTagChange("TRANSFER_1", code == 41 ? "68" : "41");
+            await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
+            Assert.Equal(0, supervisor.GetSnapshots()[0].Counters.Code68);
+            supervisor.RecordPlcTagChange("TRANSFER_1", code.ToString());
             supervisor.RecordPlcTagChange("TRANSFER_2", "67");
             await supervisor.SimulateParcelAsync(0, "12345678901", new Dimension(12, 8, 5), 4.75m);
             await supervisor.SimulateParcelAsync(0, "12345678902", new Dimension(12, 8, 5), 4.75m);
@@ -611,11 +619,14 @@ public sealed class SortEngineTests
         }
     }
 
-    [Fact]
-    public async Task Code68IncrementLogsSensorPlcDecisionAndTimestamps()
+    [Theory]
+    [InlineData(68)]
+    [InlineData(41)]
+    public async Task Code68IncrementLogsSensorPlcDecisionAndTimestamps(int code)
     {
         var repository = new FakeRepository();
         var line = Line();
+        line.Plc.TransferErrorCode = code;
         line.CorrelationDelayMs = 100;
         line.Plc.TransferTag = "TRANSFER_TEST";
         var logger = new RecordingLogger();
@@ -623,10 +634,10 @@ public sealed class SortEngineTests
             new SortEngine(repository, NullLogger<SortEngine>.Instance), logger, () => { });
         try
         {
-            controller.RecordPlcTransferReception("68");
+            controller.RecordPlcTransferReception(code.ToString());
             var processing = controller.SimulateAsync("12345678901", new Dimension(12, 8, 5), 4.75m);
             controller.RecordPlcTransferReception("4");
-            controller.RecordPlcTransferReception(" 68\0");
+            controller.RecordPlcTransferReception($" {code}\0");
             Assert.DoesNotContain(logger.Messages, value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
             await processing;
 
@@ -634,13 +645,13 @@ public sealed class SortEngineTests
                 value => value.Contains("DIAGNOSTIC CODE 68", StringComparison.Ordinal));
             Assert.Contains("compteur Code 68=1", message, StringComparison.Ordinal);
             Assert.Contains("ÉCART TRANSFERT / ENVOI DDE", message, StringComparison.Ordinal);
-            Assert.Contains("ms APRÈS la mise à jour du transfert 68", message, StringComparison.Ordinal);
+            Assert.Contains($"ms APRÈS la mise à jour du transfert {code}", message, StringComparison.Ordinal);
             Assert.Contains("association au même colis non confirmée", message, StringComparison.Ordinal);
             Assert.Contains("\n\nDÉCLENCHEUR DU COMPTAGE\n", message, StringComparison.Ordinal);
             Assert.Contains("\n\nLECTURES DU COLIS\n", message, StringComparison.Ordinal);
             Assert.Contains("\n\nCONTEXTE AUTOMATE AVANT INCRÉMENT\n", message, StringComparison.Ordinal);
             Assert.Contains("\n\nDÉCISION POUR CE COLIS\n", message, StringComparison.Ordinal);
-            Assert.Contains("TRANSFER_TEST=[68]", message, StringComparison.Ordinal);
+            Assert.Contains($"TRANSFER_TEST=[{code}]", message, StringComparison.Ordinal);
             Assert.Contains("caméra=[12345678901]", message, StringComparison.Ordinal);
             Assert.Contains("balance=4.75 lb", message, StringComparison.Ordinal);
             Assert.Contains("dimensions=12 x 8 x 5", message, StringComparison.Ordinal);
@@ -651,10 +662,10 @@ public sealed class SortEngineTests
             controller.RecordPlcTransferReception("4");
             var traceCount = logger.Messages.Count(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
             Assert.Equal(1, traceCount); // Only the 68 between camera and dispatch.
-            controller.RecordPlcTransferReception(" 68\0");
+            controller.RecordPlcTransferReception($" {code}\0");
             var transfer = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
             Assert.Contains("TRACE TRANSFERT — dimensions=12 x 8 x 5", transfer, StringComparison.Ordinal);
-            Assert.Contains("TRANSFER_TEST=68", transfer, StringComparison.Ordinal);
+            Assert.Contains($"TRANSFER_TEST={code}", transfer, StringComparison.Ordinal);
             Assert.Contains("caméra=[12345678901]", transfer, StringComparison.Ordinal);
             Assert.Contains("caméra → transfert=", transfer, StringComparison.Ordinal);
             Assert.Contains("transfert → DDE=", transfer, StringComparison.Ordinal);
@@ -662,7 +673,7 @@ public sealed class SortEngineTests
             Assert.DoesNotContain(sentAt, transfer, StringComparison.Ordinal);
             Assert.Equal(1, logger.Messages.Count(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal)));
             var next = controller.SimulateAsync("12345678902", new Dimension(9, 8, 7), 3m);
-            controller.RecordPlcTransferReception("68");
+            controller.RecordPlcTransferReception(code.ToString());
             await next;
             var nextTrace = logger.Messages.Last(value => value.Contains("TRACE TRANSFERT", StringComparison.Ordinal));
             Assert.Contains("colis #2", nextTrace, StringComparison.Ordinal);

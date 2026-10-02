@@ -59,7 +59,7 @@ internal sealed class LineController
     }
     public void RecordPlcReception(string value)
     {
-        if (string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal)) return;
+        if (IsTransferError(value)) return;
         lock (_gate)
         {
             _plcInput = new(value, DateTimeOffset.Now, (_plcInput?.Sequence ?? 0) + 1);
@@ -319,7 +319,7 @@ internal sealed class LineController
         {
             reception = new(value, DateTimeOffset.Now, (_plcTransferInput?.Sequence ?? 0) + 1);
             _plcTransferInput = reception;
-            if (IsCode68(value) && _latestCameraTrace is { Dispatched: false } trace)
+            if (IsTransferError(value) && _latestCameraTrace is { Dispatched: false } trace)
                 trace.Transfers.Add(reception);
         }
         _changed();
@@ -430,7 +430,7 @@ internal sealed class LineController
             }
             parcelCounters.CameraReads++;
             parcelCounters.TotalParcels++;
-            if (IsCode68(_plcTransferInput?.Raw))
+            if (IsTransferError(_plcTransferInput?.Raw))
             {
                 code68Count = ++parcelCounters.Code68;
                 code68CountedAt = DateTimeOffset.Now;
@@ -646,10 +646,10 @@ internal sealed class LineController
             "  chute finalement envoyée={FinalDispatchedChute}\n" +
             "  envoi automate confirmé à {FinalDispatchedAt}",
             _options.Id + 1, parcel.ParcelId, count, FormatTimestamp(countedAt),
-            FormatTransferDispatchTiming(transfer.ReceivedAt, finalDispatchedAt),
+            FormatTransferDispatchTiming(transfer.ReceivedAt, finalDispatchedAt, _options.Plc.TransferErrorCode),
             transfer.ReceivedAt < parcel.CameraTimestamp
-                ? "Le transfert 68 était déjà présent avant cette caméra : association au même colis non confirmée."
-                : "Comparaison avec le transfert 68 observé pour ce diagnostic.",
+                ? $"Le transfert {_options.Plc.TransferErrorCode} était déjà présent avant cette caméra : association au même colis non confirmée."
+                : $"Comparaison avec le transfert {_options.Plc.TransferErrorCode} observé pour ce diagnostic.",
             _options.Plc.TransferTag, FormatFrame(transfer.Raw), FormatTimestamp(transfer.ReceivedAt), transfer.Sequence, transferAgeMs,
             FormatFrame(parcel.CameraData), FormatTimestamp(parcel.CameraTimestamp),
             FormatWeight(parcel.Weight, parcel.WeightTimestamp), FormatTimestamp(parcel.WeightTimestamp),
@@ -665,17 +665,17 @@ internal sealed class LineController
             FormatTimestamp(finalDispatchedAt));
     }
 
-    internal static string FormatTransferDispatchTiming(DateTimeOffset transferAt, DateTimeOffset? dispatchedAt)
+    internal static string FormatTransferDispatchTiming(DateTimeOffset transferAt, DateTimeOffset? dispatchedAt, int transferErrorCode = 68)
     {
         if (dispatchedAt is null) return "Écart indisponible : aucun envoi DDE confirmé pour ce colis.";
         var milliseconds = (transferAt - dispatchedAt.Value).TotalMilliseconds;
         var delay = Math.Abs(milliseconds).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         var signedDelay = milliseconds.ToString("+0.###;-0.###;0", System.Globalization.CultureInfo.InvariantCulture);
         var description = milliseconds < 0
-            ? $"Envoi DDE confirmé {delay} ms APRÈS la mise à jour du transfert 68."
+            ? $"Envoi DDE confirmé {delay} ms APRÈS la mise à jour du transfert {transferErrorCode}."
             : milliseconds > 0
-                ? $"Envoi DDE confirmé {delay} ms AVANT la mise à jour du transfert 68."
-                : "Envoi DDE confirmé et mise à jour du transfert 68 au même instant (0 ms).";
+                ? $"Envoi DDE confirmé {delay} ms AVANT la mise à jour du transfert {transferErrorCode}."
+                : $"Envoi DDE confirmé et mise à jour du transfert {transferErrorCode} au même instant (0 ms).";
         return $"DÉLAI = TRANSFERT − DDE = {signedDelay} ms\n  {description}";
     }
 
@@ -704,11 +704,11 @@ internal sealed class LineController
         foreach (var transfer in transfers)
             _logger.LogInformation(
                 "TRACE TRANSFERT — dimensions={Dimensions}; ligne {Line}, colis #{ParcelId}; caméra=[{CameraData}] reçue à {CameraAt}; " +
-                "{TransferTag}=68 reçu à {TransferAt}; DDE envoyé à {SentAt}; caméra → transfert={CameraToTransferMs} ms; " +
+                "{TransferTag}={TransferValue} reçu à {TransferAt}; DDE envoyé à {SentAt}; caméra → transfert={CameraToTransferMs} ms; " +
                 "transfert → DDE={TransferToSendMs} ms; caméra → DDE={CameraToSendMs} ms",
                 FormatDimensions(parcel.Dimension, parcel.DimensionTimestamp), _options.Id + 1, parcel.ParcelId,
                 FormatFrame(cameraTrace!.Camera.Raw), FormatTime(cameraTrace.Camera.ReceivedAt), _options.Plc.TransferTag,
-                FormatTime(transfer.ReceivedAt), FormatTime(sentAt),
+                transfer.Raw.Trim('\0', ' ', '\r', '\n', '\t'), FormatTime(transfer.ReceivedAt), FormatTime(sentAt),
                 (long)(transfer.ReceivedAt - cameraTrace.Camera.ReceivedAt).TotalMilliseconds,
                 (long)(sentAt - transfer.ReceivedAt).TotalMilliseconds,
                 (long)(sentAt - cameraTrace.Camera.ReceivedAt).TotalMilliseconds);
@@ -790,8 +790,8 @@ internal sealed class LineController
     private static bool IsCorrelated<T>(TimedValue<T>? value, DateTimeOffset cameraTimestamp, TimeSpan window) =>
         value is not null && (cameraTimestamp - value.Timestamp).Duration() <= window;
 
-    private static bool IsCode68(string? value) =>
-        value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), "68", StringComparison.Ordinal);
+    private bool IsTransferError(string? value) =>
+        value is not null && string.Equals(value.Trim('\0', ' ', '\r', '\n', '\t'), _options.Plc.TransferErrorCode.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
     internal static bool IsSmallParcel(Dimension dimension, decimal maximumSide) =>
         maximumSide > 0 && dimension.Length > 0 && dimension.Width > 0 && dimension.Height > 0 &&

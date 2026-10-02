@@ -51,6 +51,7 @@ public sealed class PlcConfigurationTests
             plc.OpcTopic = "NATIONEX";
             plc.OpcUpdateRateMs = 250;
             plc.CloseChute39Tag = "CLOSE_CHUTE_39_CUSTOM";
+            plc.TransferErrorCode = 41;
             await editor.SaveAsync(edited, null);
             var config = new ConfigurationBuilder().AddJsonFile(editor.FilePath).Build();
             var restored = config.GetSection("Conveyor").Get<ConveyorOptions>()!;
@@ -61,6 +62,8 @@ public sealed class PlcConfigurationTests
             Assert.Equal("NATIONEX", saved.OpcTopic);
             Assert.Equal(250, saved.OpcUpdateRateMs);
             Assert.Equal("CLOSE_CHUTE_39_CUSTOM", saved.CloseChute39Tag);
+            Assert.Equal(41, saved.TransferErrorCode);
+            Assert.Equal(68, restored.Lines[1].Plc.TransferErrorCode);
             Assert.Equal("ORIGINAL", saved.DdeTopic);
             Assert.Equal("COLISDDE_M30", saved.ChuteTag);
             Assert.Equal("TRANSFER_M31", restored.Lines[1].Plc.TransferTag);

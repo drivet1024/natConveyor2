@@ -178,6 +178,7 @@ else
                 <div class="config-grid">
                     @TextField("Tag chute automate", line.Plc.ChuteTag, value => line.Plc.ChuteTag = value)
                     @TextField("Tag lecture transfert", line.Plc.TransferTag, value => line.Plc.TransferTag = value)
+                    @NumberField("Valeur TRANSFERT pour le compteur Code 68 (Québec : 41)", line.Plc.TransferErrorCode, value => line.Plc.TransferErrorCode = value)
                     @TextField("Tag faute balance", line.Plc.ScaleFaultTag, value => line.Plc.ScaleFaultTag = value)
                     @TextField("Tag STOP_MANUEL — départ / arrêt ligne", line.Plc.StopManuelTag, value => line.Plc.StopManuelTag = value.Trim())
                     @NumberField("Colis sans balance avant faute", line.Plc.ScaleFaultParcelThreshold, value => line.Plc.ScaleFaultParcelThreshold = value)

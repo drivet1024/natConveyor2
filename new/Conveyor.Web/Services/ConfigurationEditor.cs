@@ -119,6 +119,8 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
         var databaseLineIds = options.Lines.Where(line => line.DatabaseLineId.HasValue).Select(line => line.DatabaseLineId!.Value).ToArray();
         if (databaseLineIds.Distinct().Count() != databaseLineIds.Length) throw new InvalidOperationException("Les lineId MySQL renseignés doivent être uniques.");
         PlcConfiguration.Validate(options.GetConfiguredLines().First().Plc);
+        if (options.Lines.Any(line => line.Plc.TransferErrorCode < 0))
+            throw new InvalidOperationException("La valeur du code d’erreur TRANSFERT doit être positive ou nulle.");
         foreach (var converter in options.Lines.SelectMany(line => new[] { line.ScaleConverter, line.DimensionConverter }))
         {
             if (converter.Type is not ("Old" or "New")) throw new InvalidOperationException("Modèle de convertisseur invalide.");

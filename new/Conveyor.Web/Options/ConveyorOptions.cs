@@ -181,6 +181,7 @@ public sealed class PlcOptions
     public int Port { get; set; } = 7000;
     public string ChuteTag { get; set; } = "COLISDDE";
     public string TransferTag { get; set; } = "";
+    [Range(0, int.MaxValue)] public int TransferErrorCode { get; set; } = 68;
     public string CloseChute39Tag { get; set; } = "CLOSE_CHUTE_39";
     public string ScaleFaultTag { get; set; } = "";
     public string StopManuelTag { get; set; } = "";

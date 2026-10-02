@@ -332,6 +332,14 @@ Dans les journaux, « Lecture directe DDE reçue … sans notification correspon
 
 ### Commandes de marche du convoyeur
 
+Dans **Configuration → Tags automate**, chaque ligne possède un champ **Valeur
+TRANSFERT pour le compteur Code 68** (`Lines[].Plc.TransferErrorCode`). Il vaut 68
+par défaut pour les configurations existantes ; régler **41 à Québec**, sur chaque
+ligne concernée, puis enregistrer et redémarrer pour appliquer la configuration.
+`TransferTag` reste le nom du tag à lire. Cette valeur configurable est utilisée
+pour le comptage, le filtrage de la case AUTOMATE et les traces de transfert.
+Le nom du compteur `Code68` et ses champs historiques sont conservés.
+
 Configurer **Conveyor ID** dans les paramètres globaux, puis enregistrer et redémarrer. Les boutons **DÉMARRER / ARRÊTER** à côté d’AUTOMATE commandent ensemble les deux lignes via `START=1` / `START=0`, comme DDEFrm. Démarrer demande confirmation ; arrêter impose PAUSE (0), JAM (1) ou DOWN (2). Après l’envoi, une ligne est insérée dans `conveyor_action` avec la date locale, CONVEYOR_ID, ACTION (1/0) et CAUSE (NULL au démarrage). Un échec d’insertion après envoi est signalé sans renvoyer la commande. La simulation n’insère aucune action réelle. CONNECTER/DÉCONNECTER dans l’engrenage restent les commandes de connexion aux appareils.
 
 ## Volume et poids moyens par shift
