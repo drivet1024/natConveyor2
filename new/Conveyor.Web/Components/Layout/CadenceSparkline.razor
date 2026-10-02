@@ -54,12 +54,13 @@
 
 @code {
     [Parameter] public IReadOnlyList<CadencePoint> Points { get; set; } = [];
+    [Parameter] public DateTime? HistoryDay { get; set; }
     private readonly string _gradientId = "cadence-" + Guid.NewGuid().ToString("N");
     private DateTime _windowStart;
     private IReadOnlyList<CadencePoint> _visiblePoints = [];
     protected override void OnParametersSet()
     {
-        _windowStart = WindowStart(DateTime.Now);
+        _windowStart = HistoryDay?.Date.AddHours(16) ?? WindowStart(DateTime.Now);
         _visiblePoints = Points.Where(p => p.At.LocalDateTime >= _windowStart && p.At.LocalDateTime <= _windowStart.AddHours(11))
             .OrderBy(p => p.At).ToArray();
     }

@@ -1,0 +1,155 @@
+@page "/historique-journee"
+@inject ISortingDayArchiveStore Archive
+@inject IOptions<ConveyorOptions> Options
+@using System.Globalization
+
+<PageTitle>Historique des journées de tri</PageTitle>
+<header class="dashboard-header">
+    <div><span class="eyebrow">ARCHIVES</span><h1>Journée de tri</h1><p>Compteurs et mesures conservés à chaque période de dix minutes.</p></div>
+    <a class="btn" href="statistiques">Statistiques</a>
+</header>
+<div class="archive-toolbar">
+    <label>Date de début de la journée <input type="date" @bind="_day" /></label>
+    <button type="button" class="btn" disabled="@_loading" @onclick="LoadAsync">@(_loading ? "Chargement…" : "Afficher")</button>
+    <label>Mode <select @bind="_maintenance"><option value="false">Production</option><option value="true">Maintenance</option></select></label>
+    @if (_snapshots.Count > 0)
+    {
+        <label>Relevé <select @bind="_selectedId">
+            @foreach (var sample in _snapshots)
+            {
+                <option value="@sample.Id">@(sample.Source == "legacy" ? "Totaux sauvegardés de la journée — heure non disponible" : $"{sample.CapturedAt.LocalDateTime:dd/MM HH:mm:ss} · session {sample.Session[..Math.Min(6, sample.Session.Length)]} · remise à zéro {sample.ResetGeneration}")</option>
+            }
+        </select></label>
+    }
+</div>
+@if (_error is not null)
+{
+    <p class="config-notice error" role="alert">@_error</p>
+}
+else if (!_loading && Selected is not { })
+{
+    <p>Aucune archive disponible pour cette journée. Les anciens totaux restent consultables dans Statistiques.</p>
+}
+else if (!_loading && Selected is { } sample)
+{
+    <p>Début de journée : <strong>@sample.ShiftStart.ToString("dd/MM/yyyy HH:mm")</strong> · dépôt @sample.DepotId · convoyeur @sample.ConveyorId.</p>
+    <p class="archive-note">Les valeurs sont celles des compteurs au moment du relevé : ne pas additionner les relevés successifs. Les redémarrages et remises à zéro restent séparés. « — » signifie non disponible.</p>
+    @if (sample.Source == "legacy")
+    {
+        <p class="archive-note">Compteurs récupérés dans les sauvegardes journalières existantes. Ce relevé ne contient pas les chutes pleines ni la cadence par dix minutes. Les champs absents ne sont pas reconstitués.</p>
+    }
+    @foreach (var line in sample.Lines.Where(line => line.Maintenance == _maintenance).OrderBy(line => line.LineId))
+    {
+        <section class="archive-section">
+            <h2>Ligne @(line.LineId + 1) · @(_maintenance ? "Maintenance" : "Production")</h2>
+            <div class="archive-table"><table><thead><tr><th>Indicateur</th><th>Valeur</th><th>Pourcentage</th></tr></thead><tbody>
+                @{ var metrics = SortingDaySnapshot.Metrics(line); }
+                @foreach (var field in SortingDaySnapshot.CounterFields)
+                {
+                    <tr><td>@Label(field.Name)</td><td>@Format(metrics[field.Name])</td><td>@(metrics.TryGetValue(field.Name + "Percent", out var percent) && percent.HasValue ? Format(percent) + " %" : "—")</td></tr>
+                }
+                <tr><td>Cadence (colis/h)</td><td>@Format(metrics["ParcelsPerHour"])</td><td>—</td></tr>
+                <tr><td>Total des rejets</td><td>@Format(metrics["TotalRejected"])</td><td>@Format(metrics["TotalRejectedPercent"]) %</td></tr>
+                <tr><td>Triés par expédition ou code postal</td><td>@Format(metrics["SortedParcels"])</td><td>@Format(metrics["SortedParcelsPercent"]) %</td></tr>
+                <tr><td>Poids moyen (lb)</td><td>@Format(metrics["AverageWeightPounds"])</td><td>—</td></tr>
+                <tr><td>Volume moyen (pi³)</td><td>@Format(metrics["AverageVolumeCubicFeet"])</td><td>—</td></tr>
+            </tbody></table></div>
+            <details><summary>Colis envoyés par chute</summary>
+                <div class="archive-table"><table><thead><tr><th>Chute</th><th>Colis envoyés</th></tr></thead><tbody>
+                @foreach (var chute in line.Counters.ChuteDispatchCounts.OrderBy(pair => pair.Key))
+                { <tr><td>@chute.Key</td><td>@chute.Value.ToString("N0")</td></tr> }
+                </tbody></table></div>
+                @if (line.Counters.ChuteDispatchCounts.Count == 0) { <p>Aucun détail de chute sauvegardé.</p> }
+            </details>
+            <details><summary>Routes non configurées (@line.Counters.UnconfiguredRouteParcels.Count détails)</summary>
+                <p class="archive-note">Les 500 derniers détails disponibles au moment du relevé.</p>
+                <div class="archive-table"><table><thead><tr><th>Heure</th><th>Colis</th><th>Code postal</th><th>Route</th></tr></thead><tbody>
+                @foreach (var parcel in line.Counters.UnconfiguredRouteParcels.Reverse())
+                { <tr><td>@parcel.ReceivedAt.LocalDateTime.ToString("HH:mm:ss")</td><td>@parcel.Waybill</td><td>@parcel.PostalCode</td><td>@parcel.RouteId</td></tr> }
+                </tbody></table></div>
+            </details>
+            <details><summary>Plusieurs code-barres (@line.Counters.MultipleBarcodeParcels.Count détails)</summary>
+                <p class="archive-note">Les 500 derniers détails disponibles au moment du relevé.</p>
+                <div class="archive-table"><table><thead><tr><th>Heure</th><th>Lecture caméra</th></tr></thead><tbody>
+                @foreach (var parcel in line.Counters.MultipleBarcodeParcels.Reverse())
+                { <tr><td>@parcel.ReceivedAt.LocalDateTime.ToString("HH:mm:ss")</td><td>@parcel.CameraData</td></tr> }
+                </tbody></table></div>
+            </details>
+            <details><summary>Petits colis (@line.Counters.SmallParcelDetails.Count détails)</summary>
+                <p class="archive-note">Les 500 derniers détails disponibles au moment du relevé.</p>
+                <div class="archive-table"><table><thead><tr><th>Heure</th><th>Poids (lb)</th><th>Dimensions</th></tr></thead><tbody>
+                @foreach (var parcel in line.Counters.SmallParcelDetails.Reverse())
+                { <tr><td>@parcel.ReceivedAt.LocalDateTime.ToString("HH:mm:ss")</td><td>@parcel.Weight</td><td>@parcel.Dimension.Length × @parcel.Dimension.Width × @parcel.Dimension.Height po</td></tr> }
+                </tbody></table></div>
+            </details>
+            <details><summary>Pas dans le système · clients</summary>
+                <div class="archive-table"><table><thead><tr><th>Clients</th><th>Préfixes</th><th>Colis</th></tr></thead><tbody>
+                @foreach (var customer in line.Counters.MissingShipmentCustomers)
+                { <tr><td>@customer.Customers</td><td>@customer.Prefixes</td><td>@customer.Count</td></tr> }
+                </tbody></table></div>
+            </details>
+        </section>
+    }
+    <section class="archive-section">
+        <h2>Convoyeur · état au relevé</h2>
+        <p>Marche : @(sample.ConveyorRunning switch { true => "En marche", false => "Arrêté", _ => "—" }) · Compteur automate chutes pleines : @(sample.FullChutesCount?.ToString() ?? "—") · Code 42 : @(sample.Code42Count?.ToString() ?? "—")</p>
+        <p class="archive-note">Les compteurs automate sont des valeurs brutes. Les nombres et durées par chute correspondent aux compteurs depuis leur dernière remise à zéro ; ils ne s’additionnent pas entre relevés.</p>
+        <div class="archive-table"><table><thead><tr><th>Chute</th><th>Passages à pleine</th><th>Temps cumulé</th><th>État</th></tr></thead><tbody>
+        @foreach (var chute in sample.Chutes)
+        { <tr><td>@chute.Chute</td><td>@(chute.FullTransitions?.ToString("N0") ?? "—")</td><td>@Duration(chute.FullSeconds)</td><td>@(chute.Full switch { true => "Pleine", false => "Libre", _ => "—" })</td></tr> }
+        </tbody></table></div>
+    </section>
+    <section class="archive-section">
+        <h2>Cadence de production · journée sélectionnée</h2>
+        @if (DayCadence.Count == 0) { <p>Aucun point de cadence sauvegardé.</p> }
+        else
+        {
+            <CadenceSparkline Points="DayCadence" HistoryDay="sample.ShiftStart.Date" />
+            <details><summary>Valeurs de tous les intervalles</summary><div class="archive-table"><table><thead><tr><th>Heure</th><th>Colis/h</th></tr></thead><tbody>
+            @foreach (var point in DayCadence)
+            { <tr><td>@point.At.LocalDateTime.ToString("dd/MM HH:mm:ss")</td><td>@point.ParcelsPerHour.ToString("N0")</td></tr> }
+            </tbody></table></div></details>
+        }
+    </section>
+}
+
+@code {
+    private DateTime _day;
+    private bool _maintenance, _loading;
+    private string? _error, _selectedId;
+    private IReadOnlyList<SortingDaySnapshot> _snapshots = [];
+    private SortingDaySnapshot? Selected => _snapshots.FirstOrDefault(s => s.Id == _selectedId);
+    private IReadOnlyList<CadencePoint> DayCadence => _snapshots.SelectMany(s => s.Cadence)
+        .GroupBy(p => p.At).Select(g => new CadencePoint(g.Key, g.Last().ParcelsPerHour)).OrderBy(p => p.At).ToArray();
+    protected override async Task OnInitializedAsync()
+    {
+        _day = Options.Value.Statistics.GetShiftStart(DateTime.Now).Date;
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _snapshots = await Archive.LoadAsync(_day, CancellationToken.None); _selectedId = _snapshots.LastOrDefault()?.Id; }
+        catch (Exception) { _error = "Impossible de charger cette journée. Vérifier la connexion et les tables d’archives."; _snapshots = []; }
+        finally { _loading = false; }
+    }
+    private static string Format(decimal? value) => value?.ToString("N2", CultureInfo.GetCultureInfo("fr-CA")) ?? "—";
+    private static string Duration(double? seconds) => seconds is { } value
+        ? $"{(long)value / 3600:00}:{(long)value / 60 % 60:00}:{(long)value % 60:00}" : "—";
+    private static string Label(string name) => name switch
+    {
+        "CameraReads" => "Lectures caméra", "DimensionReads" => "Lectures dimensionneur", "ScaleReads" => "Lectures balance",
+        "TotalParcels" => "Colis convoyés", "SortingRunSeconds" => "Temps de marche (secondes)",
+        "Rejected" => "Rejets anciens sans catégorie", "RejectedShipmentNotFound" => "Pas dans le système",
+        "RejectedRouteNotConfigured" => "Route non configurée", "RejectedCode86RetryLimit" => "Limite de reprises code 86",
+        "RejectedMultipleShipments" => "Plusieurs code-barres", "RejectedConfiguredRoute" => "Rejet par route configurée",
+        "RejectedOther" => "Autres rejets", "NoReads" => "Sans lecture", "Code98" => "Code 98", "Code68" => "Code 68",
+        "Code97" => "Code 97", "Code98RecirculatedOverTwice" => "Code 98 — plus de deux recirculations",
+        "MeasuredVolumeCubicFeet" => "Volume total mesuré (pi³)", "VolumeMeasuredParcels" => "Colis avec volume mesuré",
+        "MeasuredWeightPounds" => "Poids total mesuré (lb)", "WeightMeasuredParcels" => "Colis avec poids mesuré",
+        "DimensionErrors" => "Erreurs dimensions", "ScaleErrors" => "Erreurs poids", "ScaleFaults" => "Fautes balance",
+        "LightParcels" => "Colis légers", "SmallParcels" => "Petits colis", "InverseLengthParcels" => "Colis inversés",
+        "SortedWithoutIssue" => "Triés sans problème", "SortedByWaybill" => "Triés par expédition",
+        "SortedByPostalCode" => "Triés par code postal", "DatabaseInserts" => "Enregistrements en base", _ => name
+    };
+}

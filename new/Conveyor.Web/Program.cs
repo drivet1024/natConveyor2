@@ -95,6 +95,8 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Convey
 builder.Services.AddHostedService<PlcRecoveryMonitor>();
 builder.Services.AddSingleton<CadenceHistoryService>();
 builder.Services.AddHostedService(services => services.GetRequiredService<CadenceHistoryService>());
+builder.Services.AddSingleton<ISortingDayArchiveStore, SortingDayArchiveStore>();
+builder.Services.AddHostedService<SortingDayArchiveService>();
 
 var app = builder.Build();
 

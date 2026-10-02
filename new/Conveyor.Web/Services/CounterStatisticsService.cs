@@ -18,6 +18,7 @@ public sealed class CounterStatisticsService(IOptions<ConveyorOptions> options, 
     private string? _filePath;
     internal string? FallbackDirectoryOverride { get; set; }
     public bool Initialized => _activeShift.HasValue;
+    public DateTime? ActiveShift => _activeShift;
     private string LegacyFilePath => Path.Combine(environment.ContentRootPath, "data", "counter-statistics.json");
     private string FallbackFilePath
     {

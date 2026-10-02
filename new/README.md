@@ -350,3 +350,58 @@ peut être partiellement couvert : le graphique indique les nombres mesurés sur
 le total des colis. Les moyennes globales sont pondérées par le nombre de mesures,
 et non calculées comme la moyenne des moyennes des lignes. Les shifts à zéro
 colis sont masqués, comme dans le tableau.
+
+## Archives détaillées par journée de tri
+
+**Statistiques → Historique par journée de tri** (`/historique-journee`) permet de
+choisir la date de début de la journée, le relevé et le mode production/maintenance.
+La journée suit `Statistics.ShiftStartTime`, y compris après minuit. La collecte
+fonctionne lorsque `Statistics.Enabled=true`, hors simulation et après restauration
+des compteurs. Aucun changement de configuration de production n’est nécessaire
+si la sauvegarde des statistiques est déjà activée.
+
+La migration additive est intégrée au premier enregistrement. Elle conserve les
+tables existantes et ajoute :
+
+| Table | Contenu |
+| --- | --- |
+| `conveyor_day_snapshot` | Dépôt, convoyeur, journée, heure UTC, session, remise à zéro, état automate et copie JSON complète |
+| `conveyor_day_metric` | Tous les compteurs numériques et ratios par ligne et mode ; valeurs manquantes à NULL |
+| `conveyor_day_chute` | Colis envoyés par chute et relevés des passages à pleine, durées et états ; ligne -1 pour les mesures communes |
+| `conveyor_day_cadence` | Points de cadence horaire calculés sur les intervalles de dix minutes |
+
+Le relevé courant est actualisé toutes les cinq secondes dans une tranche de dix
+minutes. Les tranches précédentes sont conservées sans purge automatique. Un
+redémarrage ou une remise à zéro crée un relevé distinct, même dans la même tranche.
+Ce sont des **valeurs cumulées observées**, pas des volumes à additionner entre
+relevés. Les compteurs automate et les durées de chutes restent tels qu’affichés
+en direct, depuis leur dernière remise à zéro ; ils ne sont pas présentés comme
+des totaux journaliers recalculés. Les détails de colis sont limités aux 500 derniers
+détails présents dans chaque relevé, comme les compteurs en direct.
+
+La file d’attente est écrite avant l’envoi MySQL dans
+`%LOCALAPPDATA%/Conveyor.Web/<identifiant-installation>/sorting-day-archive.json`.
+Elle conserve les tranches en cas de coupure de base, reprend après redémarrage
+et réessaie sans doublon. Une panne entre deux captures peut perdre les dernières
+cinq secondes de détails d’archive. La restauration des compteurs et la sauvegarde
+des totaux journaliers existantes restent indépendantes.
+
+Les totaux de `conveyor_counter_state` restent proposés dans le sélecteur de relevé,
+y compris pour les journées antérieures et pour consulter la sauvegarde finale
+après un changement de journée. Les champs absents de l’ancien JSON sont affichés
+« — » ; aucun historique de cadence ou de chute pleine n’est inventé.
+
+Outil d’audit (ne lit ni n’écrit les tags automate) :
+
+```powershell
+dotnet run --project scripts/DatabaseAudit -- chemin/conveyor.settings.json
+# Création additive des quatre tables :
+dotnet run --project scripts/DatabaseAudit -- chemin/conveyor.settings.json --apply-archive-schema
+# Vérification des insertions/upserts dans une transaction annulée, puis lecture des archives existantes :
+dotnet run --project scripts/DatabaseAudit -- chemin/conveyor.settings.json --verify-archive
+```
+
+Les commandes sont exécutées depuis la racine du dépôt. L’audit sans option ne fait
+que lire le schéma et les dates présentes. Les tables peuvent être créées avant
+déploiement avec un compte disposant de CREATE. L’application vérifie leur création
+au premier enregistrement et utilise CREATE/SELECT/INSERT/UPDATE/DELETE.

@@ -1,0 +1,8 @@
+.archive-toolbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:1rem;margin-bottom:1rem}
+.archive-toolbar label{display:flex;flex-direction:column;gap:.4rem;font-size:.85rem}
+.archive-toolbar input,.archive-toolbar select{padding:.55rem;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);max-width:100%}
+.archive-section{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:1rem 0;padding:1rem}
+.archive-section h2{font-size:1.2rem;color:var(--orange)}
+.archive-note{color:var(--muted);font-size:.85rem}
+.archive-table{overflow:auto;max-height:65vh}table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{text-align:left;padding:.6rem;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{position:sticky;top:0;background:var(--panel2)}
+details{margin:1rem 0}summary{cursor:pointer;color:var(--ink)}

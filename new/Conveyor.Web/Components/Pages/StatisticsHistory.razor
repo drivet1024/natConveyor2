@@ -8,6 +8,7 @@
 
 <header class="dashboard-header">
     <div><span class="eyebrow">PRODUCTION GLOBALE</span><h1>Statistiques</h1><p>@HeaderDescription</p></div>
+    <a class="btn" href="historique-journee">Historique par journée de tri</a>
     <button class="btn" disabled="@(_activeTab == "history" && _loading)" @onclick="RefreshActiveAsync">@(_activeTab == "history" && _loading ? "Chargement…" : "Actualiser")</button>
 </header>
 
