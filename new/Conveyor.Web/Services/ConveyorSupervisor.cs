@@ -131,6 +131,14 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
                         ? (long?)_fullChuteTransitions.GetValueOrDefault(chute) : null);
         }
     }
+    public IReadOnlyList<int> FullChutesActive
+    {
+        get
+        {
+            lock (_stopAndGoGate)
+                return _fullChuteStates.Where(pair => pair.Value == true).Select(pair => pair.Key).Order().ToArray();
+        }
+    }
     public IReadOnlyList<int> FullChuteAlarms
     {
         get

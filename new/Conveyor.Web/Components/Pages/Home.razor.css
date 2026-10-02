@@ -5,13 +5,6 @@
 .parcel-details-button:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; }
 .parcel-details-button > .metric, .parcel-details-button > .mobile-counter { box-sizing: border-box; width: 100%; height: 100%; }
 .mobile-counters { display: none; }
-.conveyor-tag-counts { display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-.conveyor-tag-counts strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-.conveyor-tag-counts strong { white-space: nowrap; }
-@media (min-width: 769px) {
-    .conveyor-tag-counts { order: -1; }
-}
-.conveyor-tag-counts span { display: block; color: var(--muted); font-size: .7rem; }
 .line-state-badges { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
 .code98-state { align-items: center; justify-content: center; padding: .35rem .5rem; border: 1px solid; border-radius: 4px; font-size: .75rem; font-weight: 800; }
 .code98-state.enabled { color: var(--green); border-color: var(--green); background: #49d17d18; }
@@ -138,10 +131,6 @@
     .header-summary { display: contents; }
     .shipment-freshness { grid-column: 1 / -1; grid-row: 2; align-items: center; gap: 1.2rem; font-size: .78rem; }
     .mobile-indicator { display: inline-flex; align-items: center; gap: .5rem; }
-    .conveyor-tag-counts { grid-column: 1 / -1; grid-row: 3; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; align-items: stretch; }
-    .conveyor-tag-counts > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; min-width: 0; }
-    .conveyor-tag-counts > div:first-child { padding-right: .75rem; }
-    .conveyor-tag-counts > div + div { border-left: 1px solid var(--line); padding-left: .75rem; justify-content: flex-end; text-align: right; }
     .shipment-freshness .connection-led { flex-shrink: 0; }
     .shipment-freshness .connection-led.sim { background: var(--orange); box-shadow: none; }
     .header-summary ::deep .service-status { grid-column: 2; grid-row: 1; }

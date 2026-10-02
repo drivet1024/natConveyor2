@@ -61,10 +61,6 @@
             <button type="button" class="btn btn-reset reset-data-button" disabled="@_resettingData" title="Vider scan_history, wb, conveyor_shipment, postalcode, location, code98 et code86 — base commune aux deux lignes" @onclick="ResetData">@(_resettingData ? "Suppression…" : "Reset Data")</button>
         </div>
         <ServiceStatus />
-        <div class="conveyor-tag-counts" aria-label="Compteurs du convoyeur">
-            <div title="@($"{Options.Value.General?.FullChutesTag} — valeur brute du tag")"><strong>@SharedTagCount(Supervisor.FullChutesCount)</strong><span>Chutes pleines</span></div>
-            <div title="@($"{Options.Value.General?.Code42Tag} — valeur brute du tag")"><strong>@SharedTagCount(Supervisor.Code42Count)</strong><span>Code 42</span></div>
-        </div>
         <div class="mobile-only shipment-freshness">
             <span class="mobile-indicator" role="status" title="@ShipmentFreshnessLabel" aria-label="@ShipmentFreshnessLabel"><span class="connection-led @ShipmentFreshnessCss" aria-hidden="true"></span><span>Synchro</span></span>
             <span class="mobile-indicator" role="status" title="@ConveyorMotionLabel" aria-label="@ConveyorMotionLabel"><span class="connection-led @(MobileRunning == true ? "ok" : MobileRunning == false ? "ko" : "sim")" aria-hidden="true"></span><span>Convoyeur</span></span>
@@ -206,6 +202,8 @@
             @if (Options.Value.Simulation) { <button class="btn btn-test" @onclick="() => Inject(line.LineId)">Colis test</button> }
             @if (!string.IsNullOrEmpty(_shiftError)) { <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span> }
             <div class="line-tools">
+                @if (_shifts.Count != 1 || _shifts[0].Id != Supervisor.CurrentShiftId)
+                {
                 <label class="shift-choice">Shift
                     <select @key="Supervisor.CurrentShiftId" @bind:get="Supervisor.CurrentShiftId" @bind:set="ChangeShift" disabled="@(_changingShift || _shifts.Count == 0)" title="Shift commun aux deux lignes — appliqué aux prochains colis">
                         @if (!_shifts.Any(shift => shift.Id == Supervisor.CurrentShiftId))
@@ -215,7 +213,8 @@
                         @foreach (var shift in _shifts) { <option value="@shift.Id" selected="@(shift.Id == Supervisor.CurrentShiftId)">@shift.Name</option> }
                     </select>
                 </label>
-                @if (!string.IsNullOrWhiteSpace(Options.Value.GetConfiguredLines().FirstOrDefault(option => option.Id == line.LineId)?.Plc.StopManuelTag))
+                }
+                @if (MobileRunning == true && !string.IsNullOrWhiteSpace(Options.Value.GetConfiguredLines().FirstOrDefault(option => option.Id == line.LineId)?.Plc.StopManuelTag))
                 {
                     <ManualLineButton LineId="line.LineId" Started="Supervisor.GetManualLineState(line.LineId)" />
                 }
@@ -237,9 +236,6 @@
     internal static bool? ResolveMobileLineRunning(bool? scaleFaultActive, bool? conveyorRunning) =>
         scaleFaultActive == true || conveyorRunning == false ? false
         : scaleFaultActive == false && conveyorRunning == true ? true : null;
-    private string SharedTagCount(int? count) => !PlcSimulated() && PlcConnected() && count.HasValue
-        ? count.Value.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("fr-CA"))
-        : "—";
     private string ConveyorMotionLabel => MobileRunning == true ? "Convoyeur en fonction" : MobileRunning == false ? "Convoyeur arrêté" : "État du convoyeur inconnu";
     private string MobileConveyorName => Options.Value.General?.DepotId == 1
         ? "Convoyeur du " + (Options.Value.GetConfiguredLines().Any(line => line.DatabaseLineId == 3) ? "bas" : "haut")

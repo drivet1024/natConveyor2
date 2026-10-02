@@ -134,6 +134,7 @@
 @code {
     [Parameter] public IReadOnlyList<PlcDispatch> Station1Parcels { get; set; } = [];
     [Parameter] public IReadOnlyDictionary<int, long> Traffic15Minutes { get; set; } = new Dictionary<int, long>();
+    [Parameter] public IReadOnlyList<int> FullChutes { get; set; } = [];
     [Parameter] public IReadOnlyList<PlcDispatch> Station2Parcels { get; set; } = [];
     private ElementReference _svg;
     private IJSObjectReference? _animation;
@@ -158,7 +159,7 @@
                 finally { await module.DisposeAsync(); }
             }
             if (!_disposed)
-                await _animation.InvokeVoidAsync("update", Running, Station1Parcels, Station2Parcels, Traffic15Minutes);
+                await _animation.InvokeVoidAsync("update", Running, Station1Parcels, Station2Parcels, Traffic15Minutes, FullChutes);
         }
         catch (JSDisconnectedException) { }
         finally { _animationGate.Release(); }

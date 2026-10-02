@@ -178,6 +178,8 @@
                 <span class="shift-error" role="alert">@_shiftError <button type="button" class="btn" @onclick="LoadShifts">Réessayer</button></span>
             }
             <div class="line-tools">
+                @if (_shifts.Count != 1 || _shifts[0].Id != Supervisor.CurrentShiftId)
+                {
                 <label class="shift-choice">Shift
                     <select @key="Supervisor.CurrentShiftId" @bind:get="Supervisor.CurrentShiftId" @bind:set="ChangeShift" disabled="@(_changingShift || _shifts.Count == 0)" title="Shift commun aux deux lignes — appliqué aux prochains colis">
                         @if (!_shifts.Any(shift => shift.Id == Supervisor.CurrentShiftId))
@@ -190,7 +192,8 @@
                         }
                     </select>
                 </label>
-                @if (!string.IsNullOrWhiteSpace(Options.Value.GetConfiguredLines().FirstOrDefault(option => option.Id == line.LineId)?.Plc.StopManuelTag))
+                }
+                @if (ConveyorState(line) == true && !string.IsNullOrWhiteSpace(Options.Value.GetConfiguredLines().FirstOrDefault(option => option.Id == line.LineId)?.Plc.StopManuelTag))
                 {
                     <ManualLineButton LineId="line.LineId" Started="Supervisor.GetManualLineState(line.LineId)" />
                 }

@@ -81,6 +81,7 @@ public interface IConveyorSupervisor
     int? Code42Count { get; }
     bool Chute4AlarmActive { get; }
     IReadOnlyList<int> FullChuteAlarms => Chute4AlarmActive ? new[] { 4 } : Array.Empty<int>();
+    IReadOnlyList<int> FullChutesActive => Array.Empty<int>();
     bool Maintenance { get; }
     bool HasStartedOperatingMode { get; }
     bool CanChangeOperatingMode { get; }

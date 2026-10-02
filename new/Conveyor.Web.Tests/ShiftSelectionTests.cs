@@ -189,6 +189,7 @@ public sealed class ShiftSelectionTests
         using var supervisor = CreateSupervisor(options, gateway);
         gateway.Emit("STOP", "0");
         gateway.Emit("FULL_1", "1");
+        Assert.Equal(new[] { 1 }, supervisor.FullChutesActive);
         await Task.Delay(1200);
         Assert.Equal(("STOP", 1), Assert.Single(gateway.Writes));
         gateway.Emit("STOP", "1");
@@ -196,13 +197,16 @@ public sealed class ShiftSelectionTests
         await Task.Delay(1200);
         Assert.Single(gateway.Writes); // Chute 48 has not reported a state yet.
         Assert.Contains(1, supervisor.FullChuteAlarms);
+        Assert.Empty(supervisor.FullChutesActive);
         gateway.Emit("FULL_48", "1");
+        Assert.Equal(new[] { 48 }, supervisor.FullChutesActive);
         await Task.Delay(1200);
         Assert.Single(gateway.Writes);
         gateway.Emit("FULL_48", "0");
         await Task.Delay(1200);
         Assert.Equal(new[] { 1, 0 }, gateway.Writes.Select(write => write.Value));
         Assert.Equal(new[] { 1, 48 }, supervisor.FullChuteAlarms);
+        Assert.Empty(supervisor.FullChutesActive);
         gateway.Emit("STOP", "0");
         Assert.Empty(supervisor.FullChuteAlarms);
     }

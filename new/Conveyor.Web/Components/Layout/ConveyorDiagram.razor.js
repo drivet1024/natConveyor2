@@ -20,6 +20,7 @@ export function create(svg) {
     const destinationLayer = svg.querySelector('[data-destination-layer]');
     const highlights = new Map();
     let traffic = new Map();
+    let fullChutes = new Set();
     let destinationsDirty = false;
     const paths = new Map();
     const parcels = new Map();
@@ -70,9 +71,9 @@ export function create(svg) {
         for (const parcel of parcels.values()) counts.set(parcel.chute, (counts.get(parcel.chute) ?? 0) + 1);
         const maximum = Math.max(0, ...[...traffic].filter(([chute]) => svg.querySelector(`#chute-${chute}-path`) || chute === 98).map(([, count]) => count));
         for (const [chute, highlight] of highlights) {
-            if (!counts.has(chute) && !traffic.has(chute)) { highlight.group.remove(); highlights.delete(chute); }
+            if (!counts.has(chute) && !traffic.has(chute) && !fullChutes.has(chute)) { highlight.group.remove(); highlights.delete(chute); }
         }
-        for (const chute of new Set([...counts.keys(), ...traffic.keys()])) {
+        for (const chute of new Set([...counts.keys(), ...traffic.keys(), ...fullChutes])) {
             const count = counts.get(chute) ?? 0;
             const recent = traffic.get(chute) ?? 0;
             let highlight = highlights.get(chute);
@@ -102,9 +103,11 @@ export function create(svg) {
                 highlight = {group,badge,text,glow,background};
                 highlights.set(chute,highlight);
             }
-            const color = trafficColor(recent, maximum);
+            const full = fullChutes.has(chute);
+            const color = full ? '#ff4e5b' : trafficColor(recent, maximum);
             highlight.glow.setAttribute('stroke', color);
-            highlight.glow.setAttribute('stroke-opacity', recent > 0 ? .25 + .2 * Math.min(1, recent / maximum) : 0);
+            highlight.glow.setAttribute('stroke-opacity', full ? .9 : recent > 0 ? .25 + .2 * Math.min(1, recent / maximum) : 0);
+            highlight.group.setAttribute('data-chute-full', String(full));
             highlight.background.setAttribute('fill', color);
             highlight.background.setAttribute('stroke', color);
             highlight.group.setAttribute('data-traffic-15-minutes', recent);
@@ -132,9 +135,10 @@ export function create(svg) {
         tick(now);
         if (running && parcels.size) frame = requestAnimationFrame(animate);
     }
-    function update(isRunning, station1, station2, traffic15Minutes = {}) {
+    function update(isRunning, station1, station2, traffic15Minutes = {}, activeFullChutes = []) {
         if (disposed) return;
         traffic = new Map(Object.entries(traffic15Minutes).map(([chute, count]) => [Number(chute), Number(count)]).filter(([, count]) => count > 0));
+        fullChutes = new Set(activeFullChutes.map(Number));
         destinationsDirty = true;
         tick(performance.now()); // Settle the previous running interval before changing state.
         running = isRunning;

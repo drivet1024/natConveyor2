@@ -14,7 +14,7 @@
 
 <section class="map-panel" aria-label="Schéma du convoyeur du haut de St-Hubert">
     <div class="map-toolbar">
-        <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span>→ Sens de circulation</span></div>
+        <div class="map-legend"><span><i class="belt-key"></i>Convoyeur</span><span><i class="camera-key"></i>Lecture</span><span style="color:#ff4e5b">● Chute pleine</span><span>→ Sens de circulation</span></div>
         <label class="map-shift">Shift d’affichage
             <select @bind:get="_displayShift" @bind:set="ChangeDisplayShift" disabled="@(_shifts.Count == 0)" title="Consulter les destinations sans modifier le shift du tri">
                 @if (!_shifts.Any(shift => shift.Id == _displayShift))
@@ -34,7 +34,7 @@
         }
     </div>
     <div class="map-viewport" aria-label="Vue complète du convoyeur">
-        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Traffic15Minutes="_traffic15Minutes" Station1Dispatch="_station1" Station2Dispatch="_station2" Station1Parcels="_parcels1" Station2Parcels="_parcels2" /></div>
+        <div class="map-canvas"><ConveyorDiagram Destinations="_destinations" DestinationStatus="@_destinationStatus" Running="_running" Counts="_counts" Traffic15Minutes="_traffic15Minutes" FullChutes="_fullChutes" Station1Dispatch="_station1" Station2Dispatch="_station2" Station1Parcels="_parcels1" Station2Parcels="_parcels2" /></div>
     </div>
     <p style="padding:0 1rem;color:var(--muted);font-size:.8rem"><span style="display:inline-block;width:5rem;height:.6rem;background:linear-gradient(to right,#a5ddff 20%,#ffe066 60%,#f58220);border-radius:3px"></span> Trafic sur 15 min · bleu pâle : faible · jaune : intermédiaire · orange : élevé, par rapport à la chute la plus chargée · envois automate confirmés</p>
 </section>
@@ -43,6 +43,7 @@
 
 @code {
     private bool _running;
+    private IReadOnlyList<int> _fullChutes = [];
     private IReadOnlyDictionary<int, long> _traffic15Minutes = new Dictionary<int, long>();
     private IReadOnlyDictionary<int, long> _counts = new Dictionary<int, long>();
     private DateTimeOffset? _station1, _station2;
@@ -52,6 +53,7 @@
     {
         if (Supervisor.ConveyorId != 1) return;
         var lines = Supervisor.GetSnapshots();
+        _fullChutes = Supervisor.FullChutesActive;
         _traffic15Minutes = lines.SelectMany(line => line.ChuteTraffic15Minutes ?? new Dictionary<int, long>())
             .GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
         _running = Supervisor.ConveyorRunning == true && lines.Any(line => line.Connections.Plc && line.Running);
