@@ -1,15 +1,18 @@
 $ErrorActionPreference = 'Stop'
-# Load only the retry function, without invoking deployment or scheduled tasks.
+# Load only file helpers, without invoking deployment or scheduled tasks.
 $parseTokens = $null
 $parseErrors = $null
 $tree = [Management.Automation.Language.Parser]::ParseFile(
     (Join-Path $PSScriptRoot 'Deploy-Conveyor.ps1'), [ref]$parseTokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
-$function = $tree.Find({ param($node)
-    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
-    $node.Name -eq 'Invoke-ConveyorFileOperation'
-}, $true)
-. ([scriptblock]::Create($function.Extent.Text))
+foreach ($name in @('Invoke-ConveyorFileOperation', 'Test-ConveyorFileChanged')) {
+    $function = $tree.Find({ param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq $name
+    }, $true)
+    if (-not $function) { throw "Missing function: $name" }
+    . ([scriptblock]::Create($function.Extent.Text))
+}
 
 Add-Type -TypeDefinition @'
 using System.IO;
@@ -23,7 +26,27 @@ public static class ConveyorLockTest {
 }
 '@
 $testFile = [IO.Path]::GetTempFileName()
+$sourceFile = [IO.Path]::GetTempFileName()
 try {
+    [IO.File]::WriteAllText($sourceFile, 'same content')
+    [IO.File]::WriteAllText($testFile, 'same content')
+    [IO.File]::SetLastWriteTimeUtc($testFile, [DateTime]::UtcNow.AddDays(-1))
+    if (Test-ConveyorFileChanged -SourceFile $sourceFile -TargetFile $testFile) {
+        throw 'Identical content with different timestamps must not be copied.'
+    }
+    [IO.File]::WriteAllText($testFile, 'edit content')
+    [IO.File]::SetLastWriteTimeUtc($testFile, [IO.File]::GetLastWriteTimeUtc($sourceFile))
+    if (-not (Test-ConveyorFileChanged -SourceFile $sourceFile -TargetFile $testFile)) {
+        throw 'Different content with identical size and timestamp must be copied.'
+    }
+    [IO.File]::WriteAllText($testFile, 'short')
+    if (-not (Test-ConveyorFileChanged -SourceFile $sourceFile -TargetFile $testFile)) {
+        throw 'Different sizes must be copied.'
+    }
+    if (-not (Test-ConveyorFileChanged -SourceFile $sourceFile -TargetFile ($testFile + '.missing'))) {
+        throw 'Missing destination must be copied.'
+    }
+
     $lock = [ConveyorLockTest]::HoldAsync($testFile)
     Invoke-ConveyorFileOperation -TargetPath $testFile -TimeoutSeconds 5 -Operation {
         [IO.File]::WriteAllText($testFile, 'retry succeeded')
@@ -56,6 +79,6 @@ try {
     }
     catch [UnauthorizedAccessException] { $failed = $true }
     if (-not $failed) { throw 'Access denied was ignored.' }
-    Write-Host 'PASS: temporary lock, persistent lock, unchanged file, access denied.'
+    Write-Host 'PASS: content comparison, missing destination, temporary lock, persistent lock, unchanged file, access denied.'
 }
-finally { Remove-Item -LiteralPath $testFile -Force }
+finally { Remove-Item -LiteralPath $testFile,$sourceFile -Force }

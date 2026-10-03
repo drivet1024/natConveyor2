@@ -66,6 +66,27 @@ avant ce premier déploiement. Le script n'arrête que l'exécutable du dossier 
 
 ## Mises à jour suivantes
 
+### Compilation et déploiement accélérés
+
+Le workflow restaure les dépendances pour l'architecture choisie (`win-x86` ou
+`win-x64`) et les garde dans un cache NuGet entre les exécutions. Il compile une
+seule fois en Release, exécute les tests sur cette architecture, puis publie ces
+mêmes binaires avec `--no-build --no-restore`. La publication inclut toujours le
+runtime .NET : aucun SDK ni runtime à installer sur les convoyeurs. Le paquet
+utilise une compression légère (niveau 1) pour réduire le travail d'archivage.
+
+Après l'arrêt et la vérification des verrous, le script compare la taille et le
+SHA-256 des fichiers, puis copie uniquement ceux dont le contenu a changé. Les
+dates d'extraction du paquet ne déclenchent pas de recopies inutiles du runtime.
+Les configurations locales restent exclues, les tests restent obligatoires et
+le contrôle HTTP après redémarrage est conservé. Le journal indique le nombre
+de fichiers copiés. Le gain dépend du cache, des changements et des serveurs ;
+la première exécution doit encore alimenter le cache.
+
+Voir les options de [publication .NET](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-publish),
+le [cache GitHub Actions](https://github.com/actions/cache) et la
+[compression des artefacts](https://github.com/actions/upload-artifact).
+
 Un push sur `main` suffit : compilation et tests sur GitHub, téléchargement puis
 redémarrage sur le serveur. Plus besoin de copier les scripts ou les binaires à la main.
 La compilation est unique, puis deux jobs déploient le même paquet :

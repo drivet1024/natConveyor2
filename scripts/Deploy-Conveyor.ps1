@@ -39,6 +39,16 @@ function Get-ConveyorDeploymentProcess {
         }
     }
 }
+
+function Test-ConveyorFileChanged {
+    param([Parameter(Mandatory)][string]$SourceFile,
+          [Parameter(Mandatory)][string]$TargetFile)
+    if (-not [IO.File]::Exists($TargetFile)) { return $true }
+    if ([IO.FileInfo]::new($SourceFile).Length -ne [IO.FileInfo]::new($TargetFile).Length) { return $true }
+    # Artifact extraction changes timestamps; compare contents instead.
+    return (Get-FileHash -LiteralPath $SourceFile -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath $TargetFile -Algorithm SHA256).Hash
+}
 if ([string]::IsNullOrWhiteSpace($TaskName)) { throw 'CONVEYOR_TASK_NAME est obligatoire.' }
 if (-not $HealthUrl.IsAbsoluteUri -or $HealthUrl.Scheme -notin @('http', 'https')) {
     throw 'CONVEYOR_HEALTH_URL doit être une URL HTTP(S) absolue.'
@@ -66,12 +76,13 @@ if (-not (Test-Path -LiteralPath (Join-Path $destination 'appsettings.json'))) {
 $files = @(Get-ChildItem -LiteralPath $source -Recurse -File | Where-Object {
     $_.Name -notlike 'appsettings*.json' -and $_.Name -notlike 'conveyor.settings.json*'
 })
-foreach ($file in $files) {
+$deploymentFiles = @(foreach ($file in $files) {
     $target = Join-Path $destination ([IO.Path]::GetRelativePath($source, $file.FullName))
     if (-not [IO.Path]::GetFullPath($target).StartsWith($destination + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Un fichier sort du dossier de déploiement.'
     }
-}
+    [pscustomobject]@{ Source = $file.FullName; Target = $target }
+})
 
 if (-not $task.Settings.Enabled) { throw 'La tâche Conveyor est désactivée. La réactiver avant le déploiement.' }
 # Capture handles before stopping the task: a terminating process can disappear
@@ -102,8 +113,8 @@ try {
     } while ($processes.Count -gt 0 -or $taskRunning)
 
     # Check all existing targets before modifying any file.
-    foreach ($file in $files) {
-        $target = Join-Path $destination ([IO.Path]::GetRelativePath($source, $file.FullName))
+    foreach ($file in $deploymentFiles) {
+        $target = $file.Target
         if (Test-Path -LiteralPath $target) {
             Invoke-ConveyorFileOperation -TargetPath $target -Operation {
                 $handle = [IO.File]::Open($target, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
@@ -111,11 +122,15 @@ try {
             }
         }
     }
-    foreach ($file in $files) {
-        $target = Join-Path $destination ([IO.Path]::GetRelativePath($source, $file.FullName))
+    $changedFiles = @($deploymentFiles | Where-Object {
+        Test-ConveyorFileChanged -SourceFile $_.Source -TargetFile $_.Target
+    })
+    Write-Host "Copie de $($changedFiles.Count) fichiers modifies sur $($deploymentFiles.Count)."
+    foreach ($file in $changedFiles) {
+        $target = $file.Target
         New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
         Invoke-ConveyorFileOperation -TargetPath $target -Operation {
-            [IO.File]::Copy($file.FullName, $target, $true)
+            [IO.File]::Copy($file.Source, $target, $true)
         }
     }
 }

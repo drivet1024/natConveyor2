@@ -56,20 +56,35 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restaurer
+      - name: Reutiliser les packages NuGet
+        # Cache packages only: binaries are rebuilt from the current checkout.
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-net10-${{ inputs.architecture }}-${{ hashFiles('new/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-net10-${{ inputs.architecture }}-
+
+      - name: Restaurer les dependances
         run: |
-          dotnet restore new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj
+          dotnet restore new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj `
+            --runtime "${{ inputs.architecture }}" `
+            -p:SelfContained=true
 
       - name: Compiler
         run: |
           dotnet build new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj `
             --configuration Release `
+            --runtime "${{ inputs.architecture }}" `
+            --self-contained true `
             --no-restore
 
       - name: Tester
         run: |
           dotnet test new/Conveyor.Web.Tests/Conveyor.Web.Tests.csproj `
             --configuration Release `
+            --runtime "${{ inputs.architecture }}" `
+            -p:SelfContained=true `
             --no-build `
             --logger trx `
             --results-directory "$env:RUNNER_TEMP/conveyor-tests/$env:GITHUB_RUN_ID"
@@ -80,6 +95,8 @@ jobs:
             --configuration Release `
             --runtime "${{ inputs.architecture }}" `
             --self-contained true `
+            --no-build `
+            --no-restore `
             --output "$env:RUNNER_TEMP/conveyor-package/app"
 
       - name: Verifier les verrous de deploiement
@@ -102,6 +119,7 @@ jobs:
         with:
           name: conveyor-windows-${{ inputs.architecture }}
           retention-days: 7
+          compression-level: 1
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/conveyor-package/
