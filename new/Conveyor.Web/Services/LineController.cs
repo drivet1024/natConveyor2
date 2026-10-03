@@ -19,6 +19,7 @@ internal sealed class LineController
     private readonly Action _changed;
     private readonly ISmsAlerts? _sms;
     private readonly bool _automaticCounterReset;
+    private readonly AxisParcelEvents? _axisEvents;
     private CancellationTokenSource? _stopping;
     private List<Task> _tasks = [];
     private TcpFrameReceiver? _cameraReceiver;
@@ -159,7 +160,8 @@ internal sealed class LineController
 
     public LineController(LineOptions options, bool simulation, IConveyorRepository repository, IPlcGateway plc,
         bool controlsPlcConnection,
-        SortEngine sortEngine, ILogger logger, Action changed, ISmsAlerts? sms = null, bool automaticCounterReset = true)
+        SortEngine sortEngine, ILogger logger, Action changed, ISmsAlerts? sms = null, bool automaticCounterReset = true,
+        AxisParcelEvents? axisEvents = null)
     {
         _options = options;
         _simulation = simulation;
@@ -171,6 +173,7 @@ internal sealed class LineController
         _changed = changed;
         _sms = sms;
         _automaticCounterReset = automaticCounterReset;
+        _axisEvents = axisEvents;
         // With scheduled capture enabled, a startup before today's reset must still
         // reset today, otherwise tomorrow's snapshot would contain two shifts.
         var now = DateTime.Now;
@@ -600,7 +603,11 @@ internal sealed class LineController
             catch (Exception plcException) { _plcConnected = false; _logger.LogError(plcException, "Automate indisponible"); }
         }
         if (finalDispatchedChute is { } sentChute)
+        {
             lock (_gate) parcelCounters.ChuteDispatchCounts[sentChute] = parcelCounters.ChuteDispatchCounts.GetValueOrDefault(sentChute) + 1;
+            var parcelNumber = !string.IsNullOrWhiteSpace(classifiedDecision?.Barcode) ? classifiedDecision.Barcode : $"colis-{parcel.ParcelId}";
+            _axisEvents?.Publish(new(_options.Id, parcel.ParcelId, parcelNumber, sentChute, parcel.CameraTimestamp));
+        }
         if (!successfullySortedByPostalCode && classifiedDecision is { } classification)
             lock (_gate)
             {

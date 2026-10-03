@@ -228,7 +228,7 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
     public ConveyorSupervisor(IOptions<ConveyorOptions> options, IConveyorRepository repository,
         SortEngine sortEngine, ILoggerFactory loggerFactory, IConfigurationEditor editor, ISmsAlerts? sms = null,
         CounterStatisticsService? statistics = null, IRslinxRestarter? rslinxRestarter = null,
-        IPlcGateway? plcGateway = null)
+        IPlcGateway? plcGateway = null, AxisParcelEvents? axisEvents = null)
     {
         var configuration = options.Value;
         _configuration = configuration;
@@ -282,7 +282,8 @@ public sealed class ConveyorSupervisor : BackgroundService, IConveyorSupervisor
             var controller = new LineController(line, configuration.Simulation, repository, _plc,
                 line.Id == primaryLine.Id, sortEngine,
                 loggerFactory.CreateLogger($"Conveyor.Line.{line.Id}"), () => Changed?.Invoke(), sms,
-                automaticCounterReset: !_coordinateStatistics);
+                automaticCounterReset: !_coordinateStatistics,
+                axisEvents: configuration.AxisCamera.Enabled ? axisEvents : null);
             controller.SetMaintenance(Maintenance);
             return controller;
         });

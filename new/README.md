@@ -1,5 +1,67 @@
 # Conveyor Control
 
+## Caméra Axis et vidéos des colis
+
+La page **Caméra Axis** (`/camera-axis`) affiche le direct de la première caméra
+et les 100 derniers enregistrements, avec recherche par colis ou chute, lecture
+dans la page et téléchargement AVI. Dans **Paramètres**, entrer le NIP de
+configuration, le nom de la caméra, le compte Axis et son mot de passe et le
+répertoire de sauvegarde sur le serveur, puis activer, enregistrer et
+redémarrer Conveyor. L’adresse initiale est `http://10.11.5.6` ; les chutes 24,
+25 et 26 et les deux stations de lecture sont proposées. La caméra reste
+désactivée tant que son compte n’est pas configuré. Le mot de passe enregistré
+n’est jamais affiché ni transmis dans l’URL du direct.
+La case **Enregistrer les colis automatiquement** active ou désactive la collecte
+immédiatement après sauvegarde, sans interrompre le direct. Les autres changements
+de configuration nécessitent un redémarrage. Désactiver termine les vidéos déjà
+commencées en les marquant incomplètes et annule les colis en attente.
+
+Le serveur conserve en mémoire un tampon continu de 10 secondes et enregistre,
+pour chaque colis envoyé à une chute surveillée, les 10 secondes précédant son
+arrivée estimée et les 5 suivantes. La destination utilisée est le dernier envoi
+automate confirmé, après une éventuelle reprise suite à une erreur MySQL. Un
+envoi automate échoué ne déclenche pas de vidéo. Le direct et le tampon sont
+partagés entre les navigateurs ; fermer la page n’arrête pas la collecte.
+
+**La chute physique n’est pas détectée.** L’estimation utilise le passage à la
+station de lecture, le délai configuré par chute et les périodes de marche
+signalées par l’automate. Les arrêts et les états de marche inconnus suspendent
+le trajet. Les valeurs initiales (24 : 96,6 s ; 25 : 93,5 s ; 26 : 90,4 s) sont
+issues du schéma du convoyeur du haut à 240 pieds/minute jusqu’à l’entrée des
+chutes : chronométrer jusqu’à la chute effective et ajuster ces délais dans
+Paramètres. Pour un autre convoyeur, régler tous les délais. Un colis détourné
+mécaniquement ou recirculé sans nouvel envoi ne peut pas être suivi par cette
+estimation. Après un redémarrage, les trajets déjà en cours ne sont pas repris.
+
+Le flux Axis utilise [VAPIX Motion JPEG](https://developer.axis.com/vapix/network-video/video-streaming/)
+avec un compte Viewer ; HTTP utilise Digest et HTTPS utilise Basic avec
+vérification du certificat selon les [méthodes Axis](https://developer.axis.com/vapix/authentication/).
+Vérifier que le modèle propose le flux MJPEG et la résolution sélectionnée.
+Par défaut : 640 × 480, 10 images/s, sans audio. Les JPEG de la caméra sont
+conservés dans un conteneur AVI sans réencodage ; aucun FFmpeg, SDK vidéo ni carte
+mémoire Axis n’est nécessaire sur le serveur. Les vidéos sont lisibles dans la
+page ou dans un lecteur AVI/MJPEG tel que VLC après téléchargement.
+
+Les paramètres `Conveyor.AxisCamera` sont sauvegardés dans le fichier local
+`conveyor.settings.json`, conservé par le déploiement. Un répertoire absolu de
+sauvegarde doit être configuré avant d’activer les enregistrements, par exemple
+`D:\Videos\Axis`. Le compte Windows de Conveyor doit pouvoir y écrire. Choisir un
+dossier hors du dossier publié. Les noms suivent le format
+`no_colis_nom_cam_mm-jj_hh-mm.avi`, par exemple `12345678901_Axis1_10-03_14-35.avi`.
+La date et l’heure locales du serveur correspondent à l’arrivée estimée. Windows
+interdit les deux-points dans les noms ; un suffixe `_02`, `_03`, etc. évite
+d’écraser une vidéo du même colis et de la même caméra à la même minute.
+Les fichiers JSON voisins permettent de retrouver et relire les vidéos ; les
+conserver avec les AVI. Par défaut, supprimer les plus anciennes
+au-delà de 7 jours ou 10 Go ; ces limites sont configurables. La collecte est
+limitée à 16 vidéos simultanées, un tampon de 64 Mio et 4096 colis en attente.
+Un démarrage récent, une perte d’images ou un arrêt de l’application peut produire
+une fenêtre incomplète, explicitement identifiée. Une vidéo manquée est comptée
+et signalée ; aucune panne vidéo ne bloque le tri. Les tests de simulation sont
+identifiés dans la liste. Les réglages de la caméra sont protégés par le NIP,
+mais le direct et les vidéos sont accessibles aux utilisateurs du réseau ayant
+accès à l’application, comme les autres pages de supervision.
+
 ## Historique de cadence
 
 La cadence globale de production est calculée sur des intervalles de dix minutes,

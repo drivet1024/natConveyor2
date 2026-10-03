@@ -43,6 +43,7 @@ builder.Services.AddOptions<ConveyorOptions>()
     .Bind(builder.Configuration.GetSection(ConveyorOptions.SectionName))
     .PostConfigure(options => options.ApplyGlobalSorting())
     .ValidateDataAnnotations()
+    .Validate(options => options.AxisCamera.ValidationError() is null, "Paramètres de la caméra Axis invalides.")
     .Validate(options => options.Statistics.ValidationError(options.GetConfiguredLines()) is null,
         "Statistiques : vérifier les horaires du shift, de sauvegarde et de remise à zéro.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.General?.ConveyorStartTag), "Le tag de démarrage du convoyeur est obligatoire.")
@@ -87,11 +88,15 @@ builder.Services.AddSingleton<DatabaseMetricsService>();
 builder.Services.AddSingleton<IDatabaseMetricsService>(services => services.GetRequiredService<DatabaseMetricsService>());
 builder.Services.AddHostedService(services => services.GetRequiredService<DatabaseMetricsService>());
 builder.Services.AddSingleton<ConveyorSupervisor>();
+builder.Services.AddSingleton<AxisParcelEvents>();
+builder.Services.AddSingleton<AxisRecordingStore>();
+builder.Services.AddSingleton<AxisCameraService>();
 builder.Services.AddSingleton<ICounterStatisticsStore, CounterStatisticsStore>();
 builder.Services.AddSingleton<CounterStatisticsService>();
 builder.Services.AddSingleton<StatisticsHistoryService>();
 builder.Services.AddSingleton<IConveyorSupervisor>(services => services.GetRequiredService<ConveyorSupervisor>());
 builder.Services.AddHostedService(services => services.GetRequiredService<ConveyorSupervisor>());
+builder.Services.AddHostedService(services => services.GetRequiredService<AxisCameraService>());
 builder.Services.AddHostedService<PlcRecoveryMonitor>();
 builder.Services.AddSingleton<CadenceHistoryService>();
 builder.Services.AddHostedService(services => services.GetRequiredService<CadenceHistoryService>());
@@ -131,6 +136,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapGet("/api/lines", (IConveyorSupervisor supervisor) => supervisor.GetSnapshots());
+app.MapAxisCamera();
 app.MapGet("/api/logs", (ILogStore logs) => logs.GetRecent());
 app.MapPost("/api/lines/{lineId:int}/start", async (int lineId, IConveyorSupervisor supervisor) => { await supervisor.StartLineAsync(lineId); return Results.NoContent(); });
 app.MapPost("/api/lines/{lineId:int}/restart", async (int lineId, IConveyorSupervisor supervisor) => { await supervisor.RestartLineAsync(lineId); return Results.NoContent(); });

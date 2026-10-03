@@ -14,6 +14,7 @@ public sealed class ConveyorOptions
     public StatisticsOptions Statistics { get; set; } = new();
     public OperatorKpiOptions OperatorKpis { get; set; } = new();
     public RslinxRestartOptions RslinxRestart { get; set; } = new();
+    public AxisCameraOptions AxisCamera { get; set; } = new();
     public GeneralOptions? General { get; set; }
     public SortingOptions? Sorting { get; set; }
     [MinLength(1), MaxLength(2)] public List<LineOptions> Lines { get; set; } = [];

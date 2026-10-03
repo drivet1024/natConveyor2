@@ -12,6 +12,33 @@ namespace Conveyor.Web.Tests;
 public sealed class SortEngineTests
 {
     [Theory]
+    [InlineData(false, false, 24)]
+    [InlineData(true, false, 16)]
+    [InlineData(false, true, 0)]
+    public async Task AxisReceivesOnlyFinalConfirmedDestination(bool databaseFailure, bool plcFailure, int expectedChute)
+    {
+        var repository = new FakeRepository { RouteChute = 24, FailSave = databaseFailure };
+        var events = new AxisParcelEvents();
+        var line = Line(); line.CorrelationDelayMs = 0;
+        var controller = new LineController(line, true, repository, new MotionPlc { FailWrite = plcFailure }, false,
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { }, axisEvents: events);
+        try
+        {
+            await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);
+            if (plcFailure) Assert.False(events.TryRead(out _));
+            else
+            {
+                Assert.True(events.TryRead(out var parcel));
+                Assert.Equal(expectedChute, parcel!.Chute);
+                Assert.Equal("12345678901", parcel.Barcode);
+                Assert.Equal(0, parcel.LineId);
+                Assert.False(events.TryRead(out _));
+            }
+        }
+        finally { await controller.StopAsync(); }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void CounterResetClearsEveryPopupForCurrentMode(bool maintenance)

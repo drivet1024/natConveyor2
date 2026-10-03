@@ -11,6 +11,7 @@ public interface IConfigurationEditor
     Task SaveAsync(ConveyorOptions options, string? newConnectionString, CancellationToken cancellationToken = default);
     Task SaveShiftAsync(int shiftId);
     Task SaveMaintenanceAsync(bool maintenance) => Task.CompletedTask;
+    Task SaveAxisCameraAsync(AxisCameraOptions options) => throw new NotSupportedException();
     string FilePath { get; }
 }
 
@@ -54,6 +55,23 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
     public Task SaveShiftAsync(int shiftId) => SaveGeneralValueAsync("ShiftId", JsonValue.Create(shiftId));
     public Task SaveMaintenanceAsync(bool maintenance) => SaveGeneralValueAsync("Maintenance", JsonValue.Create(maintenance));
 
+    public async Task SaveAxisCameraAsync(AxisCameraOptions options)
+    {
+        if (options.ValidationError() is { } error) throw new InvalidOperationException(error);
+        await _writeGate.WaitAsync();
+        try
+        {
+            var nodeOptions = new JsonNodeOptions { PropertyNameCaseInsensitive = true };
+            var document = File.Exists(FilePath) ? JsonNode.Parse(await File.ReadAllTextAsync(FilePath), nodeOptions)!.AsObject() : new JsonObject(nodeOptions);
+            var conveyor = document[ConveyorOptions.SectionName] as JsonObject;
+            if (conveyor is null) document[ConveyorOptions.SectionName] = conveyor = new JsonObject(nodeOptions);
+            var key = conveyor.Select(pair => pair.Key).FirstOrDefault(key => string.Equals(key, "AxisCamera", StringComparison.OrdinalIgnoreCase)) ?? "AxisCamera";
+            conveyor[key] = JsonSerializer.SerializeToNode(options, JsonOptions);
+            await WriteDocumentAsync(document, CancellationToken.None);
+        }
+        finally { _writeGate.Release(); }
+    }
+
     private async Task SaveGeneralValueAsync(string property, JsonNode value)
     {
         await _writeGate.WaitAsync();
@@ -91,6 +109,7 @@ public sealed class ConfigurationEditor(IOptions<ConveyorOptions> current, IWebH
 
     private static void Validate(ConveyorOptions options)
     {
+        if (options.AxisCamera.ValidationError() is { } axisError) throw new InvalidOperationException(axisError);
         if (options.OperatorKpis.ValidationError() is { } kpiError)
             throw new InvalidOperationException(kpiError);
         if (options.Sms.ValidationError() is { } smsError) throw new InvalidOperationException(smsError);
