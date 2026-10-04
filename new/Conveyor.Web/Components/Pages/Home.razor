@@ -68,6 +68,11 @@
     </div>
 </header>
 
+@if (Supervisor.ConveyorId == 1)
+{
+    <TemporaryParcelSimulation />
+}
+
 @if (_resetDataMessage is not null)
 {
     <div class="config-notice error" role="status">@_resetDataMessage</div>

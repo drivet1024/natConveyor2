@@ -1,0 +1,44 @@
+@implements IAsyncDisposable
+@inject RecordingWebhookService Webhook
+
+<section class="temporary-parcel-test" aria-label="Test temporaire du webhook">
+    <div><strong>Test temporaire · camtest</strong><span>Colis simulé vers la chute 24 · arrivée dans 15 s · aucune commande automate</span></div>
+    <button type="button" class="btn" disabled="@_active" @onclick="Simulate">@(_active ? "Simulation en cours…" : "Simuler un colis → chute 24")</button>
+    @if (_message is not null) { <p role="status">@_message</p> }
+    @if (_error is not null) { <p class="test-error" role="alert">@_error</p> }
+    @if (_connectionError is not null) { <p class="test-error" role="alert">@_connectionError</p> }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _refresh;
+    private bool _active;
+    private string? _message, _error, _connectionError;
+    protected override void OnInitialized() => _active = Webhook.SimulationActive;
+    protected override Task OnAfterRenderAsync(bool firstRender) { if (firstRender) _refresh = RefreshAsync(); return Task.CompletedTask; }
+    private void Simulate()
+    {
+        _error = null; _message = null;
+        try
+        {
+            var simulation = Webhook.SimulateChute24(); _active = true;
+            _message = $"Colis {simulation.Barcode} · arrivée simulée à {simulation.ArrivalAt.ToLocalTime():HH:mm:ss}. camtest conservera 10 s avant et 5 s après. Le test fonctionne même si le convoyeur est arrêté.";
+        }
+        catch (InvalidOperationException error) { _error = error.Message; }
+    }
+    private async Task RefreshAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_lifetime.Token)) await InvokeAsync(() =>
+            {
+                _active = Webhook.SimulationActive;
+                _connectionError = Webhook.Status.Error;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+    }
+    public async ValueTask DisposeAsync() { await _lifetime.CancelAsync(); if (_refresh is not null) await _refresh; _lifetime.Dispose(); }
+}

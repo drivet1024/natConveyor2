@@ -1,0 +1,2 @@
+.temporary-parcel-test{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:0 0 1rem;padding:1rem;border:1px dashed var(--border,#526375);border-radius:12px;background:var(--panel,#142431)}
+.temporary-parcel-test>div{display:flex;flex-direction:column;gap:.35rem;flex:1}.temporary-parcel-test span,.temporary-parcel-test p{font-size:.9rem;color:var(--muted)}.temporary-parcel-test p{margin:0;width:100%}.temporary-parcel-test .test-error{color:#ffcf78}

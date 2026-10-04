@@ -13,6 +13,55 @@ namespace Conveyor.Web.Tests;
 public sealed class RecordingWebhookTests
 {
     [Fact]
+    public void TemporarySimulationRunsWhileStoppedAndUsesExistingWebhookWindow()
+    {
+        var options = new ConveyorOptions { Simulation = false, Lines = [new() { Id = 0 }], RecordingWebhook = new() { Enabled = true, WebhookKey = new string('x', 32) } };
+        options.ApplyGlobalSorting();
+        var settings = Microsoft.Extensions.Options.Options.Create(options);
+        var events = new ParcelRecordingEvents(); var repository = new SimulationConveyorRepository();
+        using var supervisor = new ConveyorSupervisor(settings, repository, new SortEngine(repository, NullLogger<SortEngine>.Instance),
+            NullLoggerFactory.Instance, new TestConfigurationEditor());
+        using var sender = new RecordingWebhookService(settings, supervisor, events);
+        var now = DateTimeOffset.UtcNow;
+        var previousMotion = supervisor.ConveyorRunning;
+        var test = sender.SimulateChute24(now);
+        Assert.StartsWith("SIM-24-", test.Barcode);
+        Assert.Equal(now.AddSeconds(15), test.ArrivalAt);
+        Assert.Empty(sender.NextMessage(now).Jobs);
+        var approaching = Assert.Single(sender.NextMessage(now.AddSeconds(3)).Jobs);
+        Assert.Equal(24, approaching.Parcel.Chute);
+        Assert.Equal(test.Barcode, approaching.Parcel.Barcode);
+        Assert.True(approaching.Simulated); Assert.False(approaching.Arrived);
+        Assert.Throws<InvalidOperationException>(() => sender.SimulateChute24(now.AddSeconds(4)));
+        var arrived = Assert.Single(sender.NextMessage(now.AddSeconds(15)).Jobs);
+        Assert.True(arrived.Arrived); Assert.True(arrived.Simulated); Assert.Equal(approaching.Id, arrived.Id);
+        Assert.Single(sender.NextMessage(now.AddSeconds(20)).Jobs);
+        Assert.Empty(sender.NextMessage(now.AddSeconds(21)).Jobs);
+        Assert.Equal(previousMotion, supervisor.ConveyorRunning);
+        Assert.Equal(96.6, options.RecordingWebhook.TravelSeconds[24]);
+        sender.SimulateChute24(now.AddSeconds(22));
+        sender.SetRecordingEnabled(false);
+        Assert.Empty(sender.NextMessage(now.AddSeconds(26)).Jobs);
+    }
+
+    [Fact]
+    public void TemporarySimulationRequiresEnabledWebhookAndConfiguredChute24()
+    {
+        var options = new ConveyorOptions { Simulation = true, Lines = [new() { Id = 0 }] }; options.ApplyGlobalSorting();
+        var settings = Microsoft.Extensions.Options.Options.Create(options);
+        var repository = new SimulationConveyorRepository();
+        using var supervisor = new ConveyorSupervisor(settings, repository, new SortEngine(repository, NullLogger<SortEngine>.Instance),
+            NullLoggerFactory.Instance, new TestConfigurationEditor());
+        using var sender = new RecordingWebhookService(settings, supervisor, new());
+        Assert.Throws<InvalidOperationException>(() => sender.SimulateChute24());
+        options.RecordingWebhook.Enabled = true;
+        Assert.Throws<InvalidOperationException>(() => sender.SimulateChute24());
+        options.RecordingWebhook.WebhookKey = new string('x', 32);
+        options.RecordingWebhook.TravelSeconds.Remove(24);
+        Assert.Throws<InvalidOperationException>(() => sender.SimulateChute24());
+    }
+
+    [Fact]
     public async Task SenderPostsAuthenticatedScheduleAndCancellationWithoutBlockingSorting()
     {
         var builder = WebApplication.CreateBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");

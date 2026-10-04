@@ -2,6 +2,14 @@
 
 ## Webhook des enregistrements de colis
 
+Un bouton temporaire **Simuler un colis → chute 24** est affiché sur la page
+Contrôle du convoyeur du haut. Il crée un colis `SIM-24-…`, marqué simulation
+dans camtest, avec une arrivée accélérée après 15 secondes. Le test utilise le
+webhook configuré et sa fenêtre vidéo habituelle (10 s avant, 5 s après), même
+convoyeur arrêté. Il ne passe pas par le tri, les compteurs, la base de données
+ou l’automate. Un seul test peut être en cours ; le webhook et l’enregistrement
+doivent être activés et la chute 24 configurée. Les délais réels sont conservés.
+
 Le projet convoyeur ne contient aucune page caméra, aucun lecteur vidéo et aucun
 code de capture ou de stockage vidéo. Ces fonctions appartiennent à **camtest**.
 Le convoyeur transmet uniquement les notifications nécessaires au récepteur sur
