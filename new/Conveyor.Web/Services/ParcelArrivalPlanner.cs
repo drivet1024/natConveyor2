@@ -2,14 +2,21 @@ using Conveyor.Web.Options;
 
 namespace Conveyor.Web.Services;
 
-internal sealed record AxisArrival(AxisParcelEvent Parcel, DateTimeOffset At);
+internal sealed record ParcelArrival(ParcelRecordingEvent Parcel, DateTimeOffset At);
 
-internal sealed class AxisArrivalPlanner(DateTimeOffset startedAt)
+internal sealed class ParcelArrivalPlanner(DateTimeOffset startedAt)
 {
     private readonly List<(DateTimeOffset At, bool Running)> _motion = [(startedAt, false)];
-    private readonly List<AxisParcelEvent> _pending = [];
+    private readonly List<ParcelRecordingEvent> _pending = [];
     public int Count => _pending.Count;
     public void Clear() => _pending.Clear();
+    public IReadOnlyList<ParcelArrival> Upcoming(DateTimeOffset now, RecordingWebhookOptions options)
+    {
+        if (!_motion[^1].Running) return [];
+        return _pending.Select(parcel => new ParcelArrival(parcel,
+            now.AddSeconds(Math.Max(0, options.TravelSeconds[parcel.Chute] - RunningSeconds(parcel.ReadAt, now)))))
+            .Where(arrival => arrival.At <= now.AddSeconds(12)).ToArray();
+    }
 
     public void SetRunning(bool running, DateTimeOffset at)
     {
@@ -19,7 +26,7 @@ internal sealed class AxisArrivalPlanner(DateTimeOffset startedAt)
         while (_motion.Count > 2 && _motion[1].At < at.AddDays(-1)) _motion.RemoveAt(0);
     }
 
-    public bool Schedule(AxisParcelEvent parcel, AxisCameraOptions options)
+    public bool Schedule(ParcelRecordingEvent parcel, RecordingWebhookOptions options)
     {
         if (!options.RecordParcels || !options.LineIds.Contains(parcel.LineId) || !options.TravelSeconds.ContainsKey(parcel.Chute)) return false;
         if (_pending.Count >= 4096) throw new InvalidOperationException("Trop de colis en attente de vidéo.");
@@ -27,10 +34,10 @@ internal sealed class AxisArrivalPlanner(DateTimeOffset startedAt)
         return true;
     }
 
-    public IReadOnlyList<AxisArrival> Arrivals(DateTimeOffset now, AxisCameraOptions options)
+    public IReadOnlyList<ParcelArrival> Arrivals(DateTimeOffset now, RecordingWebhookOptions options)
     {
         var arrived = _pending.Select(parcel => (Parcel: parcel, At: ArrivalTime(parcel.ReadAt, options.TravelSeconds[parcel.Chute], now)))
-            .Where(item => item.At.HasValue).Select(item => new AxisArrival(item.Parcel, item.At!.Value)).ToArray();
+            .Where(item => item.At.HasValue).Select(item => new ParcelArrival(item.Parcel, item.At!.Value)).ToArray();
         foreach (var arrival in arrived) _pending.Remove(arrival.Parcel);
         _pending.RemoveAll(parcel => parcel.ReadAt < now.AddDays(-1));
         return arrived;

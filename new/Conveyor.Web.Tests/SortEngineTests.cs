@@ -15,13 +15,13 @@ public sealed class SortEngineTests
     [InlineData(false, false, 24)]
     [InlineData(true, false, 16)]
     [InlineData(false, true, 0)]
-    public async Task AxisReceivesOnlyFinalConfirmedDestination(bool databaseFailure, bool plcFailure, int expectedChute)
+    public async Task RecordingWebhookReceivesOnlyFinalConfirmedDestination(bool databaseFailure, bool plcFailure, int expectedChute)
     {
         var repository = new FakeRepository { RouteChute = 24, FailSave = databaseFailure };
-        var events = new AxisParcelEvents();
+        var events = new ParcelRecordingEvents();
         var line = Line(); line.CorrelationDelayMs = 0;
         var controller = new LineController(line, true, repository, new MotionPlc { FailWrite = plcFailure }, false,
-            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { }, axisEvents: events);
+            new SortEngine(repository, NullLogger<SortEngine>.Instance), NullLogger.Instance, () => { }, recordingEvents: events);
         try
         {
             await controller.SimulateAsync("12345678901", new(12, 8, 5), 4.75m);

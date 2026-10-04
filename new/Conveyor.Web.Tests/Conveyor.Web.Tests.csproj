@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
-    <EmbeddedResource Include="Fixtures/axis-test-frame.jpg" />
   </ItemGroup>
 
   <ItemGroup>
